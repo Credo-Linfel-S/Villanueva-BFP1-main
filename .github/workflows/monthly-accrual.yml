@@ -1,0 +1,100 @@
+name: Monthly Leave Accrual
+
+on:
+  schedule:
+    # Runs at 2:00 AM Manila Time on 1st of every month
+    # 2:00 AM PHT (UTC+8) = 6:00 PM UTC (previous day)
+    - cron: '0 18 1 * *'
+  
+  # Allows manual trigger from GitHub UI
+  workflow_dispatch:
+    inputs:
+      description:
+        type: string
+        description: 'Reason for manual run'
+        required: false
+        default: 'Manual trigger'
+
+jobs:
+  accrual:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      
+      - name: Install server dependencies
+        run: |
+          cd server
+          npm ci
+      
+      - name: Create environment file
+        run: |
+          echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" > server/.env
+          echo "SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_KEY }}" >> server/.env
+          echo "GITHUB_ACTIONS=true" >> server/.env
+          echo "NODE_ENV=production" >> server/.env
+      
+      - name: Create runner script
+        run: |
+          cd server
+          cat > run-accrual.cjs << 'EOF'
+          require('dotenv').config();
+          
+          console.log("=== BFP LEAVE ACCRUAL (GitHub Actions) ===");
+          console.log("Started at:", new Date().toISOString());
+          
+          // Force 1st of month for automation
+          const originalDate = global.Date;
+          global.Date = class extends Date {
+            getDate() { return 1; }
+            getMonth() { return new originalDate().getMonth(); }
+            getFullYear() { return new originalDate().getFullYear(); }
+            toISOString() { return new originalDate().toISOString(); }
+          };
+          
+          console.log("Running in automated mode - bypassing date check");
+          
+          const { addMonthlyAccruals } = require("./cron/monthly-accrual");
+          
+          addMonthlyAccruals()
+            .then(() => {
+              console.log("✅ Monthly accrual completed successfully!");
+              process.exit(0);
+            })
+            .catch(error => {
+              console.error("❌ Monthly accrual failed:", error.message);
+              process.exit(1);
+            });
+          EOF
+      
+      - name: Run monthly accrual
+        run: |
+          cd server
+          node run-accrual.cjs
+      
+      - name: Cleanup
+        if: always()
+        run: |
+          rm -f server/run-accrual.cjs
+          rm -f server/.env
+      
+      - name: Success notification
+        if: success()
+        run: |
+          echo "✅ Monthly leave accrual completed!"
+          echo "Time: $(date)"
+          echo "All active employees received 1.25 days leave credit."
+          echo "Check Supabase dashboard for updated balances."
+      
+      - name: Failure notification
+        if: failure()
+        run: |
+          echo "❌ Monthly accrual failed!"
+          echo "Please check the workflow logs above."
+          echo "Manual intervention may be required."

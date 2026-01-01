@@ -1,3 +1,8 @@
+console.log("=== BFP LEAVE ACCRUAL SYSTEM ===");
+console.log("Environment:", process.env.NODE_ENV || "production");
+console.log("Execution time:", new Date().toISOString());
+console.log("Time zone:", Intl.DateTimeFormat().resolvedOptions().timeZone);
+console.log("=================================");
 // server/cron/monthly-accrual.js - UPDATED VERSION
 const { supabase } = require("../lib/supabaseClient");
 
@@ -311,7 +316,8 @@ async function createInitialBalanceForYear(personnelId, year, dateHired) {
 
 // Export for testing or manual execution
 module.exports = { addMonthlyAccruals, calculateProRatedLeave };
-{/*
+{
+  /*
 // If this file is run directly
 if (require.main === module) {
   addMonthlyAccruals()
@@ -324,4 +330,5 @@ if (require.main === module) {
       process.exit(1);
     });
 }
-*/}
+*/
+}
