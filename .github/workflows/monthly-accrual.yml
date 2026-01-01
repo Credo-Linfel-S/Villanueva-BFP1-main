@@ -1,61 +1,45 @@
-name: Simple Monthly Accrual
+name: Monthly Leave Accrual
 
 on:
   schedule:
-    - cron: '0 18 1 * *'
+    - cron: '0 18 1 * *'  # 2:00 AM Manila = 6:00 PM UTC
   workflow_dispatch:
 
 jobs:
-  run-accrual:
+  accrual:
     runs-on: ubuntu-latest
     
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
       
-      - name: Use Node.js 20
+      - name: Setup Node.js 20
         uses: actions/setup-node@v4
         with:
-          node-version: '20.x'
+          node-version: '20'  # Use Node 20 to match Supabase 2.89.0
       
-      - name: Run accrual directly
+      - name: Clean install (skip lock file)
+        run: |
+          cd server
+          # Use npm install instead of npm ci to avoid lock file issues
+          npm install --no-package-lock
+      
+      - name: Run monthly accrual
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
         run: |
           cd server
           
-          # Minimal install - just what's needed
-          npm init -y  # Create package.json if missing
-          npm install @supabase/supabase-js@2.39.0 dotenv
+          node -e "
+          console.log('🚀 Starting monthly accrual...');
+          console.log('Node version:', process.version);
           
-          # Create minimal runner
-          node << 'EOF'
-          require('dotenv').config();
+          // Load environment
+          require('dotenv').config({ path: '.env' });
           
-          const { createClient } = require('@supabase/supabase-js');
-          
-          const supabase = createClient(
-            process.env.SUPABASE_URL,
-            process.env.SUPABASE_KEY
-          );
-          
-          console.log('Running accrual logic...');
-          
-          // Your accrual functions here (copy from monthly-accrual.js)
-          async function addMonthlyAccruals() {
-            console.log('Getting active employees...');
-            
-            const { data: employees } = await supabase
-              .from('personnel')
-              .select('id, date_hired, status')
-              .eq('status', 'Active')
-              .eq('is_active', true);
-              
-            console.log(`Processing ${employees?.length || 0} employees`);
-            
-            // Add your logic here...
-            console.log('✅ Accrual completed');
-          }
+          // Debug: Check environment
+          console.log('SUPABASE_URL loaded:', !!process.env.SUPABASE_URL);
           
           // Force 1st of month
           const originalDate = global.Date;
@@ -63,5 +47,30 @@ jobs:
             getDate() { return 1; }
           };
           
-          addMonthlyAccruals().catch(console.error);
-          EOF
+          // Import and run
+          const { addMonthlyAccruals } = require('./cron/monthly-accrual');
+          
+          addMonthlyAccruals()
+            .then(() => {
+              console.log('✅ Monthly accrual completed successfully!');
+              process.exit(0);
+            })
+            .catch(error => {
+              console.error('❌ Monthly accrual failed:', error.message);
+              console.error('Stack:', error.stack);
+              process.exit(1);
+            });
+          "
+      
+      - name: Success notification
+        if: success()
+        run: |
+          echo "✅ Monthly leave accrual completed!"
+          echo "Time: $(date)"
+          echo "All active employees received 1.25 days credit."
+      
+      - name: Failure notification
+        if: failure()
+        run: |
+          echo "❌ Monthly accrual failed!"
+          echo "Check logs above for details."
