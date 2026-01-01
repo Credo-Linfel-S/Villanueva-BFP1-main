@@ -2,8 +2,7 @@ name: BFP Monthly Leave Accrual
 
 on:
   schedule:
-    # 2:00 AM Manila time on 1st of every month
-    - cron: '0 18 1 * *'
+    - cron: '0 18 1 * *'  # 2:00 AM Manila = 6:00 PM UTC
   workflow_dispatch:
 
 jobs:
@@ -19,22 +18,20 @@ jobs:
         with:
           node-version: '20'
       
-      - name: Run Accrual Script
+      - name: Run Accrual (FIXED API KEY)
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
         run: |
-          # Create a standalone script that has everything
+          # Create fixed script
           cat > run-accrual.js << 'EOF'
-          // Standalone accrual runner - NO DEPENDENCIES NEEDED!
-          console.log('🚀 BFP Leave Accrual - Standalone Runner');
+          console.log('🚀 BFP Leave Accrual - FIXED VERSION');
           
-          // Get credentials from environment
           const supabaseUrl = process.env.SUPABASE_URL;
           const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
           
-          console.log('URL:', supabaseUrl?.substring(0, 30) + '...');
-          console.log('Key exists:', !!supabaseKey);
+          console.log('Using URL:', supabaseUrl?.substring(0, 30) + '...');
+          console.log('Key length:', supabaseKey?.length || 'Missing');
           
           // Force 1st of month
           const originalDate = global.Date;
@@ -42,62 +39,87 @@ jobs:
             getDate() { return 1; }
           };
           
-          // Use native fetch - no Supabase library needed!
           async function runAccrual() {
-            console.log('Running accrual logic...');
+            console.log('=== STEP 1: Get active employees ===');
             
-            // 1. Get all active employees
-            const employees = await fetchData('personnel?status=eq.Active&is_active=eq.true');
-            console.log(`Found ${employees?.length || 0} active employees`);
-            
-            // 2. For each employee, add 1.25 days
-            for (const emp of employees || []) {
-              await updateLeaveBalance(emp.id);
-            }
-            
-            console.log('✅ Accrual completed!');
-          }
-          
-          async function fetchData(query) {
+            // Use CORRECT headers for service_role key
             const response = await fetch(
-              `${supabaseUrl}/rest/v1/${query}`,
+              `${supabaseUrl}/rest/v1/personnel?status=eq.Active&is_active=eq.true&select=id,date_hired`,
               {
                 headers: {
                   'apikey': supabaseKey,
                   'Authorization': `Bearer ${supabaseKey}`,
-                  'Content-Type': 'application/json'
+                  'Content-Type': 'application/json',
+                  'Prefer': 'return=representation'
                 }
               }
             );
             
             if (!response.ok) {
-              throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+              const error = await response.text();
+              throw new Error(`HTTP ${response.status}: ${error}`);
             }
             
-            return await response.json();
+            const employees = await response.json();
+            console.log(`Found ${employees?.length || 0} active employees`);
+            
+            if (!employees || employees.length === 0) {
+              console.log('No active employees found');
+              return;
+            }
+            
+            console.log('=== STEP 2: Update leave balances ===');
+            
+            const currentYear = new Date().getFullYear();
+            const currentMonth = new Date().getMonth() + 1;
+            
+            console.log(`Adding 1.25 days for ${currentMonth}/${currentYear}`);
+            
+            for (const emp of employees) {
+              await updateEmployeeLeave(emp.id, currentYear);
+            }
+            
+            console.log('✅ Accrual completed successfully!');
           }
           
-          async function updateLeaveBalance(personnelId) {
-            const currentYear = new Date().getFullYear();
-            
-            // Get current balance
-            const balances = await fetchData(
-              `leave_balances?personnel_id=eq.${personnelId}&year=eq.${currentYear}`
-            );
-            
-            if (balances && balances.length > 0) {
+          async function updateEmployeeLeave(personnelId, year) {
+            try {
+              // Get current balance
+              const balanceRes = await fetch(
+                `${supabaseUrl}/rest/v1/leave_balances?personnel_id=eq.${personnelId}&year=eq.${year}`,
+                {
+                  headers: {
+                    'apikey': supabaseKey,
+                    'Authorization': `Bearer ${supabaseKey}`,
+                    'Content-Type': 'application/json'
+                  }
+                }
+              );
+              
+              if (!balanceRes.ok) {
+                console.log(`Employee ${personnelId}: No balance record yet`);
+                return;
+              }
+              
+              const balances = await balanceRes.json();
+              
+              if (balances.length === 0) {
+                console.log(`Employee ${personnelId}: No balance for ${year}`);
+                return;
+              }
+              
               const balance = balances[0];
               
-              // Add 1.25 days to each leave type
-              const updated = {
+              // Add 1.25 days
+              const updatedData = {
                 vacation_balance: (parseFloat(balance.vacation_balance) + 1.25).toFixed(3),
                 sick_balance: (parseFloat(balance.sick_balance) + 1.25).toFixed(3),
                 emergency_balance: (parseFloat(balance.emergency_balance) + 1.25).toFixed(3),
                 updated_at: new Date().toISOString()
               };
               
-              // Update in database
-              await fetch(
+              // Update the balance
+              const updateRes = await fetch(
                 `${supabaseUrl}/rest/v1/leave_balances?id=eq.${balance.id}`,
                 {
                   method: 'PATCH',
@@ -107,29 +129,39 @@ jobs:
                     'Content-Type': 'application/json',
                     'Prefer': 'return=minimal'
                   },
-                  body: JSON.stringify(updated)
+                  body: JSON.stringify(updatedData)
                 }
               );
               
-              console.log(`Updated employee ${personnelId}: +1.25 days`);
+              if (updateRes.ok) {
+                console.log(`✓ Employee ${personnelId}: +1.25 days`);
+              } else {
+                console.log(`✗ Employee ${personnelId}: Update failed`);
+              }
+              
+            } catch (error) {
+              console.log(`Employee ${personnelId}: Error - ${error.message}`);
             }
           }
           
-          // Run it!
-          runAccrual().catch(err => {
-            console.error('❌ Error:', err.message);
-            process.exit(1);
-          });
+          // Run the accrual
+          runAccrual()
+            .then(() => {
+              console.log('🎉 All done!');
+              process.exit(0);
+            })
+            .catch(error => {
+              console.error('❌ Fatal error:', error.message);
+              process.exit(1);
+            });
           EOF
           
-          # Run the standalone script
+          # Run it
           node run-accrual.js
       
       - name: Cleanup
         run: rm -f run-accrual.js
       
-      - name: Success Message
+      - name: Success
         if: success()
-        run: |
-          echo "🎉 SUCCESS! Monthly leave accrual completed."
-          echo "All active employees received 1.25 days leave credit."
+        run: echo "✅ Monthly accrual completed successfully!"
