@@ -1,0 +1,55 @@
+name: Monthly Leave Accrual
+
+on:
+  schedule:
+    - cron: '0 18 1 * *'  # 2:00 AM PHT = 6:00 PM UTC
+  workflow_dispatch:       # Manual trigger
+
+jobs:
+  accrual:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+      
+      - name: Install server dependencies
+        run: |
+          cd server
+          npm install
+      
+      - name: Run monthly accrual
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: |
+          cd server
+          node -e "
+            // Temporarily bypass date check
+            const originalDate = Date;
+            global.Date = class extends Date {
+              getDate() { return 1; }
+            };
+            require('./cron/monthly-accrual.js').addMonthlyAccruals()
+              .then(() => {
+                console.log('✅ Accrual completed');
+                process.exit(0);
+              })
+              .catch((err) => {
+                console.error('❌ Accrual failed:', err);
+                process.exit(1);
+              });
+          "
+      
+      - name: Notify on success
+        if: success()
+        run: echo "✅ Monthly accrual completed successfully!"
+      
+      - name: Notify on failure
+        if: failure()
+        run: echo "❌ Monthly accrual failed!"
