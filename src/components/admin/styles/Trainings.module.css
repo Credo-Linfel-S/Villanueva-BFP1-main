@@ -1,0 +1,743 @@
+
+/* ===== TOP CONTROLS ===== */
+.TSTopControls {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  margin: 20px;
+  gap: 15px;
+  margin-top: -5px;
+}
+
+.TSTableHeader {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Filter and Search Controls */
+.TSFilterType,
+.TSSearchBar {
+  padding: 8px 12px;
+  margin-left: 5px;
+  border-radius: 20px;
+  border: 1px solid rgba(0, 0, 0, 0.456);
+  font-size: 14px;
+  outline: none;
+  transition: all 0.25s ease;
+  width: 130px;
+}
+
+.TSFilterType:hover,
+.TSSearchBar:hover {
+  transform: scale(1.03);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.12);
+}
+
+.TSFilterType:focus,
+.TSSearchBar:focus {
+  border-color: #3e76e6;
+  box-shadow: 0 0 0 3px rgba(62, 118, 230, 0.3);
+}
+
+.TSFilterType {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=US-ASCII,<svg xmlns='http://www.w3.org/2000/svg' width='30' height='30' viewBox='0 0 24 24'><path fill='%23848484' d='M7 10l5 5 5-5H7z'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 12px;
+  padding-right: 32px;
+}
+
+.TSSearchBar {
+  width: 250px;
+}
+
+/* ===== SUMMARY CARDS ===== */
+.TSSummary {
+  display: flex;
+  gap: 20px;
+  margin: 20px;
+  flex-wrap: wrap;
+}
+
+.TSSummaryCard {
+  flex: 1;
+  min-width: 150px;
+  padding: 20px;
+  border-radius: 12px;
+  color: #fff;
+  text-align: center;
+  box-shadow: 0 5px 4px rgba(16, 95, 175, 0.597);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  cursor: pointer;
+  border: none;
+}
+
+.TSSummaryCard:hover {
+  transform: translateY(-4px);
+}
+
+.TSSummaryCard.TSActive {
+  border: 3px solid #fff;
+  transform: translateY(-6px) scale(1.05);
+}
+
+.TSTotal {
+  background: linear-gradient(135deg, #1060af, #529ae1);
+}
+
+.TSPending {
+  background: linear-gradient(135deg, #ff9800, #ffb74d);
+}
+
+.TSCompleted {
+  background: linear-gradient(135deg, #4caf50, #81c784);
+}
+
+.TSOngoing {
+  background: linear-gradient(135deg, #2196f3, #64b5f6);
+}
+
+.TSCancelled {
+  background: linear-gradient(135deg, #f44336, #e57373);
+}
+
+.TSSummaryCard h3 {
+  margin: 0 0 10px 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.TSSummaryCard p {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+}
+
+/* ===== TABLE CONTAINER ===== */
+.TSTableContainer {
+  width: 100%;
+  padding: 20px;
+  margin-top: 20px;
+}
+
+/* ===== TABLE STYLES ===== */
+.TSTable {
+  width: 105%;
+  padding: 20px;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 14px;
+  margin-left: -25px;
+  background: #fff;
+  border-radius: 12px;
+  overflow: hidden;
+  text-align: center;
+  position: relative;
+  bottom: 2vh;
+  box-shadow: 0 5px 4px rgba(16, 95, 175, 0.597);
+}
+
+.TSTable thead tr {
+  background: #529ae1;
+}
+
+.TSTable th {
+  padding: 14px 16px;
+  text-align: center;
+  font-weight: 700;
+  font-size: 15px;
+  color: #000000;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.TSTable tbody td {
+  padding: 14px 16px;
+  border-bottom: 1px solid #000000;
+  color: #333;
+  transition: background 0.25s ease;
+}
+
+/* Alternate row colors */
+.TSTable tbody tr:nth-child(even) td {
+  background: #81878c;
+  color: var(--text-secondary, #fff);
+}
+
+.TSTable tbody tr:nth-child(even):hover td {
+  background: var(--accent, #549ee9);
+}
+
+.TSTable tbody tr:nth-child(odd) td {
+  background: rgba(255, 255, 255, 0.95);
+}
+
+.TSTable tbody tr:nth-child(odd):hover td {
+  background: var(--accent, #549ee9);
+}
+
+/* Row hover effects */
+.TSTable tbody tr {
+  transition: transform 0.25s ease, box-shadow 0.25s ease, background 0.25s ease;
+}
+
+.TSTable tbody tr:hover {
+  background: #549ee9;
+  color: #fff;
+  transform: translateY(-4px) scale(1.01);
+  box-shadow: 0 4px 8px rgba(33, 17, 17, 0.914), 0 8px 16px rgba(0, 0, 0, 0.1);
+  z-index: 5;
+  position: relative;
+}
+
+.TSTable tbody tr:hover td {
+  background: #549ee9 !important;
+  color: #fff;
+}
+
+/* ===== STATUS STYLES ===== */
+.TSStatus {
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: capitalize;
+  display: inline-block;
+}
+
+.pending {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.completed {
+  background: #d1edff;
+  color: #0c5460;
+}
+
+.ongoing {
+  background: #e1d5f5;
+  color: #4a235a;
+}
+
+.cancelled {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+/* ===== ACTION BUTTONS ===== */
+.TSActionBtn {
+  padding: 6px 12px;
+  margin: 2px;
+  font-size: 12px;
+  cursor: pointer;
+  border-radius: 6px;
+  border: none;
+  font-weight: 600;
+  transition: all 0.25s ease;
+}
+
+.TSEditBtn {
+  background: rgb(6, 6, 239);
+  color: #ffffff;
+  padding: 6px 4px;
+  border-radius: 5px;
+  border: none;
+  width: 60px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.25s ease;
+}
+
+.TSEditBtn:hover {
+   background-color: blue;
+  color: #002642;
+  transform: translateY(-2px);
+  transition: ease 0.3s;
+  box-shadow: 0 4px 15px rgb(0, 0, 0);
+}
+
+.TSDeleteBtn {
+  background-color: red;
+  color: white;
+  padding: 6px 10px;
+  border-radius: 5px;
+  border: none;
+  width: 60px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.25s ease;
+}
+
+.TSDeleteBtn:hover {
+  color: black;
+  transform: translateY(-2px);
+  transition: ease 0.3s;
+  background-color: #7c0101;
+}
+
+/* ===== ADD BUTTON ===== */
+.TSAddBtn {
+  padding: 12px 24px;
+  background: linear-gradient(135deg, #1060af, #529ae1);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: bold;
+  transition: all 0.3s ease;
+  margin: 2px;
+  margin-bottom: -10px;
+  box-shadow: 0 4px 8px rgba(16, 95, 175, 0.3);
+}
+
+.TSAddBtn:hover {
+  background: linear-gradient(135deg, #0d4d8c, #3e76e6);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(16, 95, 175, 0.4);
+}
+
+/* ===== FORM CARD ===== */
+.TSFormCard {
+  position: fixed;
+  top: 0;
+  right: -450px;
+  width: 420px;
+  height: 100vh;
+  background: #ffff;
+  padding: 0;
+  border-radius: 0;
+  box-shadow: -4px 0 20px rgba(0, 0, 0, 0.3);
+  transition: right 0.4s ease;
+  z-index: 1500;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+.TSModalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 2000;
+  padding: 20px;
+}
+.TSModalContent form {
+  padding: 25px;
+}
+
+.TSModalContent .TSFormSection h3 {
+  margin: 0 0 15px 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: #000000;
+  padding-bottom: 8px;
+ 
+}
+
+.TSModalContent .TSFormGroup label {
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: #333;
+  display: block;
+  font-size: 13px;
+}
+
+.TSModalContent .TSFormGroup input,
+.TSModalContent .TSFormGroup select {
+  padding: 10px 12px;
+  border-radius: 6px;
+  border: 1px solid #ddd;
+  background-color: #fff;
+  font-size: 14px;
+  transition: all 0.2s ease;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.TSModalContent .TSFormGroup input:focus,
+.TSModalContent .TSFormGroup select:focus {
+  border-color: #1060af;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(16, 96, 175, 0.1);
+}
+
+.TSModalContent .TSFormActions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 25px;
+  padding-top: 20px;
+  border-top: 1px solid #eee;
+}
+.TSModalContent {
+  background: white;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 600px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  animation: TSModalSlideIn 0.3s ease-out;
+}
+
+@keyframes TSModalSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-50px) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.TSModalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 25px;
+  background: linear-gradient(135deg, #1060af, #529ae1);
+  color: white;
+  border-radius: 12px 12px 0 0;
+}
+
+.TSModalHeader h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+}
+.TSFormCard.TSActive {
+  right: 0;
+}
+
+
+.TSFormCard form {
+  padding: 25px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.TSFormRow {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 15px;
+}
+.TSFormSection {
+  margin-bottom: 25px;
+}
+.TSFormSection h2 {
+  margin: 0 0 15px 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: #000000;
+  padding-bottom: 8px;
+ 
+}
+
+.TSFormRow .TSFormGroup {
+  flex: 1;
+
+}
+.TSFormHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 25px;
+ 
+  color: rgb(0, 0, 0);
+  margin-bottom: 0;
+}
+.TSFormHeader h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+.TSCloseBtn {
+  background: none;
+  border: none;
+  color: rgb(0, 0, 0);
+  font-size: 34px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: end;
+position: relative;
+left: 15px;
+bottom: 10px;
+  justify-content: center;
+  border-radius: 50%;
+  transition: background 0.2s ease;
+}
+
+.TSCloseBtn:hover {
+  color: #dc3545;
+}
+
+
+.TSFormCard label {
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: #333;
+  display: block;
+  font-size: 13px;
+}
+.TSFormCard input,
+.TSFormCard select {
+  padding: 10px 12px;
+  border-radius: 6px;
+  border: 1px solid #ddd;
+  background-color: #fff;
+  font-size: 14px;
+  transition: all 0.2s ease;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.TSFormCard input:focus,
+.TSFormCard select:focus {
+  border-color: #1060af;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(16, 96, 175, 0.1);
+}
+
+.TSFormActions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: auto;
+  padding-top: 20px;
+  border-top: 1px solid #eee;
+}
+.TSReadOnlyInput {
+  background-color: #f8f9fa !important;
+  color: #666 !important;
+  border-color: #e9ecef !important;
+  cursor: not-allowed;
+}
+
+.TSFormActions button {
+  padding: 12px 24px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  min-width: 120px;
+}
+.TSSaveBtn {
+  background: linear-gradient(135deg, #1060af, #529ae1);
+  color: white;
+}
+.TSSaveBtn:hover {
+  background: linear-gradient(135deg, #0d4d8c, #3e76e6);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.572);
+}
+
+.TSCancelBtn {
+  background: #6c757d;
+  color: white;
+}
+
+.TSCancelBtn:hover {
+  background: #5a6268;
+  transform: translateY(-1px);
+}
+
+/* ===== NO REQUESTS TABLE ===== */
+.TSNoRequestsTable {
+  text-align: center;
+  padding: 60px 20px;
+  background: #f8f9fa;
+  color: #6c757d;
+}
+
+.TSNoRequestsTable h3 {
+  margin: 0 0 10px 0;
+  color: #495057;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.TSNoRequestsTable p {
+  margin: 0;
+  font-size: 14px;
+  color: #6c757d;
+}
+
+/* ===== PAGINATION STYLES ===== */
+.TSPaginationContainer {
+  display: flex;
+  position: relative;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+  bottom: 15px;
+  gap: 10px;
+  left: 30px;
+
+  padding-right: 10px;
+}
+
+.TSPaginationBtn {
+  background: #1060af;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.25s ease;
+
+}
+
+.TSPaginationBtn:hover:not(:disabled) {
+  background: #1060af;
+  transform: scale(1.05);
+}
+
+.TSPaginationBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed !important;
+  transform: none;
+}
+
+.TSPaginationBtn.TSActive {
+  background: #74B1EF;
+  pointer-events: none;
+  transform: scale(1.15);
+}
+
+.TSPaginationEllipsis {
+  padding: 8px 8px;
+  color: #666;
+  font-weight: bold;
+}
+
+.TSPaginationBtn.TSDisabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+.TSPaginationBtn.TSDisabled:hover {
+  color: white !important;
+  transform: none !important;
+}
+
+.TSPaginationBtn.TSActive.TSDisabled {
+  background: #74B1EF;
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+/* ===== LOADING STATE ===== */
+.TSLoading {
+  text-align: center;
+  padding: 40px;
+  font-size: 18px;
+  color: var(--text-primary, #333);
+}
+
+/* ===== RESPONSIVE DESIGN ===== */
+@media (max-width: 768px) {
+  .TSMainContent {
+    margin-left: 0;
+    padding: 20px 10px;
+  }
+
+  .TSTopControls {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 15px;
+  }
+
+  .TSTableHeader {
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .TSSummary {
+    flex-direction: column;
+  }
+
+  .TSSummaryCard {
+    min-width: auto;
+  }
+
+  .TSTable {
+    font-size: 12px;
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .TSTable th,
+  .TSTable td {
+    padding: 10px 8px;
+  }
+
+  .TSPaginationContainer {
+    justify-content: center;
+    flex-wrap: wrap;
+    left: 0;
+  }
+
+  .TSFormCard {
+    width: 90%;
+    right: -100%;
+  }
+
+  .TSFormRow {
+    flex-direction: column;
+    gap: 15px;
+  }
+}
+
+@media (max-width: 480px) {
+  .TSTable {
+    font-size: 11px;
+  }
+
+  .TSTable th,
+  .TSTable td {
+    padding: 8px 6px;
+  }
+
+  .TSStatus {
+    font-size: 10px;
+    padding: 4px 8px;
+  }
+
+  .TSActionBtn {
+    padding: 4px 8px;
+    font-size: 11px;
+  }
+
+  .TSFilterType,
+  .TSSearchBar {
+    width: 100%;
+    margin: 5px 0;
+  }
+
+  .TSTopControls {
+    margin: 10px;
+  }
+}

@@ -1,0 +1,565 @@
+/* EMPLR.module.css */
+
+/* ===== Main Content ===== */
+
+.pageTitle {
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 25px;
+}
+
+/* ===== Content Layout ===== */
+.contentWrapper {
+  display: flex;
+  gap: 30px;
+  flex-wrap: wrap;
+}
+
+/* Leave Balance - Now on the right */
+.leaveBalance {
+  flex: 1 1 280px;
+  background: linear-gradient(135deg, #054a91, #3e7cb1);
+  color: #fff;
+  border-radius: 16px;
+  padding: 22px 20px;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.15);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  order: 2; /* Move to right side */
+  height: fit-content;
+}
+
+.leaveBalance:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.2);
+}
+
+.leaveBalance h3 {
+  margin-bottom: 18px;
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #dbe4ee;
+  text-align: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  padding-bottom: 10px;
+}
+
+.leaveBalance ul {
+  list-style: none;
+  padding: 0;
+}
+
+.leaveBalance li {
+  margin-bottom: 18px;
+}
+
+.leaveBalance .label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.95rem;
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+
+.leaveBalance .progress {
+  height: 10px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.2);
+  overflow: hidden;
+}
+
+.leaveBalance .progressBar {
+  height: 100%;
+  border-radius: 6px;
+  transition: width 0.4s ease;
+}
+
+.progressVacation {
+  background: #81a4cd;
+}
+.progressSick {
+  background: #dbe4ee;
+}
+.progressEmergency {
+  background: #ffd166;
+}
+
+/* Leave Form - Now on the left */
+.formCard {
+  flex: 2 1 480px;
+  background: #fff;
+  padding: 25px;
+  border-radius: 12px;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.05);
+  order: 1; /* Move to left side */
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.formGroup {
+  position: relative;
+  margin-bottom: 20px;
+}
+
+.formGroupFull {
+  grid-column: span 2;
+}
+
+.formCard label {
+  font-weight: 600;
+  color: #475569;
+}
+
+.formCard input,
+.formCard select {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  font-size: 1rem;
+  background: #f9fafb;
+  transition: 0.2s;
+}
+
+.formCard input:focus,
+.formCard select:focus {
+  border-color: #2563eb;
+  outline: none;
+  background: #fff;
+  box-shadow: 0 0 6px rgba(37, 99, 235, 0.2);
+}
+
+.formGroup label {
+  position: absolute;
+  top: 50%;
+  left: 14px;
+  transform: translateY(-50%);
+  background: #fff;
+  padding: 0 6px;
+  color: #64748b;
+  font-size: 0.95rem;
+  pointer-events: none;
+  transition: 0.2s ease all;
+}
+
+.formGroup input:focus + label,
+.formGroup input:not(:placeholder-shown) + label,
+.formGroup select:focus + label,
+.formGroup select:valid + label {
+  top: -6px;
+  left: 10px;
+  font-size: 0.8rem;
+  color: #2563eb;
+  background: #fff;
+}
+
+.numDaysInput {
+  background-color: #f1f5f9;
+  cursor: not-allowed;
+}
+
+/* Location Group */
+.chosenLocation {
+  display: block;
+  margin-top: 5px;
+  color: #2563eb;
+  font-weight: 600;
+}
+
+/* Buttons */
+.formButtons {
+  grid-column: span 2;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.btnPrimary,
+.btnSecondary {
+  padding: 10px 18px;
+  border-radius: 8px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.btnPrimary {
+  background: #2563eb;
+  color: #fff;
+  box-shadow: 0 3px 8px rgba(37, 99, 235, 0.2);
+}
+
+.btnPrimary:hover {
+  background: #1d4ed8;
+}
+
+.btnSecondary {
+  background: #e2e8f0;
+  color: #475569;
+}
+
+.btnSecondary:hover {
+  background: #cbd5e1;
+}
+
+/* ===== Modal Styles ===== */
+.modal {
+  display: none;
+  position: fixed;
+  z-index: 1000;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  justify-content: center;
+  align-items: center;
+}
+
+.modalShow {
+  display: flex;
+}
+
+.modalContent {
+  position: relative;
+  background: #fff;
+  padding: 25px 20px;
+  border-radius: 12px;
+  width: 320px;
+  text-align: center;
+  box-shadow: 0 6px 12px rgba(0,0,0,0.2);
+  animation: fadeIn 0.2s ease;
+}
+
+.closeBtn {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  font-size: 22px;
+  font-weight: bold;
+  color: #475569;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.closeBtn:hover {
+  color: #2563eb;
+}
+
+.modalContent h3 {
+  margin-bottom: 15px;
+  color: #2563eb;
+}
+
+.modalRadioOptions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ===== Toast Notification ===== */
+.toast {
+  position: fixed;
+  top: 30px;
+  right: 30px;
+  background: #2563eb;
+  color: #fff;
+  padding: 14px 22px;
+  border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  font-weight: 600;
+  opacity: 0;
+  transform: translateY(-20px);
+  pointer-events: none;
+  transition: opacity 0.4s ease, transform 0.4s ease;
+  z-index: 2000;
+}
+
+.toastShow {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ===== Responsive ===== */
+@media (max-width: 900px) {
+  .mainContent {
+    margin-left: 0;
+    padding: 20px;
+  }
+
+  .contentWrapper {
+    flex-direction: column;
+  }
+
+  .formGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .leaveBalance,
+  .formCard {
+    order: initial; /* Reset order for mobile */
+    flex: 1 1 auto;
+  }
+  
+  .formButtons {
+    grid-column: span 1;
+  }
+}
+
+/* Add these to your existing CSS file */
+
+/* Formula Information */
+.formulaInfo {
+  background: #f0f9ff;
+  border-left: 4px solid #2563eb;
+  padding: 12px 16px;
+  margin-bottom: 20px;
+  border-radius: 8px;
+}
+
+.formulaInfo h4 {
+  color: #2563eb;
+  margin-top: 0;
+  margin-bottom: 8px;
+  font-size: 1rem;
+}
+
+.formulaInfo p {
+  margin: 5px 0;
+  font-size: 0.85rem;
+  color: #475569;
+}
+
+.hireDateInfo {
+  margin-top: 10px !important;
+  padding-top: 8px;
+  border-top: 1px dashed #cbd5e1;
+  color: #1e293b !important;
+  font-weight: 500;
+}
+
+/* Balance Info */
+.balanceInfo {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 8px 12px;
+  border-radius: 6px;
+  margin-bottom: 15px;
+  font-size: 0.8rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.balanceInfo p {
+  margin: 4px 0;
+}
+
+/* Available Balance */
+.availableBalance {
+  display: block;
+  margin-top: 5px;
+  color: #059669;
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+/* Days Warning */
+.daysWarning {
+  margin-top: 5px;
+  font-size: 0.8rem;
+}
+
+.warningText {
+  color: #dc2626;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.okText {
+  color: #059669;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* Insufficient Balance Modal */
+.insufficientMessage {
+  text-align: left;
+  margin: 15px 0;
+  padding: 10px;
+  background: #fef2f2;
+  border-radius: 8px;
+  border-left: 4px solid #dc2626;
+}
+
+.importantNote {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #fca5a5;
+  color: #7f1d1d;
+  font-size: 0.9rem;
+}
+
+/* Loading State */
+.loading {
+  text-align: center;
+  padding: 40px;
+  font-size: 1.2rem;
+  color: #475569;
+}
+
+/* Error Message */
+.errorMessage {
+  background: #fef2f2;
+  color: #dc2626;
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  border-left: 4px solid #dc2626;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.errorIcon {
+  font-size: 1.2rem;
+}
+
+/* Leaves Taken Counter */
+.leavesTaken {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.75rem;
+  margin-left: 5px;
+  font-weight: normal;
+}
+
+/* Balance Limits Info */
+.balanceInfo p {
+  margin: 3px 0;
+  font-size: 0.75rem;
+  opacity: 0.9;
+}
+
+/* Add these styles to your CSS file */
+.locationDetails {
+  margin: 20px 0;
+}
+
+.locationDetails label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 500;
+  color: #333;
+}
+
+.locationInput {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+  transition: border-color 0.3s;
+}
+
+.locationInput:focus {
+  outline: none;
+  border-color: #4a90e2;
+  box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.1);
+}
+
+.locationHint {
+  display: block;
+  margin-top: 4px;
+  color: #666;
+  font-size: 12px;
+}
+
+/* Add these styles to your CSS file */
+.locationDetails {
+  margin: 20px 0;
+  animation: fadeIn 0.3s ease-in;
+}
+
+.locationDetails label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 500;
+  color: #333;
+}
+
+.locationInput {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+  transition: border-color 0.3s;
+}
+
+.locationInput:focus {
+  outline: none;
+  border-color: #4a90e2;
+  box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.1);
+}
+
+.locationHint {
+  display: block;
+  margin-top: 4px;
+  color: #666;
+  font-size: 12px;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* In EmployeeLeaveRequest.module.css */
+.modalRadioOptions {
+  margin: 20px 0;
+}
+
+.modalRadioOptions label {
+  display: flex;
+  align-items: center;
+  margin: 10px 0;
+  cursor: pointer;
+}
+
+.modalRadioOptions input[type="radio"] {
+  margin-right: 10px;
+}
+
+.locationDetails textarea {
+  min-height: 80px;
+  resize: vertical;
+}
+
+.locationHint {
+  color: #666;
+  font-size: 12px;
+  margin-top: 5px;
+  display: block;
+}

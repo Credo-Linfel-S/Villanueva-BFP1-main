@@ -1,0 +1,16 @@
+{
+  "name": "server",
+  "version": "1.0.0",
+  "description": "BFP Leave Management Cron Jobs",
+  "main": "scheduler.js",
+  "scripts": {
+    "start": "node scheduler.js",
+    "cron": "node cron/monthly-accrual.js",
+    "test": "node test-connection.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.86.2",
+    "dotenv": "^16.6.1",
+    "node-cron": "^3.0.3"
+  }
+}
