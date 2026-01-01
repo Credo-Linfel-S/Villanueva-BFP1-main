@@ -18,150 +18,29 @@ jobs:
         with:
           node-version: '20'
       
-      - name: Run Accrual (FIXED API KEY)
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+      - name: Install dependencies
         run: |
-          # Create fixed script
-          cat > run-accrual.js << 'EOF'
-          console.log('🚀 BFP Leave Accrual - FIXED VERSION');
+          cd server
+          npm install
+      
+      - name: Create environment file
+        run: |
+          echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" > server/.env
+          echo "SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_KEY }}" >> server/.env
+          echo "NODE_ENV=production" >> server/.env
+      
+      - name: Run BFP Accrual Script
+        run: |
+          cd server
+          echo "🚀 Running BFP Monthly Accrual from GitHub Actions"
+          echo "Date: $(date)"
           
-          const supabaseUrl = process.env.SUPABASE_URL;
-          const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
-          
-          console.log('Using URL:', supabaseUrl?.substring(0, 30) + '...');
-          console.log('Key length:', supabaseKey?.length || 'Missing');
-          
-          // Force 1st of month
-          const originalDate = global.Date;
-          global.Date = class extends Date {
-            getDate() { return 1; }
-          };
-          
-          async function runAccrual() {
-            console.log('=== STEP 1: Get active employees ===');
-            
-            // Use CORRECT headers for service_role key
-            const response = await fetch(
-              `${supabaseUrl}/rest/v1/personnel?status=eq.Active&is_active=eq.true&select=id,date_hired`,
-              {
-                headers: {
-                  'apikey': supabaseKey,
-                  'Authorization': `Bearer ${supabaseKey}`,
-                  'Content-Type': 'application/json',
-                  'Prefer': 'return=representation'
-                }
-              }
-            );
-            
-            if (!response.ok) {
-              const error = await response.text();
-              throw new Error(`HTTP ${response.status}: ${error}`);
-            }
-            
-            const employees = await response.json();
-            console.log(`Found ${employees?.length || 0} active employees`);
-            
-            if (!employees || employees.length === 0) {
-              console.log('No active employees found');
-              return;
-            }
-            
-            console.log('=== STEP 2: Update leave balances ===');
-            
-            const currentYear = new Date().getFullYear();
-            const currentMonth = new Date().getMonth() + 1;
-            
-            console.log(`Adding 1.25 days for ${currentMonth}/${currentYear}`);
-            
-            for (const emp of employees) {
-              await updateEmployeeLeave(emp.id, currentYear);
-            }
-            
-            console.log('✅ Accrual completed successfully!');
-          }
-          
-          async function updateEmployeeLeave(personnelId, year) {
-            try {
-              // Get current balance
-              const balanceRes = await fetch(
-                `${supabaseUrl}/rest/v1/leave_balances?personnel_id=eq.${personnelId}&year=eq.${year}`,
-                {
-                  headers: {
-                    'apikey': supabaseKey,
-                    'Authorization': `Bearer ${supabaseKey}`,
-                    'Content-Type': 'application/json'
-                  }
-                }
-              );
-              
-              if (!balanceRes.ok) {
-                console.log(`Employee ${personnelId}: No balance record yet`);
-                return;
-              }
-              
-              const balances = await balanceRes.json();
-              
-              if (balances.length === 0) {
-                console.log(`Employee ${personnelId}: No balance for ${year}`);
-                return;
-              }
-              
-              const balance = balances[0];
-              
-              // Add 1.25 days
-              const updatedData = {
-                vacation_balance: (parseFloat(balance.vacation_balance) + 1.25).toFixed(3),
-                sick_balance: (parseFloat(balance.sick_balance) + 1.25).toFixed(3),
-                emergency_balance: (parseFloat(balance.emergency_balance) + 1.25).toFixed(3),
-                updated_at: new Date().toISOString()
-              };
-              
-              // Update the balance
-              const updateRes = await fetch(
-                `${supabaseUrl}/rest/v1/leave_balances?id=eq.${balance.id}`,
-                {
-                  method: 'PATCH',
-                  headers: {
-                    'apikey': supabaseKey,
-                    'Authorization': `Bearer ${supabaseKey}`,
-                    'Content-Type': 'application/json',
-                    'Prefer': 'return=minimal'
-                  },
-                  body: JSON.stringify(updatedData)
-                }
-              );
-              
-              if (updateRes.ok) {
-                console.log(`✓ Employee ${personnelId}: +1.25 days`);
-              } else {
-                console.log(`✗ Employee ${personnelId}: Update failed`);
-              }
-              
-            } catch (error) {
-              console.log(`Employee ${personnelId}: Error - ${error.message}`);
-            }
-          }
-          
-          // Run the accrual
-          runAccrual()
-            .then(() => {
-              console.log('🎉 All done!');
-              process.exit(0);
-            })
-            .catch(error => {
-              console.error('❌ Fatal error:', error.message);
-              process.exit(1);
-            });
-          EOF
-          
-          # Run it
-          node run-accrual.js
+          # Use actual current date (system will check if it's the 1st)
+          node ./cron/monthly-accrual.js
       
       - name: Cleanup
-        run: rm -f run-accrual.js
+        run: rm -f server/.env
       
-      - name: Success
+      - name: Success notification
         if: success()
-        run: echo "✅ Monthly accrual completed successfully!"
+        run: echo "✅ BFP monthly leave accrual completed successfully!"

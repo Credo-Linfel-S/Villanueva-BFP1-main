@@ -157,6 +157,7 @@ const PersonnelRegister = () => {
     station: "",
     birth_date: "",
     date_hired: "",
+    
     retirement_date: "",
   });
 
