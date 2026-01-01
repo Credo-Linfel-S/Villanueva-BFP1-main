@@ -1,45 +1,40 @@
-name: Monthly Leave Accrual
+name: BFP Monthly Leave Accrual
 
 on:
   schedule:
-    - cron: '0 18 1 * *'  # 2:00 AM Manila = 6:00 PM UTC
+    # 2:00 AM Manila time on 1st of every month
+    - cron: '0 18 1 * *'
   workflow_dispatch:
 
 jobs:
-  accrual:
+  run-accrual:
     runs-on: ubuntu-latest
     
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
       
-      - name: Setup Node.js 20
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'  # Use Node 20 to match Supabase 2.89.0
+          node-version: '20'
       
-      - name: Clean install (skip lock file)
-        run: |
-          cd server
-          # Use npm install instead of npm ci to avoid lock file issues
-          npm install --no-package-lock
-      
-      - name: Run monthly accrual
+      - name: Run Accrual Script
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
         run: |
-          cd server
+          # Create a standalone script that has everything
+          cat > run-accrual.js << 'EOF'
+          // Standalone accrual runner - NO DEPENDENCIES NEEDED!
+          console.log('🚀 BFP Leave Accrual - Standalone Runner');
           
-          node -e "
-          console.log('🚀 Starting monthly accrual...');
-          console.log('Node version:', process.version);
+          // Get credentials from environment
+          const supabaseUrl = process.env.SUPABASE_URL;
+          const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
           
-          // Load environment
-          require('dotenv').config({ path: '.env' });
-          
-          // Debug: Check environment
-          console.log('SUPABASE_URL loaded:', !!process.env.SUPABASE_URL);
+          console.log('URL:', supabaseUrl?.substring(0, 30) + '...');
+          console.log('Key exists:', !!supabaseKey);
           
           // Force 1st of month
           const originalDate = global.Date;
@@ -47,30 +42,94 @@ jobs:
             getDate() { return 1; }
           };
           
-          // Import and run
-          const { addMonthlyAccruals } = require('./cron/monthly-accrual');
+          // Use native fetch - no Supabase library needed!
+          async function runAccrual() {
+            console.log('Running accrual logic...');
+            
+            // 1. Get all active employees
+            const employees = await fetchData('personnel?status=eq.Active&is_active=eq.true');
+            console.log(`Found ${employees?.length || 0} active employees`);
+            
+            // 2. For each employee, add 1.25 days
+            for (const emp of employees || []) {
+              await updateLeaveBalance(emp.id);
+            }
+            
+            console.log('✅ Accrual completed!');
+          }
           
-          addMonthlyAccruals()
-            .then(() => {
-              console.log('✅ Monthly accrual completed successfully!');
-              process.exit(0);
-            })
-            .catch(error => {
-              console.error('❌ Monthly accrual failed:', error.message);
-              console.error('Stack:', error.stack);
-              process.exit(1);
-            });
-          "
+          async function fetchData(query) {
+            const response = await fetch(
+              `${supabaseUrl}/rest/v1/${query}`,
+              {
+                headers: {
+                  'apikey': supabaseKey,
+                  'Authorization': `Bearer ${supabaseKey}`,
+                  'Content-Type': 'application/json'
+                }
+              }
+            );
+            
+            if (!response.ok) {
+              throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+            }
+            
+            return await response.json();
+          }
+          
+          async function updateLeaveBalance(personnelId) {
+            const currentYear = new Date().getFullYear();
+            
+            // Get current balance
+            const balances = await fetchData(
+              `leave_balances?personnel_id=eq.${personnelId}&year=eq.${currentYear}`
+            );
+            
+            if (balances && balances.length > 0) {
+              const balance = balances[0];
+              
+              // Add 1.25 days to each leave type
+              const updated = {
+                vacation_balance: (parseFloat(balance.vacation_balance) + 1.25).toFixed(3),
+                sick_balance: (parseFloat(balance.sick_balance) + 1.25).toFixed(3),
+                emergency_balance: (parseFloat(balance.emergency_balance) + 1.25).toFixed(3),
+                updated_at: new Date().toISOString()
+              };
+              
+              // Update in database
+              await fetch(
+                `${supabaseUrl}/rest/v1/leave_balances?id=eq.${balance.id}`,
+                {
+                  method: 'PATCH',
+                  headers: {
+                    'apikey': supabaseKey,
+                    'Authorization': `Bearer ${supabaseKey}`,
+                    'Content-Type': 'application/json',
+                    'Prefer': 'return=minimal'
+                  },
+                  body: JSON.stringify(updated)
+                }
+              );
+              
+              console.log(`Updated employee ${personnelId}: +1.25 days`);
+            }
+          }
+          
+          // Run it!
+          runAccrual().catch(err => {
+            console.error('❌ Error:', err.message);
+            process.exit(1);
+          });
+          EOF
+          
+          # Run the standalone script
+          node run-accrual.js
       
-      - name: Success notification
+      - name: Cleanup
+        run: rm -f run-accrual.js
+      
+      - name: Success Message
         if: success()
         run: |
-          echo "✅ Monthly leave accrual completed!"
-          echo "Time: $(date)"
-          echo "All active employees received 1.25 days credit."
-      
-      - name: Failure notification
-        if: failure()
-        run: |
-          echo "❌ Monthly accrual failed!"
-          echo "Check logs above for details."
+          echo "🎉 SUCCESS! Monthly leave accrual completed."
+          echo "All active employees received 1.25 days leave credit."
