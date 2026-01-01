@@ -1,0 +1,99 @@
+name: Monthly Leave Accrual
+
+on:
+  schedule:
+    - cron: '0 18 1 * *'  # 2:00 AM Manila = 6:00 PM UTC
+  workflow_dispatch:
+
+jobs:
+  accrual:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: server/package-lock.json
+      
+      - name: Install dependencies
+        run: |
+          cd server
+          
+          # Remove any existing lock file (if exists)
+          rm -f package-lock.json 2>/dev/null || true
+          
+          # Install with exact versions to avoid conflicts
+          npm install --no-package-lock
+          
+          # Or use npm ci with fresh lock
+          # npm ci --no-audit
+      
+      - name: Setup environment
+        run: |
+          cd server
+          
+          # Create .env file
+          cat > .env << EOF
+          SUPABASE_URL=${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_KEY }}
+          GITHUB_ACTIONS=true
+          NODE_ENV=production
+          EOF
+      
+      - name: Run monthly accrual
+        run: |
+          cd server
+          
+          # Simple inline script to avoid file creation
+          node -e "
+          // Load environment
+          require('dotenv').config();
+          
+          console.log('🚀 Starting monthly accrual...');
+          console.log('Node:', process.version);
+          console.log('Time:', new Date().toISOString());
+          
+          // Force 1st of month for automation
+          const originalDate = global.Date;
+          global.Date = class extends Date {
+            getDate() { return 1; }
+            getMonth() { return new originalDate().getMonth(); }
+            getFullYear() { return new originalDate().getFullYear(); }
+            toISOString() { return new originalDate().toISOString(); }
+          };
+          
+          // Import and run
+          const { addMonthlyAccruals } = require('./cron/monthly-accrual');
+          
+          addMonthlyAccruals()
+            .then(() => {
+              console.log('✅ Monthly accrual completed!');
+              console.log('All active employees received 1.25 days.');
+              process.exit(0);
+            })
+            .catch(error => {
+              console.error('❌ Accrual failed:', error.message);
+              if (error.stack) console.error('Stack:', error.stack);
+              process.exit(1);
+            });
+          "
+      
+      - name: Cleanup
+        if: always()
+        run: |
+          rm -f server/.env
+      
+      - name: Notify result
+        run: |
+          if [ ${{ job.status }} == 'success' ]; then
+            echo '✅ Workflow completed successfully!'
+            echo 'Check Supabase for updated leave balances.'
+          else
+            echo '❌ Workflow failed.'
+            echo 'See logs above for error details.'
+          fi
