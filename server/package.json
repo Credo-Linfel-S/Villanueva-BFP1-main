@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "type": "commonjs",
   "dependencies": {
-    "@supabase/supabase-js": "^2.89.0",
+    "@supabase/supabase-js": "^2.39.0",
     "dotenv": "^17.2.3",
     "node-cron": "^4.2.1",
     "uuid": "^8.3.2"
