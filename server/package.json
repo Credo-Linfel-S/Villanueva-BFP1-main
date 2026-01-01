@@ -1,16 +1,14 @@
 {
-  "name": "server",
+  "name": "bfp-leave-server",
   "version": "1.0.0",
-  "description": "BFP Leave Management Cron Jobs",
-  "main": "scheduler.js",
-  "scripts": {
-    "start": "node scheduler.js",
-    "cron": "node cron/monthly-accrual.js",
-    "test": "node test-connection.js"
-  },
+  "type": "commonjs",
   "dependencies": {
-    "@supabase/supabase-js": "^2.86.2",
-    "dotenv": "^16.6.1",
-    "node-cron": "^3.0.3"
+    "@supabase/supabase-js": "^2.89.0",
+    "dotenv": "^17.2.3",
+    "node-cron": "^4.2.1",
+    "uuid": "^8.3.2"
+  },
+  "engines": {
+    "node": ">=20.0.0"
   }
 }
