@@ -1310,7 +1310,7 @@ const PersonnelRecentActivity = () => {
                       <th>Action By</th>
                       <th>Status</th>
                       <th>Date & Time</th>
-                      <th>Actions</th>
+                      {/* Removed the Actions column header */}
                     </tr>
                   </thead>
                   <tbody>
@@ -1388,14 +1388,7 @@ const PersonnelRecentActivity = () => {
                             </small>
                           </div>
                         </td>
-                        <td>
-                          <button
-                            className={styles.viewDetailsBtn}
-                            onClick={() => handleViewDetails(activity)}
-                          >
-                            View Details
-                          </button>
-                        </td>
+                        {/* Removed the Actions column cell */}
                       </tr>
                     ))}
                   </tbody>
@@ -1585,25 +1578,42 @@ const PersonnelRecentActivity = () => {
                       )}
                     </div>
 
-                    <div className={styles.activityFooter}>
-                      <button
-                        className={styles.viewDetailsBtn}
-                        onClick={() => handleViewDetails(activity)}
-                      >
-                        View Details
-                      </button>
-                    </div>
+                    {/* Removed the activity footer with view details button */}
                   </div>
                 ))}
               </div>
 
-              {filteredActivities.length > 0 && (
-                <div className={styles.viewMoreContainer}>
-                  <button className={styles.viewMoreBtn}>
-                    View All Activities →
-                  </button>
-                </div>
-              )}
+              {/* VIEW ALL ACTIVITIES BUTTON */}
+              <div className={styles.viewMoreContainer}>
+                <button
+                  className={styles.viewMoreBtn}
+                  onClick={() => {
+                    if (activityFilter !== "all") {
+                      // Switch to "all" filter
+                      setActivityFilter("all");
+                      toast.info("Now showing all activities");
+                    } else {
+                      // If already on "all", you could:
+                      // 1. Load more activities
+                      // 2. Navigate to a detailed activities page
+                      // 3. Show a message
+                      toast.info("Already viewing all activities");
+
+                      // Example: Load more activities
+                      // fetchMoreActivities();
+                    }
+                  }}
+                  title={
+                    activityFilter !== "all"
+                      ? "Show all activity types"
+                      : "Already showing all activities"
+                  }
+                >
+                  {activityFilter !== "all"
+                    ? "View All Activities →"
+                    : "Viewing All Activities"}
+                </button>
+              </div>
             </>
           )}
         </div>

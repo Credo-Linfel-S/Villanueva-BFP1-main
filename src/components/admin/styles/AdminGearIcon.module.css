@@ -397,6 +397,7 @@
 
 .editForm {
   padding: 20px;
+  z-index: 1000px;
 }
 
 .formGroup {

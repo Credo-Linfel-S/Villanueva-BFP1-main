@@ -914,7 +914,7 @@ const MainContent = ({ isCollapsed }) => {
 
           {/* Recruitment module */}
           <div className="stat-card">
-            <div className="stat-icon leave-icon">📋</div>
+            <div className="stat-icon leave-icon">🤝</div>
             <div className="stat-content">
               <h3>Total Recruited Applicants</h3>
               <p className="stat-number">
@@ -926,7 +926,7 @@ const MainContent = ({ isCollapsed }) => {
               </p>
               <div className="stat-subtitle">
                 {!leaveLoading && !leaveError && (
-                  <span className="stat-info">Awaiting review/approval</span>
+                  <span className="stat-info">Station Applicants</span>
                 )}
               </div>
             </div>

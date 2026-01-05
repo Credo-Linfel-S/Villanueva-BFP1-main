@@ -1,0 +1,39 @@
+name: Cleanup Old Inventory Audit Records
+on:
+  schedule:
+    - cron: '0 18 31 12 *'  # 18:00 UTC Dec 31 = 02:00 AM PH Time Jan 1
+  
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: 'Dry run (no deletions)'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  cleanup-audit:
+    runs-on: ubuntu-latest
+    environment: production
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      
+      - name: Run cleanup script
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          IS_DRY_RUN: ${{ inputs.dry-run }}
+        run: |
+          cd server
+          if [ "$IS_DRY_RUN" = "true" ]; then
+            node scripts/cleanup-inventory-audit.js --dry-run
+          else
+            node scripts/cleanup-inventory-audit.js
+          fi
