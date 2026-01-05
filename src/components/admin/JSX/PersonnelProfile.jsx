@@ -7,6 +7,10 @@ import styles from "../styles/PersonnelProfile.module.css";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { supabase } from "../../../lib/supabaseClient.js";
+// Import the BFP preloader component and its styles
+import BFPPreloader from "../../BFPPreloader.jsx"; // Adjust path as needed
+ // Make sure this path is correct
+
 const PersonnelProfile = () => {
   const { isSidebarCollapsed } = useSidebar();
   const [personnelList, setPersonnelList] = useState([]);
@@ -24,6 +28,10 @@ const PersonnelProfile = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [documentToDelete, setDocumentToDelete] = useState(null);
   const [uploading, setUploading] = useState(false);
+
+  // Preloader state
+  const [showPreloader, setShowPreloader] = useState(true);
+  const [loadingProgress, setLoadingProgress] = useState(0);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -66,6 +74,11 @@ const PersonnelProfile = () => {
     }
   };
 
+  // Update progress during loading
+  const updateLoadingProgress = (progress) => {
+    setLoadingProgress(progress);
+  };
+
   // Load personnel from Supabase
   useEffect(() => {
     loadPersonnel();
@@ -74,6 +87,7 @@ const PersonnelProfile = () => {
   const loadPersonnel = async () => {
     try {
       setIsLoading(true);
+      updateLoadingProgress(10);
 
       // Fetch personnel with their documents and rank images
       const { data: personnelData, error: personnelError } = await supabase
@@ -82,6 +96,8 @@ const PersonnelProfile = () => {
         .order("last_name", { ascending: true });
 
       if (personnelError) throw personnelError;
+
+      updateLoadingProgress(30);
 
       // Process rank images for each personnel
       const personnelWithRankImages = personnelData.map((personnel) => {
@@ -101,6 +117,8 @@ const PersonnelProfile = () => {
         };
       });
 
+      updateLoadingProgress(50);
+
       // Fetch all documents for all personnel
       const { data: documentsData, error: documentsError } = await supabase
         .from("personnel_documents")
@@ -108,6 +126,8 @@ const PersonnelProfile = () => {
         .order("uploaded_at", { ascending: false });
 
       if (documentsError) throw documentsError;
+
+      updateLoadingProgress(70);
 
       // Group documents by personnel_id
       const documentsByPersonnel = {};
@@ -126,12 +146,30 @@ const PersonnelProfile = () => {
         })) || [];
 
       setPersonnelList(updatedPersonnel);
+      updateLoadingProgress(90);
+
+      // Small delay to show completion
+      setTimeout(() => {
+        updateLoadingProgress(100);
+        setIsLoading(false);
+        // Hide preloader after a short delay to show completion
+        setTimeout(() => {
+          setShowPreloader(false);
+        }, 500);
+      }, 300);
     } catch (error) {
       console.error("Error loading personnel:", error);
       toast.error("Failed to load personnel data");
-    } finally {
       setIsLoading(false);
+      setShowPreloader(false);
     }
+  };
+
+  // Handle retry from preloader
+  const handleRetryFromPreloader = () => {
+    setShowPreloader(true);
+    setLoadingProgress(0);
+    loadPersonnel();
   };
 
   // Upload file to Supabase Storage
@@ -613,11 +651,15 @@ const PersonnelProfile = () => {
     return buttons;
   };
 
-  if (isLoading) {
+  // Render BFP Preloader if still loading
+  if (showPreloader) {
     return (
-      <div className={styles.preLoading}>
-        <p>Loading personnel data...</p>
-      </div>
+      <BFPPreloader
+        loading={isLoading}
+        progress={loadingProgress}
+        moduleTitle="PERSONNEL PROFILE • Loading Records..."
+        onRetry={handleRetryFromPreloader}
+      />
     );
   }
 

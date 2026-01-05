@@ -284,13 +284,13 @@
 
 /* ===== ADD BUTTON ===== */
 .TSAddBtn {
-  padding: 12px 24px;
+  padding: 10px 10px;
   background: linear-gradient(135deg, #1060af, #529ae1);
   color: #fff;
   border: none;
   border-radius: 8px;
   cursor: pointer;
-  font-size: 16px;
+  font-size: 13px;
   font-weight: bold;
   transition: all 0.3s ease;
   margin: 2px;

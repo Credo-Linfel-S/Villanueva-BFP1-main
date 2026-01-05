@@ -41,7 +41,7 @@ const getModuleTitle = () => {
     "/placement": "PLACEMENT SYSTEM • Assigning Positions...",
     "/history": "HISTORY SYSTEM • Retrieving Archives...",
     "/personnelrecentactivity": "ACTIVITY LOGS • Monitoring Actions...",
-    "/admin": "ADMIN DASHBOARD • Loading Secure Session...",
+    "/admin": "ADMIN DASHBOARD • Loading Data...",
     "/recruitment": "RECRUITMENT DASHBOARD • Screening Candidates...",
     "/recruitment/profile": "RECRUITMENT PROFILE • Reviewing Applications...",
     "/employee": "EMPLOYEE DASHBOARD • Loading Personal Data...",
@@ -365,7 +365,7 @@ const getModuleTitle = () => {
               )}
             </div>
 
-            <h1 className={styles.bfpText}>BUREAU OF FIRE PROTECTION</h1>
+            <h1 className={styles.bfpText}>BUREAU OF FIRE PROTECTION <br/> VILLANUEVA STATION</h1>
             <p className={styles.offlineSubtitle}>
               <span className={styles.offlineBadge}>
                 {connectionError === "BROWSER_OFFLINE"
@@ -457,7 +457,8 @@ const getModuleTitle = () => {
               <div className={styles.bfpLogoInner}></div>
             </div>
 
-            <h1 className={styles.bfpText}>BUREAU OF FIRE PROTECTION</h1>
+            <h1 className={styles.bfpText}>BUREAU OF FIRE PROTECTION <br/> VILLANUEVA STATION</h1>
+     
             <p className={styles.bfpSubtitle}>{getModuleTitle()}</p>
 
             <div className={styles.progressContainer}>

@@ -16,6 +16,14 @@ import {
   saveLeaveDocumentMetadata,
 } from "../../utils/leaveDocumentUpload.js";
 import { fillLeaveFormEnhanced } from "../../utils/pdfLeaveFormFiller.js";
+// Import from your new client-side utility
+import { 
+  calculateWorkingDays, 
+  getPhilippineHolidays,
+  calculateCalendarDays,
+  LeaveCalculator 
+} from "../../utils/holidayCalendar.js";
+
 const LeaveManagement = () => {
   const { isSidebarCollapsed } = useSidebar();
   const { user: authUser, hasSupabaseAuth } = useAuth();
@@ -24,7 +32,12 @@ const LeaveManagement = () => {
   const [isInitializing, setIsInitializing] = useState(true);
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [showContent, setShowContent] = useState(false);
-
+  const [holidays, setHolidays] = useState([]);
+  const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
+  const [showLeaveBreakdownModal, setShowLeaveBreakdownModal] = useState(false);
+  const [selectedLeaveForCalculation, setSelectedLeaveForCalculation] =
+    useState(null);
+  const [leaveBreakdown, setLeaveBreakdown] = useState(null);
   // Add this state to track if data is fully loaded
   const [isDataFullyLoaded, setIsDataFullyLoaded] = useState(false);
 
@@ -37,6 +50,12 @@ const LeaveManagement = () => {
   const [filterValue, setFilterValue] = useState("All");
   const [modalData, setModalData] = useState(null);
   const [processingAction, setProcessingAction] = useState(null);
+  const [showApprovalOptionsModal, setShowApprovalOptionsModal] =
+    useState(false);
+  const [selectedRequestForApproval, setSelectedRequestForApproval] =
+    useState(null);
+
+  // Add this state to track if data is fully loaded
 
   // New states for confirmation modals
   const [showApproveModal, setShowApproveModal] = useState(false);
@@ -134,7 +153,100 @@ const LeaveManagement = () => {
       supabase.removeChannel(channel);
     };
   }, []); // Empty dependency array - runs once on mount
+  useEffect(() => {
+    loadHolidays();
+  }, []);
 
+  const loadHolidays = async () => {
+    try {
+      const response = await fetch(
+        `https://date.nager.at/api/v3/PublicHolidays/${currentYear}/PH`
+      );
+      const data = await response.json();
+      setHolidays(data);
+    } catch (error) {
+      console.error("Failed to load holidays:", error);
+      // Load fallback
+      const fallback = [
+        { date: `${currentYear}-01-01`, name: "New Year's Day" },
+        // ... other holidays
+      ];
+      setHolidays(fallback);
+    }
+  };
+  // Add these helper functions after your existing functions like updateStatus
+
+  // Replace the placeholder with actual implementation
+  const getLeaveBalanceForType = async (leaveType, personnelId) => {
+    try {
+      const currentYear = new Date().getFullYear();
+
+      const { data: balance, error } = await supabase
+        .from("leave_balances")
+        .select("vacation_balance, sick_balance, emergency_balance")
+        .eq("personnel_id", personnelId)
+        .eq("year", currentYear)
+        .single();
+
+      if (error) {
+        console.error("Error fetching balance:", error);
+        return 0;
+      }
+
+      switch (leaveType) {
+        case "Vacation":
+          return parseFloat(balance.vacation_balance) || 0;
+        case "Sick":
+          return parseFloat(balance.sick_balance) || 0;
+        case "Emergency":
+          return parseFloat(balance.emergency_balance) || 0;
+        default:
+          return 0;
+      }
+    } catch (error) {
+      console.error("Error in getLeaveBalanceForType:", error);
+      return 0;
+    }
+  };
+  // Create a simple calculator (or put this in a separate utils file)
+  // Add these constants for the calendar calculations
+  const calculateCalendarDays = (startDate, endDate) => {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const timeDiff = end - start;
+    return Math.floor(timeDiff / (1000 * 60 * 60 * 24)) + 1;
+  };
+
+  // OR you can import it from your utility file
+  // Calculate working days for a request
+  const calculateLeaveDetails = async (leaveRequest) => {
+    const { startDate, endDate } = leaveRequest;
+
+    // Get working days (exclude weekends and holidays)
+    const workingDays = calculateWorkingDays(startDate, endDate, holidays);
+    const totalDays = calculateCalendarDays(startDate, endDate);
+    const holidayDays = totalDays - workingDays;
+
+    return {
+      totalCalendarDays: totalDays,
+      workingDays,
+      holidayDays,
+      holidaysInRange: holidays.filter((h) => {
+        const holidayDate = new Date(h.date);
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+        return holidayDate >= start && holidayDate <= end;
+      }),
+    };
+  };
+
+  // In your modal or view details, show the breakdown
+  const showLeaveCalculation = async (request) => {
+    setSelectedLeaveForCalculation(request);
+    const breakdown = await calculateLeaveDetails(request);
+    setLeaveBreakdown(breakdown);
+    setShowLeaveBreakdownModal(true);
+  };
   const setupRealtimeUpdates = () => {
     const channel = supabase
       .channel("leave-requests-changes")
@@ -1038,12 +1150,237 @@ const LeaveManagement = () => {
     }
   };
 
-  // New functions for modal handling
+  // Replace or modify your existing handleApproveClick function
   const handleApproveClick = (id, employeeName) => {
-    setSelectedRequest({ id, employeeName });
-    setShowApproveModal(true);
+    const request = leaveRequests.find((req) => req.id === id);
+    if (!request) return;
+
+    setSelectedRequestForApproval(request);
+    setShowApprovalOptionsModal(true);
   };
 
+const handleApproveWithOptions = async (
+  requestId,
+  approveFor,
+  withPayDays = null
+) => {
+  try {
+    setProcessingAction(requestId);
+    const request = leaveRequests.find((req) => req.id === requestId);
+    if (!request) return;
+
+    // Create calculator and calculate breakdown
+    const calculator = new LeaveCalculator(holidays);
+    const availableBalance = await getLeaveBalanceForType(
+      request.leaveType,
+      request.personnel_id
+    );
+    const breakdown = calculator.calculateLeaveBreakdown(
+      {
+        ...request,
+        approveFor,
+        withPayDays,
+      },
+      availableBalance
+    );
+
+    // Update leave request with payment details
+    const updateData = {
+      status: "Approved",
+      approve_for: approveFor,
+      paid_days: breakdown.paidDays,
+      unpaid_days: breakdown.unpaidDays,
+      working_days: breakdown.totalWorkingDays,
+      holiday_days: breakdown.holidayDays,
+      updated_at: new Date().toISOString(),
+      approved_by: adminUsername,
+    };
+
+    // Calculate the actual balance update
+    const totalDeducted = breakdown.paidDays + breakdown.unpaidDays;
+
+    // Update in database
+    const { error } = await supabase
+      .from("leave_requests")
+      .update(updateData)
+      .eq("id", requestId);
+
+    if (error) throw error;
+
+    // Deduct leave credits for ALL days (both paid AND unpaid)
+    // Both types are deducted, only difference is monthly accrual eligibility
+    if (totalDeducted > 0) {
+      await updateLeaveBalanceForApproval(
+        request.leave_balance_id,
+        request.leave_type,
+        totalDeducted
+      );
+    }
+
+    // Update local state
+    setLeaveRequests((prev) =>
+      prev.map((req) =>
+        req.id === requestId
+          ? { ...req, ...updateData, status: "Approved" }
+          : req
+      )
+    );
+
+    setFilteredRequests((prev) =>
+      prev.map((req) =>
+        req.id === requestId
+          ? { ...req, ...updateData, status: "Approved" }
+          : req
+      )
+    );
+
+    let message = `Leave approved (${breakdown.paidDays} paid, ${breakdown.unpaidDays} unpaid)`;
+
+    if (approveFor === "without_pay") {
+      message += " - ❌ No monthly accrual for this month";
+    } else if (approveFor === "both" && breakdown.unpaidDays > 0) {
+      message += " - ⚠️ Partial monthly accrual block";
+    } else {
+      message += " - ✅ Eligible for monthly accrual";
+    }
+
+    toast.success(message);
+
+    // Close modal
+    setShowApprovalOptionsModal(false);
+    setSelectedRequestForApproval(null);
+  } catch (error) {
+    console.error("Error approving leave:", error);
+    toast.error("Failed to approve leave");
+  } finally {
+    setProcessingAction(null);
+  }
+};
+
+  // Add this component before the final return statement
+  const ApprovalOptionsModal = ({ request, onClose, onApprove }) => {
+    const [approveFor, setApproveFor] = useState("with_pay");
+    const [withPayDays, setWithPayDays] = useState(request.num_days || 0);
+    const [breakdown, setBreakdown] = useState(null);
+
+    useEffect(() => {
+      calculateBreakdown();
+    }, [approveFor, withPayDays]);
+
+    // In ApprovalOptionsModal component, change:
+    const calculateBreakdown = async () => {
+      const calculator = new LeaveCalculator(holidays);
+      const availableBalance = await getLeaveBalanceForType(
+        request.leaveType,
+        request.personnel_id
+      );
+      const result = calculator.calculateLeaveBreakdown(
+        {
+          ...request,
+          approveFor,
+          withPayDays,
+        },
+        availableBalance
+      );
+      setBreakdown(result);
+    };
+    return (
+      <div className={styles.confirmationModalOverlay} onClick={onClose}>
+        <div
+          className={styles.confirmationModal}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className={styles.confirmationHeader}>
+            <h2>Approve Leave: {request.employeeName}</h2>
+            <button className={styles.confirmationCloseBtn} onClick={onClose}>
+              &times;
+            </button>
+          </div>
+
+          <div className={styles.confirmationBody}>
+            <div className={styles.paymentOptions}>
+              <label>
+                <input
+                  type="radio"
+                  value="with_pay"
+                  checked={approveFor === "with_pay"}
+                  onChange={(e) => setApproveFor(e.target.value)}
+                />
+                With Pay (deduct from leave credits) still eligible for monthly accrual
+              </label>
+
+              <label>
+                <input
+                  type="radio"
+                  value="without_pay"
+                  checked={approveFor === "without_pay"}
+                  onChange={(e) => setApproveFor(e.target.value)}
+                />
+                Without Pay (deducts leave credits) does not eligible for monthly accrual
+              </label>
+
+              <label>
+                <input
+                  type="radio"
+                  value="both"
+                  checked={approveFor === "both"}
+                  onChange={(e) => setApproveFor(e.target.value)}
+                />
+                Partial (mixed) Unpaid days affect monthly accrual eligibility
+              </label>
+            </div>
+
+            {approveFor === "both" && (
+              <div className={styles.partialDays}>
+                <label>Days with Pay:</label>
+                <input
+                  type="number"
+                  min="0"
+                  max={request.num_days}
+                  value={withPayDays}
+                  onChange={(e) =>
+                    setWithPayDays(parseInt(e.target.value) || 0)
+                  }
+                />
+                <small>Total requested: {request.num_days} days</small>
+              </div>
+            )}
+
+            {breakdown && (
+              <div className={styles.breakdownSummary}>
+                <h4>Summary:</h4>
+                <p>Working Days: {breakdown.totalWorkingDays}</p>
+                <p>Holidays/Weekends: {breakdown.holidayDays}</p>
+                <p>With Pay: {breakdown.paidDays} days</p>
+                <p>Without Pay: {breakdown.unpaidDays} days</p>
+
+                {breakdown.requiresApproval && (
+                  <p className={styles.warning}>
+                    ⚠️ This leave requires special approval
+                  </p>
+                )}
+              </div>
+            )}
+
+            <div className={styles.confirmationActions}>
+              <button
+                className={styles.confirmationCancelBtn}
+                onClick={onClose}
+              >
+                Cancel
+              </button>
+              <button
+                className={styles.confirmationApproveBtn}
+                onClick={() => onApprove(request.id, approveFor, withPayDays)}
+              >
+                Approve
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
   const handleRejectClick = (id, employeeName) => {
     setSelectedRequest({ id, employeeName });
     setRejectionReason("");
@@ -1364,7 +1701,7 @@ const LeaveManagement = () => {
               <table className={styles.leaveTable}>
                 <thead>
                   <tr>
-                    <th>Rank & Name</th>
+                    <th>Personnel</th>
                     <th>Type</th>
                     <th>Location</th>
                     <th>Date of Filing</th>
@@ -1462,9 +1799,12 @@ const LeaveManagement = () => {
                                   >
                                     View
                                   </button>
+
                                 </div>
+                                
                               ) : !isPending ? (
                                 <div className={styles.statusInfo}>
+                            
                                   <button
                                     className={styles.viewBtn}
                                     onClick={() => setModalData(req)}
@@ -1480,6 +1820,7 @@ const LeaveManagement = () => {
                                   >
                                     View
                                   </button>
+                                  
                                 </div>
                               )}
                             </td>
@@ -1681,6 +2022,7 @@ const LeaveManagement = () => {
                             >
                               {isProcessing ? "Processing..." : "Reject"}
                             </button>
+                
                             <button
                               className={styles.viewBtn}
                               onClick={() => setModalData(req)}
@@ -1737,6 +2079,48 @@ const LeaveManagement = () => {
               )}
             </div>
           </>
+        )}
+        {/* Add this near your other modals (showApproveModal, showRejectModal) */}
+        {showApprovalOptionsModal && selectedRequestForApproval && (
+          <ApprovalOptionsModal
+            request={selectedRequestForApproval}
+            onClose={() => {
+              setShowApprovalOptionsModal(false);
+              setSelectedRequestForApproval(null);
+            }}
+            onApprove={handleApproveWithOptions}
+          />
+        )}
+        {showLeaveBreakdownModal && leaveBreakdown && (
+          <div className={styles.breakdownModal}>
+            <h3>Leave Breakdown</h3>
+            <div className={styles.breakdownDetails}>
+              <p>
+                <strong>Total Calendar Days:</strong>{" "}
+                {leaveBreakdown.totalCalendarDays}
+              </p>
+              <p>
+                <strong>Working Days:</strong> {leaveBreakdown.workingDays}
+              </p>
+              <p>
+                <strong>Holidays/Weekends:</strong> {leaveBreakdown.holidayDays}
+              </p>
+
+              {leaveBreakdown.holidaysInRange.length > 0 && (
+                <div className={styles.holidayList}>
+                  <strong>Holidays during leave:</strong>
+                  <ul>
+                    {leaveBreakdown.holidaysInRange.map((holiday, idx) => (
+                      <li key={idx}>
+                        {new Date(holiday.date).toLocaleDateString()}:{" "}
+                        {holiday.name}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          </div>
         )}
         {modalData && (
           <div
@@ -1919,6 +2303,13 @@ const LeaveManagement = () => {
                     }}
                   >
                     ✗ Reject This Request
+                  </button>
+                  <button
+                    className={styles.calculateBtn}
+                    onClick={() => showLeaveCalculation(modalData)}
+                    title="Calculate working days and holidays"
+                  >
+                    🧮 Calculate
                   </button>
                 </div>
               )}

@@ -352,7 +352,7 @@
 
 .IIRTable th:nth-child(2),
 .IIRTable td:nth-child(2) {
-  width: 200px; /* Personnel Name */
+  width: 100px; /* Personnel Name */
   min-width: 200px;
 }
 
@@ -466,7 +466,7 @@
 /* Badge Number */
 .IIRBadgeNumber {
   font-size: 0.85rem;
-  color: #e0e0e0;
+  color: #ffdd00;
   margin-top: 2px;
 }
 
@@ -846,6 +846,8 @@
   
   .IIRViewModalContent {
     max-width: 95%;
+
+    
     margin: 10px;
   }
   
@@ -1243,4 +1245,1161 @@
   height: 24px;
   object-fit: contain;
   border-radius: 3px;
+}
+
+
+/* Add to your CSS module file */
+
+/* Approve Modal Styles */
+.approveModalIcon {
+  text-align: center;
+  font-size: 48px;
+  margin-bottom: 20px;
+}
+
+.combinedModalIcon {
+  font-size: 56px;
+  animation: pulse 1.5s infinite;
+}
+
+.approveModalMessage {
+  text-align: center;
+  margin-bottom: 20px;
+  line-height: 1.6;
+  color: #333;
+}
+
+.modal-breakdown {
+  background: #f8f9fa;
+  padding: 15px;
+  border-radius: 8px;
+  margin: 10px 0;
+  text-align: left;
+  border-left: 4px solid #529ae1;
+}
+
+.modal-breakdown div {
+  margin: 8px 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.modal-total {
+  background: #e8f5e9;
+  padding: 15px;
+  border-radius: 8px;
+  margin: 10px 0;
+  text-align: left;
+  border-left: 4px solid #28a745;
+  font-weight: bold;
+}
+
+.approveModalBreakdown {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 15px;
+  margin: 15px 0;
+  border: 1px solid #e9ecef;
+}
+
+.breakdownItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px dashed #dee2e6;
+}
+
+.breakdownItem:last-child {
+  border-bottom: none;
+}
+
+.breakdownTotal {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 0;
+  margin-top: 10px;
+  border-top: 2px solid #dee2e6;
+  font-size: 1.1em;
+}
+
+.routineDot {
+  font-size: 20px;
+  margin-right: 10px;
+}
+
+.clearanceDot {
+  font-size: 20px;
+  margin-right: 10px;
+}
+
+.combinedDot {
+  font-size: 24px;
+  margin-right: 10px;
+}
+
+.approveModalWarning {
+  background: #fff3cd;
+  border: 1px solid #ffc107;
+  border-radius: 6px;
+  padding: 12px;
+  margin-top: 20px;
+  text-align: center;
+  color: #856404;
+  font-size: 0.9em;
+}
+
+/* Button Styles for Approve Modal */
+.IIRCancelBtn {
+  background: #6c757d;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: background 0.2s;
+}
+
+.IIRCancelBtn:hover {
+  background: #5a6268;
+}
+
+.IIRConfirmBtn {
+  background: #28a745;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: background 0.2s;
+}
+
+.IIRConfirmBtn:hover {
+  background: #218838;
+}
+
+/* Animation for Combined Icon */
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Close button styling */
+.IIRCloseBtn {
+  background: #6c757d;
+  color: white;
+  border: none;
+  padding: 10px 24px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: 0 2px 4px rgba(108, 117, 125, 0.2);
+}
+
+.IIRCloseBtn:hover {
+  background: #5a6268;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(108, 117, 125, 0.3);
+}
+
+.IIRCloseBtn:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 2px rgba(108, 117, 125, 0.2);
+}
+
+
+/* Return All button styling */
+.returnAllBtn {
+  background: linear-gradient(135deg, #17a2b8, #138496);
+  color: white;
+  border: none;
+  padding: 10px 24px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: 0 2px 4px rgba(23, 162, 184, 0.2);
+  position: relative;
+  overflow: hidden;
+}
+
+.returnAllBtn:hover {
+  background: linear-gradient(135deg, #138496, #117a8b);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(23, 162, 184, 0.3);
+}
+
+.returnAllBtn:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 2px rgba(23, 162, 184, 0.2);
+}
+
+/* Add a hover effect that shows a tooltip */
+.returnAllBtn:after {
+  content: 'Return all equipment items';
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #333;
+  color: white;
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.2s;
+  pointer-events: none;
+  margin-bottom: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.returnAllBtn:hover:after {
+  opacity: 1;
+}
+
+/* For the Approve button in the modal actions */
+.IIRApproveBtn {
+  background: linear-gradient(135deg, #28a745, #218838);
+  color: white;
+  border: none;
+  padding: 10px 24px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: 0 2px 4px rgba(40, 167, 69, 0.2);
+}
+
+.IIRApproveBtn:hover {
+  background: linear-gradient(135deg, #218838, #1e7e34);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(40, 167, 69, 0.3);
+}
+
+.IIRApproveBtn:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 2px rgba(40, 167, 69, 0.2);
+}
+
+/* Individual Return button styling (for single equipment items) */
+.returnBtn {
+  background: linear-gradient(135deg, #20c997, #1ba87e);
+  color: white;
+  border: none;
+  padding: 6px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  box-shadow: 0 1px 3px rgba(32, 201, 151, 0.2);
+}
+
+.returnBtn:hover {
+  background: linear-gradient(135deg, #1ba87e, #18966f);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(32, 201, 151, 0.3);
+}
+
+.returnBtn:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 2px rgba(32, 201, 151, 0.2);
+}
+
+
+/* Modal Actions Container - Improved spacing and alignment */
+.IIRViewModalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding-top: 20px;
+  border-top: 1px solid #e9ecef;
+  margin-top: 20px;
+}
+
+/* Make the Return All button stand out more when it's the primary action */
+.returnAllBtn.primary {
+  background: linear-gradient(135deg, #fd7e14, #e8590c);
+  box-shadow: 0 2px 4px rgba(253, 126, 20, 0.2);
+}
+
+.returnAllBtn.primary:hover {
+  background: linear-gradient(135deg, #e8590c, #d9480f);
+  box-shadow: 0 4px 8px rgba(253, 126, 20, 0.3);
+}
+
+/* Responsive adjustments for smaller screens */
+@media (max-width: 768px) {
+  .IIRViewModalActions {
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .IIRCloseBtn,
+  .returnAllBtn,
+  .IIRApproveBtn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+/* Add a subtle glow effect for important actions */
+.returnAllBtn.important {
+  animation: subtleGlow 2s infinite ease-in-out;
+}
+
+@keyframes subtleGlow {
+  0%, 100% {
+    box-shadow: 0 2px 4px rgba(23, 162, 184, 0.2);
+  }
+  50% {
+    box-shadow: 0 2px 8px rgba(23, 162, 184, 0.4);
+  }
+}
+
+
+
+/* Page Header with Tabs */
+.pageHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+@media (max-width: 768px) {
+  .pageHeader {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+/* Tab Navigation */
+.tabNavigation {
+  display: flex;
+  gap: 10px;
+  background: #f8f9fa;
+  padding: 6px;
+  border-radius: 12px;
+  border: 1px solid #dee2e6;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.tabBtn {
+  padding: 12px 24px;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #495057;
+}
+
+.tabBtn:hover {
+  background: #e9ecef;
+  transform: translateY(-1px);
+}
+
+.activeTab {
+  background: #007bff;
+  color: white;
+  box-shadow: 0 2px 8px rgba(0, 123, 255, 0.3);
+}
+
+.activeTab:hover {
+  background: #0056b3;
+  transform: translateY(-1px);
+}
+
+/* Archived Summary Card */
+.IIRSummaryCard.IIRArchived {
+  background: linear-gradient(135deg, #6c757d 0%, #495057 100%);
+  border: 1px solid #495057;
+  color: white;
+  cursor: pointer;
+}
+
+.IIRSummaryCard.IIRArchived:hover {
+  background: linear-gradient(135deg, #495057 0%, #343a40 100%);
+  transform: translateY(-3px);
+  box-shadow: 0 4px 12px rgba(108, 117, 125, 0.3);
+}
+
+.IIRSummaryCard.IIRArchived h3 {
+  color: white;
+}
+
+.IIRSummaryCard.IIRArchived p {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 20px;
+  font-weight: 700;
+}
+
+/* Archived Modal Styles */
+.archivedCount {
+  background: #6c757d;
+  color: white;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 500;
+  margin-left: 12px;
+  vertical-align: middle;
+}
+
+/* Archived Table Container */
+.archivedTableContainer {
+  overflow-x: auto;
+  max-height: 60vh;
+  border-radius: 8px;
+  border: 1px solid #dee2e6;
+  background: white;
+  
+}
+
+.archivedTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  min-width: 1000px;
+}
+
+.archivedTable th {
+  background: #f8f9fa;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  padding: 14px 16px;
+  text-align: left;
+  border-bottom: 2px solid #dee2e6;
+  font-weight: 600;
+  color: #495057;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.archivedTable td {
+  padding: 14px 16px;
+  border-bottom: 1px solid #e9ecef;
+  vertical-align: top;
+  color: #212529;
+}
+
+.archivedTable tr:hover {
+  background-color: #f8f9fa;
+}
+
+.archivedTable tr:nth-child(even) {
+  background-color: #fcfcfc;
+}
+
+.archivedTable tr:nth-child(even):hover {
+  background-color: #f8f9fa;
+}
+
+/* Archived Personnel Info */
+.archivedPersonnel {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.archivedPersonnel strong {
+  font-weight: 600;
+  color: #212529;
+}
+
+.archivedDetails {
+  font-size: 12px;
+  color: #6c757d;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Archived Status Badge */
+.archivedStatus {
+  display: inline-block;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: #28a745;
+  color: white;
+}
+
+/* Archived Item Count */
+.archivedItemCount {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.lostCount, .damagedCount {
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  display: inline-block;
+  font-weight: 600;
+  width: fit-content;
+}
+
+.lostCount {
+  background: linear-gradient(135deg, #fff5f5 0%, #ffe3e3 100%);
+  color: #dc3545;
+  border: 1px solid #ffc9c9;
+}
+
+.damagedCount {
+  background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+  color: #856404;
+  border: 1px solid #ffd8a8;
+}
+
+/* Archived Amount Display */
+.archivedAmount {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.archivedAmount strong {
+  font-size: 15px;
+  font-weight: 700;
+  color: #212529;
+}
+
+.paidAmount {
+  font-size: 12px;
+  color: #28a745;
+  font-weight: 600;
+  background: #f8fff9;
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid #c3e6cb;
+  width: fit-content;
+}
+
+/* Settlement Method */
+.settlementMethod {
+  display: inline-block;
+  padding: 6px 12px;
+  background: #e9ecef;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #495057;
+}
+
+/* Settled By Info */
+.settledBy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.settleDate {
+  font-size: 11px;
+  color: #6c757d;
+  font-style: italic;
+}
+
+/* View Archived Button */
+.viewArchivedBtn {
+  padding: 8px 16px;
+  background: #17a2b8;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.2s;
+  min-width: 80px;
+  text-align: center;
+}
+
+.viewArchivedBtn:hover {
+  background: #138496;
+  transform: translateY(-1px);
+}
+
+/* Empty State */
+.emptyState {
+  text-align: center;
+  padding: 80px 20px;
+  color: #6c757d;
+  background: #f8f9fa;
+  border-radius: 12px;
+  margin: 20px 0;
+}
+
+.emptyIcon {
+  font-size: 64px;
+  margin-bottom: 24px;
+  opacity: 0.3;
+  animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+.emptyState h4 {
+  font-size: 20px;
+  margin-bottom: 12px;
+  color: #495057;
+  font-weight: 600;
+}
+
+.emptyState p {
+  font-size: 15px;
+  max-width: 400px;
+  margin: 0 auto;
+  line-height: 1.6;
+}
+
+/* Loading State */
+.loadingMessage {
+  text-align: center;
+  padding: 60px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  color: #495057;
+}
+
+.spinner {
+  width: 50px;
+  height: 50px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #007bff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Export Button */
+.exportBtn {
+  padding: 10px 20px;
+  background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 2px 8px rgba(40, 167, 69, 0.2);
+}
+
+.exportBtn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #218838 0%, #17a2b8 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+}
+
+.exportBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Modal Body Scroll */
+.IIRViewModalBody {
+  max-height: calc(80vh - 140px);
+  overflow-y: auto;
+  padding-right: 4px;
+
+}
+
+.IIRViewModalBody::-webkit-scrollbar {
+  width: 6px;
+}
+
+.IIRViewModalBody::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+.IIRViewModalBody::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+
+.IIRViewModalBody::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 1200px) {
+  .archivedTable {
+    font-size: 13px;
+  }
+  
+  .archivedTable th,
+  .archivedTable td {
+    padding: 12px;
+  }
+}
+
+@media (max-width: 768px) {
+  .tabNavigation {
+    flex-direction: column;
+    width: 100%;
+  }
+  
+  .tabBtn {
+    justify-content: center;
+    width: 100%;
+  }
+  
+  .archivedTable th,
+  .archivedTable td {
+    padding: 10px;
+    font-size: 12px;
+  }
+  
+  .IIRViewModalContent {
+    margin: 10px;
+  }
+}
+
+/* Print Styles for Archive */
+@media print {
+  .archivedTableContainer {
+    max-height: none;
+    overflow: visible;
+  }
+  
+  .archivedTable {
+    border: 1px solid #000;
+  }
+  
+  .archivedTable th {
+    background: #ddd !important;
+    color: #000 !important;
+    -webkit-print-color-adjust: exact;
+  }
+  
+  .archivedTable tr {
+    page-break-inside: avoid;
+  }
+}
+
+/* Animation for Archive Modal */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.IIRViewModalContent {
+  animation: slideIn 0.3s ease-out;
+  width: 900px;
+  margin-left: 200px;
+}
+
+/* Archive Filter Toggle */
+.archiveFilterToggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 20px 0;
+  padding: 12px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #dee2e6;
+}
+
+.archiveFilterToggle label {
+  font-weight: 600;
+  color: #495057;
+  font-size: 14px;
+}
+
+.archiveFilterToggle select {
+  padding: 8px 12px;
+  border: 1px solid #ced4da;
+  border-radius: 6px;
+  background: white;
+  font-size: 14px;
+  color: #495057;
+  min-width: 150px;
+}
+
+/* Archive Search */
+.archiveSearch {
+  margin: 20px 0;
+  position: relative;
+}
+
+.archiveSearch input {
+  width: 100%;
+  padding: 12px 16px 12px 40px;
+  border: 1px solid #ced4da;
+  border-radius: 8px;
+  font-size: 14px;
+  background: white url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%236c757d' viewBox='0 0 16 16'%3E%3Cpath d='M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z'/%3E%3C/svg%3E") no-repeat 16px center;
+  background-size: 16px;
+}
+
+.archiveSearch input:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+/* Archive Stats */
+.archiveStats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 15px;
+  margin: 20px 0;
+  padding: 20px;
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  border-radius: 12px;
+  border: 1px solid #dee2e6;
+}
+
+.archiveStatCard {
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+  text-align: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  border: 1px solid #dee2e6;
+}
+
+.archiveStatCard h4 {
+  font-size: 14px;
+  color: #6c757d;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+.archiveStatCard .statValue {
+  font-size: 28px;
+  font-weight: 700;
+  color: #007bff;
+  margin-bottom: 4px;
+}
+
+.archiveStatCard .statLabel {
+  font-size: 12px;
+  color: #6c757d;
+  font-weight: 500;
+}
+
+
+
+/* Add these styles to your CSS module */
+
+.clearanceTypeCell {
+  position: relative;
+  min-width: 150px;
+}
+
+.clearanceTypeMain {
+  font-weight: 600;
+}
+
+.multipleTypesIndicator {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 6px;
+  background-color: #e3f2fd;
+  color: #1976d2;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.clearanceTypesTooltip {
+  display: none;
+  position: absolute;
+  z-index: 1000;
+  top: 100%;
+  left: 0;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 8px;
+  min-width: 200px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.clearanceTypeCell:hover .clearanceTypesTooltip {
+  display: block;
+}
+
+.clearanceTypeItem {
+  padding: 4px 8px;
+  border-bottom: 1px solid #eee;
+  font-size: 12px;
+}
+
+.clearanceTypeItem:last-child {
+  border-bottom: none;
+}
+
+.clearanceStatus {
+  font-size: 11px;
+  color: #666;
+  margin-top: 2px;
+}
+
+/* Add to your CSS module */
+.multipleRequestsBadge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 6px;
+  background-color: #fff3e0;
+  color: #ef6c00;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.multipleClearanceTooltip {
+  display: none;
+  position: absolute;
+  z-index: 1000;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 12px;
+  min-width: 250px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  margin-top: 5px;
+}
+
+.clearanceTypesDisplay:hover .multipleClearanceTooltip {
+  display: block;
+}
+
+.tooltipTitle {
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #333;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 4px;
+}
+
+.tooltipItem {
+  padding: 4px 0;
+  font-size: 12px;
+  border-bottom: 1px solid #f5f5f5;
+}
+
+.tooltipItem:last-child {
+  border-bottom: none;
+}
+
+/* Multiple clearance indicators */
+.multipleTypesBadge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 2px 6px;
+  background-color: #e3f2fd;
+  color: #1976d2;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.multipleRequestsBadge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  background-color: #fff3e0;
+  color: #ef6c00;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.multipleRequestsIndicator {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 6px;
+  background-color: #fce4ec;
+  color: #c2185b;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* Tooltip for multiple clearances */
+.multipleClearanceTooltip {
+  display: none;
+  position: absolute;
+  z-index: 1000;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 12px;
+  min-width: 250px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  margin-top: 5px;
+}
+
+.clearanceTypesDisplay {
+  position: relative;
+}
+
+.clearanceTypesDisplay:hover .multipleClearanceTooltip {
+  display: block;
+}
+
+.tooltipTitle {
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #333;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 4px;
+}
+
+.tooltipItem {
+  padding: 4px 0;
+  font-size: 12px;
+  border-bottom: 1px solid #f5f5f5;
+}
+
+.tooltipItem:last-child {
+  border-bottom: none;
+}
+
+/* Approve modal multiple clearance details */
+.multipleClearanceDetails {
+  margin: 15px 0;
+  padding: 12px;
+  background-color: #f8f9fa;
+  border-radius: 6px;
+  border-left: 4px solid #1976d2;
+}
+
+.detailsTitle {
+  font-weight: 600;
+  margin-bottom: 10px;
+  color: #1976d2;
+  font-size: 14px;
+}
+
+.clearanceDetailItem {
+  display: flex;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid #eee;
+}
+
+.clearanceDetailItem:last-child {
+  border-bottom: none;
+}
+
+.clearanceNumber {
+  display: inline-block;
+  width: 24px;
+  height: 24px;
+  background-color: #1976d2;
+  color: white;
+  border-radius: 50%;
+  text-align: center;
+  line-height: 24px;
+  font-size: 12px;
+  margin-right: 10px;
+}
+
+.clearanceTypeName {
+  flex: 1;
+  font-weight: 500;
+}
+
+.clearanceId {
+  font-size: 11px;
+  color: #666;
+  font-family: monospace;
+}
+
+/* Modal specific styles */
+.IIRViewModalBody .clearanceTypesDisplay {
+  margin-top: 5px;
+}
+
+.clearanceTypesList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.clearanceTypeTag {
+  display: inline-block;
+  padding: 4px 10px;
+  background-color: #e8f5e9;
+  color: #2e7d32;
+  border-radius: 16px;
+  font-size: 12px;
+  font-weight: 500;
 }

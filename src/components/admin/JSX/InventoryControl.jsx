@@ -13,7 +13,10 @@ import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import BFPPreloader from "../../BFPPreloader.jsx";
 import { useAuth } from "../../AuthContext.jsx";
-
+import {
+  filterActivePersonnel,
+  isPersonnelActive,
+} from "../../filterActivePersonnel.js";
 export default function InventoryControl() {
   // ========== PRELOADER STATES ==========
   const [isInitializing, setIsInitializing] = useState(true);
@@ -341,20 +344,31 @@ export default function InventoryControl() {
     }
   }
 
-  // ========== REPLACED: loadPersonnel function ==========
+  // Then update your loadPersonnel function:
   async function loadPersonnel() {
     try {
       const { data, error } = await supabase
         .from("personnel")
-        .select("id, first_name, last_name, badge_number,rank, rank_image")
+        .select(
+          "id, first_name, last_name, badge_number, rank, rank_image, is_active, status, separation_type, separation_date, retirement_date"
+        )
         .order("last_name", { ascending: true });
 
       if (error) throw error;
 
+      // Filter out retired/resigned personnel
+      const activePersonnel = filterActivePersonnel(data || []);
+
+      console.log(
+        `Loaded ${activePersonnel.length} active personnel out of ${
+          data?.length || 0
+        } total`
+      );
+
       // Load clearance requests to check each personnel
       await loadClearanceRequests();
 
-      setPersonnel(data || []);
+      setPersonnel(activePersonnel);
     } catch (err) {
       console.error("loadPersonnel error", err);
       toast.error("Failed to load personnel: " + err.message);
@@ -1828,6 +1842,9 @@ export default function InventoryControl() {
               <option>Firefighting Equipment</option>
               <option>Protective Gear</option>
               <option>Vehicle Equipment</option>
+              <option>Communication Equipment</option>
+              <option>Medical Equipment</option>
+              <option>Tools</option>
             </select>
 
             <select
@@ -1979,6 +1996,13 @@ export default function InventoryControl() {
                       <option value="Vehicle Equipment">
                         Vehicle Equipment
                       </option>
+                      <option value="Communication Equipment">
+                        Communication Equipment
+                      </option>
+                      <option value="Medical Equipment">
+                        Medical Equipment
+                      </option>
+                      <option value="Tools">Tools</option>
                     </select>
                     <h4>Select Category</h4>
                   </div>
@@ -2771,6 +2795,13 @@ export default function InventoryControl() {
                         <option value="Vehicle Equipment">
                           Vehicle Equipment
                         </option>
+                        <option value="Communication Equipment">
+                          Communication Equipment
+                        </option>
+                        <option value="Medical Equipment">
+                          Medical Equipment
+                        </option>
+                        <option value="Tools">Tools</option>
                       </select>
                       <h4 className={styles.inventoryModalInputLabel}>
                         Category

@@ -94,7 +94,115 @@
   font-weight: 600;
   color: #333;
 }
+/* Add to your LeaveManagement.module.css */
+.calculateBtn {
+  background: #6c757d;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: background 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
 
+.calculateBtn:hover {
+  background: #5a6268;
+}
+
+/* For card view - smaller button */
+.cardActionButtons .calculateBtn {
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+/* For modal */
+.modalActions .calculateBtn {
+  background: #17a2b8;
+  padding: 8px 16px;
+  font-size: 14px;
+}
+
+.modalActions .calculateBtn:hover {
+  background: #138496;
+}
+/* Add these styles */
+.paymentOptions {
+  margin: 15px 0;
+}
+
+.paymentOptions label {
+  display: flex;
+  align-items: center;
+  margin: 10px 0;
+  cursor: pointer;
+}
+
+.paymentOptions input[type="radio"] {
+  margin-right: 10px;
+}
+
+.partialDays {
+  margin: 15px 0;
+  padding: 10px;
+  background: #f0f7ff;
+  border-radius: 4px;
+}
+
+.partialDays label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: 500;
+}
+
+.partialDays input {
+  width: 80px;
+  padding: 8px;
+  margin-right: 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.partialDays small {
+  display: block;
+  margin-top: 5px;
+  color: #666;
+  font-size: 12px;
+}
+
+.breakdownSummary {
+  margin: 15px 0;
+  padding: 15px;
+  background: #f8f9fa;
+  border-radius: 4px;
+  border-left: 4px solid #4a6fa5;
+}
+
+.breakdownSummary h4 {
+  margin-top: 0;
+  color: #333;
+}
+
+.breakdownSummary p {
+  margin: 5px 0;
+}
+
+.breakdownSummary .warning {
+  color: #d9534f;
+  font-weight: bold;
+  margin-top: 10px;
+  padding: 8px;
+  background: #fdf2f2;
+  border-radius: 4px;
+  border-left: 3px solid #d9534f;
+}
+/* Status info section */
+.statusInfo .calculateBtn {
+  margin-right: 8px;
+}
 
 /* ================================
    TABLE WRAPPER FOR SCROLLING
@@ -1185,7 +1293,7 @@ label[for="leaveStatusFilter"] {
   background: white;
   border-radius: 12px;
   width: 100%;
-  max-width: 450px;
+  max-width: 500px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
   overflow: hidden;
   margin-left: 290px;

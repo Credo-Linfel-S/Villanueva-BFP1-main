@@ -189,7 +189,44 @@ export const loadPersonnelEquipment = async (personnelId) => {
     return [];
   }
 };
+export const checkClearanceEligibility = async (personnelId, clearanceType) => {
+  try {
+    // Check for existing clearance first
+    const { exists, message } = await checkExistingClearance(
+      personnelId,
+      clearanceType
+    );
+    if (exists) {
+      return { eligible: false, reason: message };
+    }
 
+    // Check for lost equipment if applicable
+    if (
+      clearanceType === "Resignation" ||
+      clearanceType === "Retirement" ||
+      clearanceType === "Equipment Completion"
+    ) {
+      const { data: lostRecords } = await supabase
+        .from("accountability_records")
+        .select("id, is_settled")
+        .eq("personnel_id", personnelId)
+        .eq("record_type", "LOST")
+        .eq("is_settled", false);
+
+      if (lostRecords && lostRecords.length > 0) {
+        return {
+          eligible: false,
+          reason: `Cannot create clearance: ${lostRecords.length} unsettled lost equipment item(s) found. These must be settled first.`,
+        };
+      }
+    }
+
+    return { eligible: true, reason: "" };
+  } catch (error) {
+    console.error("Error checking clearance eligibility:", error);
+    return { eligible: false, reason: "System error checking eligibility" };
+  }
+};
 /**
  * Update clearance status with accountability checks
  */

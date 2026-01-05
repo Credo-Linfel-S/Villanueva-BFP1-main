@@ -5,11 +5,15 @@ import Hamburger from "../../Hamburger.jsx";
 import { useSidebar } from "../../SidebarContext.jsx";
 import { Title, Meta } from "react-head";
 import { supabase } from "../../../lib/supabaseClient.js";
-
+import BFPPreloader from "../../BFPPreloader.jsx";
+import { filterActivePersonnel } from "../../filterActivePersonnel.js"; // Import the utility
+import { ToastContainer, toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 const Promotion = () => {
   const [personnel, setPersonnel] = useState([]);
   const [filteredPersonnel, setFilteredPersonnel] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [preloaderProgress, setPreloaderProgress] = useState(0);
   const { isSidebarCollapsed } = useSidebar();
 
   // State variables for table functionality
@@ -49,6 +53,27 @@ const Promotion = () => {
     }
   };
 
+  // Function to get personnel photo URL
+  const getPersonnelPhotoUrl = (person) => {
+    if (!person) return "/bfp.jpg";
+
+    // Try photo_url first
+    if (person.photo_url) {
+      return person.photo_url;
+    }
+
+    // Try to construct from photo_path
+    if (person.photo_path) {
+      const { data: urlData } = supabase.storage
+        .from("personnel-documents")
+        .getPublicUrl(person.photo_path);
+      return urlData?.publicUrl || "/bfp.jpg";
+    }
+
+    // Fallback to default image
+    return "/bfp.jpg";
+  };
+
   const calculateYears = (dateString) => {
     if (!dateString) return 0;
     const today = new Date();
@@ -59,39 +84,62 @@ const Promotion = () => {
 
   const loadPromotionData = async () => {
     setLoading(true);
+    setPreloaderProgress(10);
+
     try {
-      // Get personnel data from Supabase
+      // Get ALL personnel data from Supabase (we'll filter later)
+      setPreloaderProgress(30);
       const { data: personnelData, error } = await supabase
         .from("personnel")
-        .select("*")
-        .eq("is_active", true)
-        .order("last_name", { ascending: true }); // Only load active personnel
+        .select(
+          "id, first_name, middle_name, last_name, username, rank, rank_image, badge_number, photo_url, photo_path, date_hired, last_promoted, last_rank, is_active, status, separation_type, separation_date, retirement_date"
+        )
+        .order("last_name", { ascending: true });
 
       if (error) throw error;
 
+      setPreloaderProgress(60);
+
+      // Filter out retired/resigned personnel using utility function
+      const activePersonnel = filterActivePersonnel(personnelData || []);
+
+      console.log(
+        `Promotion System: Loaded ${
+          activePersonnel.length
+        } active personnel out of ${personnelData?.length || 0} total`
+      );
+
       // Transform data to include promotion-specific fields
-      const transformedData = personnelData.map((person) => ({
+      const transformedData = activePersonnel.map((person) => ({
         id: person.id,
         firstName: person.first_name || "",
         middleName: person.middle_name || "",
         lastName: person.last_name || "",
         rank: person.rank || "FO1",
         lastRank: person.last_rank || person.rank || "FO1",
-        photoURL: person.photo_url || "",
+        photoURL: getPersonnelPhotoUrl(person), // Get personnel photo
         dateHired: person.date_hired || "",
         lastPromoted: person.last_promoted || person.date_hired || "",
         // Get rank images from personnel table
         rankImage: getRankImageUrl(person.rank_image),
         lastRankImage: getRankImageUrl(person.rank_image), // Use same image for last rank
         badgeNumber: person.badge_number || "",
+        // Include status fields for debugging
+        isActive: person.is_active,
+        status: person.status,
       }));
 
       setPersonnel(transformedData);
+      setPreloaderProgress(90);
     } catch (error) {
       console.error("Error loading promotion data:", error);
-      alert("Failed to load personnel data. Please try again.");
+      toast.error("Failed to load personnel data. Please try again.");
     } finally {
-      setLoading(false);
+      setPreloaderProgress(100);
+      // Small delay to show 100% completion before hiding
+      setTimeout(() => {
+        setLoading(false);
+      }, 500);
     }
   };
 
@@ -99,7 +147,7 @@ const Promotion = () => {
   const handleImageError = (e, isPlaceholder = false) => {
     if (isPlaceholder) {
       // For placeholder images
-      e.target.src = "/default-avatar.png"; // Use a local fallback
+      e.target.src = "/bfp.jpg"; // Use a local fallback
     } else {
       // For rank images
       e.target.onerror = null;
@@ -111,6 +159,12 @@ const Promotion = () => {
         placeholder.style.display = "flex";
       }
     }
+  };
+
+  // Helper for personnel photo error handling
+  const handlePersonnelPhotoError = (e) => {
+    e.target.onerror = null;
+    e.target.src = "/bfp.jpg";
   };
 
   // Filtering logic
@@ -313,7 +367,7 @@ const Promotion = () => {
   const promote = async (personId) => {
     const person = personnel.find((p) => p.id === personId);
     if (!person) {
-      alert("Personnel not found!");
+      toast.warning("Personnel not found!");
       return;
     }
 
@@ -321,7 +375,7 @@ const Promotion = () => {
     const newRank = newRankInput ? newRankInput.value.trim() : "";
 
     if (!newRank) {
-      alert("Please select a valid rank.");
+      toast.info("Please select a valid rank.");
       return;
     }
 
@@ -355,12 +409,12 @@ const Promotion = () => {
       );
       setPersonnel(updatedPersonnel);
 
-      alert(
+      toast.success(
         `Successfully promoted ${person.firstName} ${person.lastName} to ${newRank}!`
       );
     } catch (error) {
       console.error("Error promoting personnel:", error);
-      alert("Failed to update personnel record. Please try again.");
+      toast.error("Failed to update personnel record. Please try again.");
     }
   };
 
@@ -382,36 +436,76 @@ const Promotion = () => {
     return rankHierarchy.slice(currentIndex + 1);
   };
 
-  // Get rank image for next rank
+  // Get rank image for next rank - ADJUST FOR YOUR NAMING CONVENTION
   const getNextRankImage = (nextRank) => {
-    // Try to find if any personnel has this rank to get the image
-    const personWithRank = personnel.find((p) => p.rank === nextRank);
-    if (personWithRank && personWithRank.rankImage) {
-      return personWithRank.rankImage;
+    if (!nextRank) return "";
+
+    // Map rank names to file names if they're different
+    const rankToFileName = {
+      FO1: "FO1.png",
+      FO2: "FO2.png",
+      FO3: "FO3.png",
+      SFO1: "SFO1.png",
+      SFO2: "SFO2.png",
+      SFO3: "SFO3.png",
+      SFO4: "SFO4.png",
+    };
+
+    const fileName = rankToFileName[nextRank] || `${nextRank}.png`;
+
+    try {
+      const { data } = supabase.storage
+        .from("rank_images")
+        .getPublicUrl(fileName);
+
+      return data?.publicUrl || "";
+    } catch (error) {
+      console.error("Error getting next rank image:", error);
+      return "";
     }
-    return "";
   };
 
+  // Get next rank display information
+  const getNextRankDisplay = (person) => {
+    const yearsInRank = calculateYears(
+      person.lastPromoted || person.dateHired || ""
+    );
+    const eligible = yearsInRank >= 2;
+    const nextRanks = getNextRanks(person.rank);
+
+    if (nextRanks.length > 0) {
+      const nextRank = nextRanks[0];
+      const nextRankImage = getNextRankImage(nextRank);
+
+      return {
+        eligible,
+        nextRanks,
+        nextRank,
+        nextRankImage,
+        yearsInRank,
+        shouldDisplayNextRank: eligible, // Only show next rank if eligible
+      };
+    }
+
+    return {
+      eligible,
+      nextRanks,
+      nextRank: null,
+      nextRankImage: "",
+      yearsInRank,
+      shouldDisplayNextRank: false,
+    };
+  };
+
+  // Show BFP Preloader while loading
   if (loading) {
     return (
-      <div className={`main-content ${isSidebarCollapsed ? "collapsed" : ""}`}>
-        <div style={{ textAlign: "center", padding: "50px" }}>
-          <div style={{ fontSize: "48px", marginBottom: "16px" }}>📈</div>
-          <h3
-            style={{
-              fontSize: "18px",
-              fontWeight: "600",
-              color: "#2b2b2b",
-              marginBottom: "8px",
-            }}
-          >
-            Loading Promotion Data
-          </h3>
-          <p style={{ fontSize: "14px", color: "#999" }}>
-            Please wait while we load personnel information...
-          </p>
-        </div>
-      </div>
+      <BFPPreloader
+        loading={loading}
+        progress={preloaderProgress}
+        moduleTitle="PROMOTION SYSTEM • Checking Eligibility..."
+        onRetry={loadPromotionData}
+      />
     );
   }
 
@@ -471,8 +565,11 @@ const Promotion = () => {
             }`}
             onClick={() => handleCardClick("total")}
           >
-            <h3>Total Personnel</h3>
+            <h3>Active Personnel</h3>
             <p>{totalItems}</p>
+            <small className={styles.summaryNote}>
+              (Retired/Resigned excluded)
+            </small>
           </button>
           <button
             className={`${styles.QoPSummaryCard} ${styles.QoPEligible} ${
@@ -480,8 +577,11 @@ const Promotion = () => {
             }`}
             onClick={() => handleCardClick("eligible")}
           >
-            <h3>Eligible</h3>
+            <h3>Eligible for Promotion</h3>
             <p>{eligibleItems}</p>
+            <medium className={styles.summaryNote}>
+              2 years and above in current rank
+            </medium>
           </button>
           <button
             className={`${styles.QoPSummaryCard} ${styles.QoPNotEligible} ${
@@ -489,8 +589,11 @@ const Promotion = () => {
             }`}
             onClick={() => handleCardClick("not-eligible")}
           >
-            <h3>Not Eligible</h3>
+            <h3>Not Yet Eligible</h3>
             <p>{notEligibleItems}</p>
+            <medium className={styles.summaryNote}>
+              Less than in 2 years in current rank
+            </medium>
           </button>
         </div>
 
@@ -507,24 +610,28 @@ const Promotion = () => {
                 <th>First Name</th>
                 <th>Middle Name</th>
                 <th>Last Name</th>
+                <th>Badge No.</th>
                 <th>Last Rank</th>
                 <th>Current Rank</th>
                 <th>Years in Rank</th>
                 <th>Next Rank</th>
                 <th>Eligibility Status</th>
+                <th>Promote To</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {paginatedData.length === 0 ? (
                 <tr>
-                  <td colSpan="10" className={styles.QoPNoData}>
+                  <td colSpan="12" className={styles.QoPNoData}>
                     <div style={{ fontSize: "48px", marginBottom: "16px" }}>
                       <span className={styles.animatedEmoji}>📈</span>
                     </div>
-                    <h3>No Personnel Found</h3>
+                    <h3>No Active Personnel Found</h3>
                     <p>
-                      There are no personnel records matching your criteria.
+                      There are no active personnel records matching your
+                      criteria. Retired and resigned personnel are excluded from
+                      promotion eligibility.
                     </p>
                   </td>
                 </tr>
@@ -535,28 +642,37 @@ const Promotion = () => {
                   const lastName = person.lastName || "";
                   const rank = person.rank || "N/A";
                   const lastRank = person.lastRank || "—";
-                  const photo = person.photoURL || "/default-avatar.png";
                   const dateHired = person.dateHired || "";
                   const lastPromoted = person.lastPromoted || dateHired;
 
-                  const yearsInRank = calculateYears(lastPromoted);
-                  const eligible = yearsInRank >= 2;
-                  const nextRanks = getNextRanks(rank);
-                  const nextRankImage = getNextRankImage(nextRanks[0] || "");
+                  const {
+                    eligible,
+                    nextRanks,
+                    nextRank,
+                    nextRankImage,
+                    yearsInRank,
+                    shouldDisplayNextRank,
+                  } = getNextRankDisplay(person);
 
                   return (
                     <tr key={person.id} className={styles.QoPTableRow}>
-                      <td>
-                        <img
-                          src={photo}
-                          className={styles.QoPProfilePhoto}
-                          alt={`${firstName} ${lastName}`}
-                          onError={(e) => handleImageError(e, true)}
-                        />
+                      {/* Photo */}
+                      <td className={styles.photoCell}>
+                        <div className={styles.personnelPhotoContainer}>
+                          <img
+                            src={person.photoURL}
+                            alt={`${firstName} ${lastName}`}
+                            className={styles.personnelPhoto}
+                            onError={handlePersonnelPhotoError}
+                            loading="lazy"
+                          />
+                        </div>
                       </td>
+
                       <td>{firstName}</td>
                       <td>{middleName}</td>
                       <td>{lastName}</td>
+                      <td>{person.badgeNumber || "—"}</td>
 
                       {/* Last Rank with Image */}
                       <td className={styles.rankCellColumn}>
@@ -622,64 +738,72 @@ const Promotion = () => {
                         </div>
                       </td>
 
-                      <td>{yearsInRank.toFixed(1)}</td>
+                      <td>
+                        <span className={styles.yearsBadge}>
+                          {yearsInRank.toFixed(1)} years
+                        </span>
+                      </td>
 
                       {/* Next Rank with Image */}
                       <td className={styles.rankCellColumn}>
-                        {eligible && nextRanks.length > 0 ? (
-                          <div className={styles.rankCell}>
-                            {nextRankImage ? (
-                              <>
-                                <img
-                                  src={nextRankImage}
-                                  alt={nextRanks[0]}
-                                  className={styles.rankImage}
-                                  onError={(e) => handleImageError(e, false)}
-                                />
+                        <div className={styles.rankCell}>
+                          {shouldDisplayNextRank && nextRank ? (
+                            <>
+                              {nextRankImage ? (
+                                <>
+                                  <img
+                                    src={nextRankImage}
+                                    alt={nextRank}
+                                    className={styles.rankImage}
+                                    onError={(e) => handleImageError(e, false)}
+                                  />
+                                  <div
+                                    className={`${styles.rankPlaceholder} ${styles.hidden}`}
+                                  >
+                                    <span
+                                      className={styles.rankPlaceholderText}
+                                    >
+                                      {nextRank.charAt(0)}
+                                    </span>
+                                  </div>
+                                </>
+                              ) : (
                                 <div
-                                  className={`${styles.rankPlaceholder} ${styles.hidden}`}
+                                  className={`${styles.rankPlaceholder} ${styles.show}`}
                                 >
                                   <span className={styles.rankPlaceholderText}>
-                                    {nextRanks[0]
-                                      ? nextRanks[0].charAt(0)
-                                      : "N"}
+                                    {nextRank.charAt(0)}
                                   </span>
                                 </div>
-                              </>
-                            ) : (
+                              )}
+                              <span className={styles.rankText}>
+                                {nextRank}
+                              </span>
+                            </>
+                          ) : nextRanks.length === 0 ? (
+                            <>
+                              <div
+                                className={`${styles.rankPlaceholder} ${styles.show} ${styles.maxRank}`}
+                              >
+                                <span className={styles.rankPlaceholderText}>
+                                  ★
+                                </span>
+                              </div>
+                              <span className={styles.rankText}>Max Rank</span>
+                            </>
+                          ) : (
+                            <>
                               <div
                                 className={`${styles.rankPlaceholder} ${styles.show}`}
                               >
                                 <span className={styles.rankPlaceholderText}>
-                                  {nextRanks[0] ? nextRanks[0].charAt(0) : "N"}
+                                  —
                                 </span>
                               </div>
-                            )}
-                            <select
-                              className={styles.QoPRankInput}
-                              id={`next-rank-${person.id}`}
-                              defaultValue={nextRanks[0]}
-                              style={{ marginLeft: "10px" }}
-                            >
-                              {nextRanks.map((nextRank) => (
-                                <option key={nextRank} value={nextRank}>
-                                  {nextRank}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                        ) : (
-                          <div className={styles.rankCell}>
-                            <div
-                              className={`${styles.rankPlaceholder} ${styles.show}`}
-                            >
-                              <span className={styles.rankPlaceholderText}>
-                                —
-                              </span>
-                            </div>
-                            <span className={styles.rankText}>—</span>
-                          </div>
-                        )}
+                              <span className={styles.rankText}>—</span>
+                            </>
+                          )}
+                        </div>
                       </td>
 
                       <td>
@@ -690,10 +814,40 @@ const Promotion = () => {
                               : styles.QoPNotEligibleStatus
                           }`}
                         >
-                          {eligible ? "Eligible" : "Not Eligible"}
-                          {eligible && ` (${yearsInRank.toFixed(1)} years)`}
+                          {eligible ? "✅ Eligible" : "⏳ Not Eligible"}
+                          <br />
+                          <small>
+                            {eligible
+                              ? `(${yearsInRank.toFixed(1)} years)`
+                              : `(${yearsInRank.toFixed(1)}/2.0 years)`}
+                          </small>
                         </span>
                       </td>
+
+                      {/* Promote To (Dropdown) */}
+                      <td>
+                        {eligible && nextRanks.length > 0 ? (
+                          <select
+                            className={styles.QoPRankInput}
+                            id={`next-rank-${person.id}`}
+                            defaultValue={nextRanks[0]}
+                          >
+                            {nextRanks.map((nextRankOption) => (
+                              <option
+                                key={nextRankOption}
+                                value={nextRankOption}
+                              >
+                                {nextRankOption}
+                              </option>
+                            ))}
+                          </select>
+                        ) : eligible && nextRanks.length === 0 ? (
+                          <span className={styles.maxRankText}>Max Rank</span>
+                        ) : (
+                          <span className={styles.notEligibleText}>—</span>
+                        )}
+                      </td>
+
                       <td>
                         {eligible && nextRanks.length > 0 ? (
                           <button
@@ -705,7 +859,9 @@ const Promotion = () => {
                         ) : eligible && nextRanks.length === 0 ? (
                           <span className={styles.QoPMaxRank}>Max Rank</span>
                         ) : (
-                          "—"
+                          <span className={styles.QoPNotEligibleAction}>
+                            Not Eligible
+                          </span>
                         )}
                       </td>
                     </tr>
@@ -714,6 +870,32 @@ const Promotion = () => {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Bottom Pagination */}
+        <div className={styles.QoPPaginationContainer}>
+          {renderPaginationButtons()}
+        </div>
+
+        {/* Legend/Help Section */}
+        <div className={styles.legendSection}>
+          <h3>Promotion Eligibility Rules:</h3>
+          <ul>
+            <li>
+              ✅ <strong>Eligible:</strong> At least 2 years in current rank
+            </li>
+            <li>
+              ⏳ <strong>Not Eligible:</strong> Less than 2 years in current
+              rank
+            </li>
+            <li>
+              ★ <strong>Max Rank:</strong> Already at highest rank (SFO4)
+            </li>
+            <li>
+              <strong>Note:</strong> Retired and resigned personnel are excluded
+              from promotion eligibility
+            </li>
+          </ul>
         </div>
       </div>
     </div>

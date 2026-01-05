@@ -1,5 +1,5 @@
 // RecruitmentPersonnel.jsx - FIXED VERSION
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import styles from "../styles/RecruitmentPersonnel.module.css";
 import Sidebar from "../../Sidebar.jsx";
 import Hamburger from "../../Hamburger.jsx";
@@ -8,9 +8,22 @@ import { Title, Meta } from "react-head";
 import Flatpickr from "react-flatpickr";
 import "flatpickr/dist/flatpickr.css";
 import { supabase } from "../../../lib/supabaseClient.js";
-
+import BFPPreloader from "../../BFPPreloader.jsx";
+import { FaEye, FaEyeSlash, FaCopy, FaCheck } from "react-icons/fa";
+import { ToastContainer, toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 const RecruitmentPersonnel = () => {
-  const [formData, setFormData] = useState({
+  // FORM DATA STATES - Separate for add and edit
+  const [addFormData, setAddFormData] = useState({
+    candidate: "",
+    position: "",
+    applicationDate: "",
+    stage: "",
+    interviewDate: "",
+    status: "",
+  });
+
+  const [editFormData, setEditFormData] = useState({
     candidate: "",
     position: "",
     applicationDate: "",
@@ -21,8 +34,10 @@ const RecruitmentPersonnel = () => {
     resumeUrl: "",
   });
 
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
+  const [addUsername, setAddUsername] = useState("");
+  const [addPassword, setAddPassword] = useState("");
+  const [editUsername, setEditUsername] = useState("");
+  const [editPassword, setEditPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
   const [records, setRecords] = useState([]);
@@ -41,16 +56,26 @@ const RecruitmentPersonnel = () => {
   const [filterStatus, setFilterStatus] = useState("");
   const [currentFilterCard, setCurrentFilterCard] = useState("total");
 
-  // Loading state
-  const [loading, setLoading] = useState(true);
+  // Loading states
+  const [initialLoading, setInitialLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [loadingProgress, setLoadingProgress] = useState(0);
 
-  // File upload states
+  // File upload states for ADD form
   const [photoFile, setPhotoFile] = useState(null);
   const [resumeFile, setResumeFile] = useState(null);
   const [photoPreview, setPhotoPreview] = useState("");
   const [resumeFileName, setResumeFileName] = useState("");
   const [uploadProgress, setUploadProgress] = useState(0);
+
+  // EDIT MODAL SPECIFIC STATES
+  const [editPhotoPreview, setEditPhotoPreview] = useState("");
+  const [editPhotoFile, setEditPhotoFile] = useState(null);
+  const [editResumeFile, setEditResumeFile] = useState(null);
+  const [isPhotoRemoved, setIsPhotoRemoved] = useState(false);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const editPhotoInputRef = useRef(null);
+  const editResumeInputRef = useRef(null);
 
   // Load data from Supabase
   useEffect(() => {
@@ -95,32 +120,42 @@ const RecruitmentPersonnel = () => {
       .join("");
   };
 
-  // Auto-generate username when candidate name changes
+  // Auto-generate username when candidate name changes in ADD form
   useEffect(() => {
-    if (formData.candidate && editId === null) {
-      const generatedUsername = generateUsername(formData.candidate);
-      setUsername(generatedUsername);
+    if (addFormData.candidate) {
+      const generatedUsername = generateUsername(addFormData.candidate);
+      setAddUsername(generatedUsername);
 
-      if (!password) {
+      if (!addPassword) {
         const generatedPassword = generatePassword();
-        setPassword(generatedPassword);
+        setAddPassword(generatedPassword);
       }
     }
-  }, [formData.candidate]);
+  }, [addFormData.candidate]);
 
-  // Generate new password
+  // Generate new password for ADD form
   const handleGeneratePassword = () => {
     const newPassword = generatePassword();
-    setPassword(newPassword);
+    setAddPassword(newPassword);
+  };
+
+  // Generate new password for EDIT form
+  const handleGeneratePasswordEdit = () => {
+    const newPassword = generatePassword();
+    setEditPassword(newPassword);
   };
 
   const fetchRecruitmentData = async () => {
     try {
-      setLoading(true);
+      setInitialLoading(true);
+      setLoadingProgress(30);
+
       const { data, error } = await supabase
         .from("recruitment_personnel")
         .select("*")
         .order("created_at", { ascending: false });
+
+      setLoadingProgress(70);
 
       if (error) {
         console.error("Error fetching recruitment data:", error);
@@ -128,32 +163,47 @@ const RecruitmentPersonnel = () => {
       }
 
       setRecords(data || []);
+      setLoadingProgress(100);
+
+      // Small delay to show completion
+      setTimeout(() => {
+        setInitialLoading(false);
+      }, 500);
     } catch (error) {
       console.error("Error in fetchRecruitmentData:", error);
-    } finally {
-      setLoading(false);
+      setInitialLoading(false);
     }
   };
 
-  const handleInputChange = (e) => {
+  // Handle input changes for ADD form
+  const handleAddInputChange = (e) => {
     const { id, value } = e.target;
-    setFormData((prev) => ({
+    setAddFormData((prev) => ({
       ...prev,
       [id]: value,
     }));
   };
 
-  // Handle photo file selection
+  // Handle input changes for EDIT form
+  const handleEditInputChange = (e) => {
+    const { id, value } = e.target;
+    setEditFormData((prev) => ({
+      ...prev,
+      [id]: value,
+    }));
+  };
+
+  // Handle photo file selection for ADD form
   const handlePhotoChange = (e) => {
     const file = e.target.files[0];
     if (file) {
       if (!file.type.startsWith("image/")) {
-        alert("Please select an image file (JPEG, PNG, etc.)");
+        toast.info("Please select an image file (JPEG, PNG, etc.)");
         return;
       }
 
       if (file.size > 5 * 1024 * 1024) {
-        alert("Image file size should be less than 5MB");
+        toast.info("Image file size should be less than 5MB");
         return;
       }
 
@@ -167,7 +217,7 @@ const RecruitmentPersonnel = () => {
     }
   };
 
-  // Handle resume file selection
+  // Handle resume file selection for ADD form
   const handleResumeChange = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -183,17 +233,84 @@ const RecruitmentPersonnel = () => {
         ["pdf", "doc", "docx"].includes(fileExtension);
 
       if (!isValidType) {
-        alert("Please select a PDF or Word document (PDF, DOC, DOCX)");
+        toast.info("Please select a PDF or Word document (PDF, DOC, DOCX)");
         return;
       }
 
       if (file.size > 10 * 1024 * 1024) {
-        alert("Resume file size should be less than 10MB");
+        toast.info("Resume file size should be less than 10MB");
         return;
       }
 
       setResumeFile(file);
       setResumeFileName(file.name);
+    }
+  };
+
+  // Handle photo file selection for EDIT modal
+  const handleEditPhotoChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (!file.type.startsWith("image/")) {
+        toast.info("Please select an image file (JPEG, PNG, etc.)");
+        return;
+      }
+
+      if (file.size > 5 * 1024 * 1024) {
+        toast.warning("Image file size should be less than 5MB");
+        return;
+      }
+
+      setEditPhotoFile(file);
+
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setEditPhotoPreview(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // Handle resume file selection for EDIT modal
+  const handleEditResumeChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const allowedTypes = [
+        "application/pdf",
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      ];
+
+      const fileExtension = file.name.split(".").pop().toLowerCase();
+      const isValidType =
+        allowedTypes.includes(file.type) ||
+        ["pdf", "doc", "docx"].includes(fileExtension);
+
+      if (!isValidType) {
+        toast.info("Please select a PDF or Word document (PDF, DOC, DOCX)");
+        return;
+      }
+
+      if (file.size > 10 * 1024 * 1024) {
+        toast.info("Resume file size should be less than 10MB");
+        return;
+      }
+
+      setEditResumeFile(file);
+      setResumeFileName(file.name);
+    }
+  };
+
+  // Function to clear edit photo
+  const clearEditPhoto = () => {
+    if (editPhotoPreview && editPhotoPreview.startsWith("blob:")) {
+      URL.revokeObjectURL(editPhotoPreview);
+    }
+    setEditPhotoPreview(null);
+    setEditPhotoFile(null);
+    setIsPhotoRemoved(true);
+    if (editPhotoInputRef.current) {
+      editPhotoInputRef.current.value = "";
     }
   };
 
@@ -253,29 +370,23 @@ const RecruitmentPersonnel = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    if (editId !== null) {
-      await handleUpdateCandidate(e);
-      return;
-    }
-
     await addNewCandidate();
   };
 
-  // FIXED: Add new candidate with safe field mapping
+  // Add new candidate
   const addNewCandidate = async () => {
     try {
       setSubmitting(true);
       setUploadProgress(0);
 
-      if (!formData.candidate) {
-        alert("Candidate name is required");
+      if (!addFormData.candidate) {
+        toast.info("Candidate name is required");
         setSubmitting(false);
         return;
       }
 
-      if (!username || !password) {
-        alert("Please ensure username and password are generated");
+      if (!addUsername || !addPassword) {
+        toast.info("Please ensure username and password are generated");
         setSubmitting(false);
         return;
       }
@@ -301,17 +412,17 @@ const RecruitmentPersonnel = () => {
 
       // Build candidate object with only fields that are likely to exist
       const candidateData = {
-        candidate: formData.candidate,
-        position: formData.position || "Firefighter Candidate",
-        username: username,
-        password: password,
-        stage: formData.stage || "Applied",
-        status: formData.status || "Pending",
+        candidate: addFormData.candidate,
+        position: addFormData.position || "Firefighter Candidate",
+        username: addUsername,
+        password: addPassword,
+        stage: addFormData.stage || "Applied",
+        status: addFormData.status || "Pending",
       };
 
       // Only add these fields if they exist in the table structure
       if (existingFields.includes("full_name")) {
-        candidateData.full_name = formData.candidate;
+        candidateData.full_name = addFormData.candidate;
       }
 
       if (existingFields.includes("photo_url")) {
@@ -323,11 +434,11 @@ const RecruitmentPersonnel = () => {
       }
 
       if (existingFields.includes("application_date")) {
-        candidateData.application_date = formData.applicationDate || null;
+        candidateData.application_date = addFormData.applicationDate || null;
       }
 
       if (existingFields.includes("interview_date")) {
-        candidateData.interview_date = formData.interviewDate || null;
+        candidateData.interview_date = addFormData.interviewDate || null;
       }
 
       if (existingFields.includes("auth_user_id")) {
@@ -345,7 +456,7 @@ const RecruitmentPersonnel = () => {
 
       if (error) {
         console.error("Error adding candidate:", error);
-        alert(
+        toast.error(
           `Failed to add candidate: ${error.message}\n\nPlease check if all database columns exist.`
         );
         return;
@@ -354,22 +465,22 @@ const RecruitmentPersonnel = () => {
       setUploadProgress(100);
       await fetchRecruitmentData();
 
-      resetForm();
+      resetAddForm();
       setShowForm(false);
       setCurrentPage(1);
 
       setTimeout(() => {
         setUploadProgress(0);
-        alert(
-          "✅ Candidate added successfully!\n\nCredentials:\nUsername: " +
-            username +
+        toast.success(
+          "Candidate added successfully!\n\nCredentials:\nUsername: " +
+            addUsername +
             "\nPassword: " +
-            password
+            addPassword
         );
       }, 500);
     } catch (error) {
-      console.error("Error in addNewCandidate:", error);
-      alert("An error occurred. Please try again.");
+     
+      toast.error("An error occurred. Please try again.");
       setUploadProgress(0);
     } finally {
       setSubmitting(false);
@@ -381,8 +492,28 @@ const RecruitmentPersonnel = () => {
     return Math.random().toString(36).substring(2) + Date.now().toString(36);
   };
 
-  const resetForm = () => {
-    setFormData({
+  // Reset ADD form
+  const resetAddForm = () => {
+    setAddFormData({
+      candidate: "",
+      position: "",
+      applicationDate: "",
+      stage: "",
+      interviewDate: "",
+      status: "",
+    });
+    setAddUsername("");
+    setAddPassword("");
+    setShowPassword(false);
+    setPhotoFile(null);
+    setResumeFile(null);
+    setPhotoPreview("");
+    setResumeFileName("");
+  };
+
+  // Reset EDIT modal
+  const resetEditModal = () => {
+    setEditFormData({
       candidate: "",
       position: "",
       applicationDate: "",
@@ -392,19 +523,33 @@ const RecruitmentPersonnel = () => {
       photoUrl: "",
       resumeUrl: "",
     });
-    setUsername("");
-    setPassword("");
-    setShowPassword(false);
-    setPhotoFile(null);
-    setResumeFile(null);
-    setPhotoPreview("");
+    setEditUsername("");
+    setEditPassword("");
+    setEditPhotoPreview("");
+    setEditPhotoFile(null);
+    setEditResumeFile(null);
+    setIsPhotoRemoved(false);
     setResumeFileName("");
+    setIsSavingEdit(false);
+    if (editPhotoInputRef.current) {
+      editPhotoInputRef.current.value = "";
+    }
+    if (editResumeInputRef.current) {
+      editResumeInputRef.current.value = "";
+    }
+  };
+
+  // Handle closing edit modal
+  const handleCloseEditModal = () => {
+    setShowEditModal(false);
+    setEditId(null);
+    resetEditModal();
   };
 
   const handleEdit = (id) => {
     const record = records.find((item) => item.id === id);
     if (record) {
-      setFormData({
+      setEditFormData({
         candidate: record.candidate || "",
         position: record.position || "",
         applicationDate: record.application_date || "",
@@ -414,43 +559,60 @@ const RecruitmentPersonnel = () => {
         photoUrl: record.photo_url || "",
         resumeUrl: record.resume_url || "",
       });
-      setUsername(record.username || "");
-      setPassword(record.password || "");
-      setPhotoPreview(record.photo_url || "");
+      setEditUsername(record.username || "");
+      setEditPassword(record.password || "");
+      setEditPhotoPreview(record.photo_url || "");
       setResumeFileName(
         record.resume_url ? record.resume_url.split("/").pop() : ""
       );
       setEditId(id);
       setShowEditModal(true);
+      setIsPhotoRemoved(false);
     }
   };
 
-  // FIXED: Update candidate with safe field mapping
+  // Update candidate
   const handleUpdateCandidate = async (e) => {
     e.preventDefault();
 
     if (editId === null) return;
 
     try {
-      setSubmitting(true);
+      setIsSavingEdit(true);
       setUploadProgress(0);
 
-      let photoUrl = formData.photoUrl;
-      let resumeUrl = formData.resumeUrl;
-      let oldPhotoUrl = formData.photoUrl;
-      let oldResumeUrl = formData.resumeUrl;
+      let photoUrl = editFormData.photoUrl;
+      let resumeUrl = editFormData.resumeUrl;
+      let oldPhotoUrl = editFormData.photoUrl;
+      let oldResumeUrl = editFormData.resumeUrl;
 
-      if (photoFile) {
+      // Handle photo upload
+      if (editPhotoFile) {
         setUploadProgress(30);
-        photoUrl = await uploadFile(photoFile, "photos", photoFile.name);
+        photoUrl = await uploadFile(
+          editPhotoFile,
+          "photos",
+          editPhotoFile.name
+        );
+        if (oldPhotoUrl) {
+          await deleteFile(oldPhotoUrl);
+        }
+      } else if (isPhotoRemoved) {
+        // Clear photo if removed
+        photoUrl = "";
         if (oldPhotoUrl) {
           await deleteFile(oldPhotoUrl);
         }
       }
 
-      if (resumeFile) {
+      // Handle resume upload
+      if (editResumeFile) {
         setUploadProgress(60);
-        resumeUrl = await uploadFile(resumeFile, "resumes", resumeFile.name);
+        resumeUrl = await uploadFile(
+          editResumeFile,
+          "resumes",
+          editResumeFile.name
+        );
         if (oldResumeUrl) {
           await deleteFile(oldResumeUrl);
         }
@@ -458,46 +620,20 @@ const RecruitmentPersonnel = () => {
 
       setUploadProgress(90);
 
-      // Check what fields exist in the table
-      const sampleRecord = records[0];
-      const existingFields = sampleRecord ? Object.keys(sampleRecord) : [];
-
-      // Build update data with only existing fields
+      // Build update data
       const updatedData = {
-        candidate: formData.candidate,
-        position: formData.position,
-        username: username,
-        password: password,
-        stage: formData.stage,
-        status: formData.status,
+        candidate: editFormData.candidate,
+        position: editFormData.position,
+        username: editUsername,
+        password: editPassword,
+        stage: editFormData.stage,
+        status: editFormData.status,
+        photo_url: photoUrl,
+        resume_url: resumeUrl,
+        application_date: editFormData.applicationDate || null,
+        interview_date: editFormData.interviewDate || null,
+        updated_at: new Date().toISOString(),
       };
-
-      // Only include fields that exist
-      if (existingFields.includes("full_name")) {
-        updatedData.full_name = formData.candidate;
-      }
-
-      if (existingFields.includes("photo_url")) {
-        updatedData.photo_url = photoUrl;
-      }
-
-      if (existingFields.includes("resume_url")) {
-        updatedData.resume_url = resumeUrl;
-      }
-
-      if (existingFields.includes("application_date")) {
-        updatedData.application_date = formData.applicationDate || null;
-      }
-
-      if (existingFields.includes("interview_date")) {
-        updatedData.interview_date = formData.interviewDate || null;
-      }
-
-      if (existingFields.includes("updated_at")) {
-        updatedData.updated_at = new Date().toISOString();
-      }
-
-      console.log("Updating candidate with fields:", Object.keys(updatedData));
 
       const { error } = await supabase
         .from("recruitment_personnel")
@@ -506,28 +642,26 @@ const RecruitmentPersonnel = () => {
 
       if (error) {
         console.error("Error updating candidate:", error);
-        alert(`Failed to update candidate: ${error.message}`);
+        toast.error(`Failed to update candidate: ${error.message}`);
         return;
       }
 
       setUploadProgress(100);
-
       await fetchRecruitmentData();
 
       setShowEditModal(false);
-      setEditId(null);
-      resetForm();
+      resetEditModal();
 
       setTimeout(() => {
         setUploadProgress(0);
-        alert("✅ Candidate updated successfully!");
+        toast.success("Candidate updated successfully!");
       }, 500);
     } catch (error) {
       console.error("Error in handleUpdateCandidate:", error);
-      alert("An error occurred. Please try again.");
+      toast.error("An error occurred. Please try again.");
       setUploadProgress(0);
     } finally {
-      setSubmitting(false);
+      setIsSavingEdit(false);
     }
   };
 
@@ -557,7 +691,7 @@ const RecruitmentPersonnel = () => {
 
       if (error) {
         console.error("Error deleting candidate:", error);
-        alert("Failed to delete candidate. Please try again.");
+        toast.error("Failed to delete candidate. Please try again.");
         return;
       }
 
@@ -567,10 +701,10 @@ const RecruitmentPersonnel = () => {
       setDeleteId(null);
       setCurrentPage(1);
 
-      alert("✅ Candidate deleted successfully!");
+      toast.success("Candidate deleted successfully!");
     } catch (error) {
       console.error("Error in confirmDelete:", error);
-      alert("An error occurred. Please try again.");
+      toast.error("An error occurred. Please try again.");
     }
   };
 
@@ -584,7 +718,7 @@ const RecruitmentPersonnel = () => {
     if (url) {
       window.open(url, "_blank");
     } else {
-      alert("No resume available for this candidate.");
+      toast.warning("No resume available for this candidate.");
     }
   };
 
@@ -593,7 +727,7 @@ const RecruitmentPersonnel = () => {
     if (url) {
       window.open(url, "_blank");
     } else {
-      alert("No photo available for this candidate.");
+      toast.info("No photo available for this candidate.");
     }
   };
 
@@ -637,21 +771,58 @@ const RecruitmentPersonnel = () => {
   };
 
   // Password cell component for table
+  // Replace the existing PasswordCell component with this:
   const PasswordCell = ({ password }) => {
-    const [showPass, setShowPass] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
+    const [copied, setCopied] = useState(false);
+
+    const togglePassword = () => {
+      setShowPassword(!showPassword);
+    };
+
+    const copyPassword = () => {
+      if (!password) return;
+
+      navigator.clipboard.writeText(password);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    };
 
     return (
       <td className={styles.passwordCell}>
-        <span className={styles.passwordMask}>
-          {showPass ? password : "••••••"}
-        </span>
-        <button
-          type="button"
-          className={styles.togglePassword}
-          onClick={() => setShowPass(!showPass)}
-        >
-          {showPass ? "🙈" : "👁"}
-        </button>
+        <div className={styles.passwordContainer}>
+          <span className={styles.passwordMask}>
+            {showPassword ? password : "••••••••"}
+          </span>
+          <div className={styles.passwordActions}>
+            <button
+              className={styles.passwordToggle}
+              onClick={togglePassword}
+              type="button"
+              title={showPassword ? "Hide password" : "Show password"}
+            >
+              {showPassword ? (
+                <FaEyeSlash className={styles.passwordIcon} />
+              ) : (
+                <FaEye className={styles.passwordIcon} />
+              )}
+            </button>
+            <button
+              className={styles.copyBtn}
+              onClick={copyPassword}
+              type="button"
+              title="Copy password"
+              disabled={!password}
+            >
+              {copied ? (
+                <FaCheck className={styles.copyIcon} />
+              ) : (
+                <FaCopy className={styles.copyIcon} />
+              )}
+            </button>
+          </div>
+          {copied && <span className={styles.copiedText}>Copied!</span>}
+        </div>
       </td>
     );
   };
@@ -840,754 +1011,913 @@ const RecruitmentPersonnel = () => {
     );
   };
 
+  // Function to handle retry when connection fails
+  const handleRetryConnection = () => {
+    setLoadingProgress(0);
+    fetchRecruitmentData();
+  };
+
   return (
-    <div className={styles.container}>
-      <Title>Recruitment Personnel | BFP Villanueva</Title>
-      <Meta name="robots" content="noindex, nofollow" />
+    <>
+      {/* BFP Preloader */}
+      <BFPPreloader
+        loading={initialLoading}
+        progress={loadingProgress}
+        moduleTitle="RECRUITMENT DASHBOARD • Screening Candidates..."
+        onRetry={handleRetryConnection}
+      />
 
-      <Hamburger />
-      <Sidebar />
-      <div className={`main-content ${isSidebarCollapsed ? "collapsed" : ""}`}>
-        <h1>Recruitment Personnel</h1>
+      <div className={styles.container}>
+        <Title>Recruitment Personnel | BFP Villanueva</Title>
+        <Meta name="robots" content="noindex, nofollow" />
 
-        {/* Top Controls */}
-        <div className={styles.topControls}>
-          <div className={styles.tableHeader}>
-            <select
-              className={styles.filterType}
-              value={filterStage}
-              onChange={(e) => {
-                setFilterStage(e.target.value);
-                setCurrentPage(1);
-              }}
-            >
-              <option value="">All Stages</option>
-              <option>Applied</option>
-              <option>Screening</option>
-              <option>Interview</option>
-              <option>Final Review</option>
-            </select>
+        <Hamburger />
+        <Sidebar />
+        <div
+          className={`main-content ${isSidebarCollapsed ? "collapsed" : ""}`}
+        >
+          <h1>Recruitment Personnel</h1>
 
-            <select
-              className={styles.filterType}
-              value={filterStatus}
-              onChange={(e) => {
-                setFilterStatus(e.target.value);
-                setCurrentPage(1);
-              }}
-            >
-              <option value="">All Status</option>
-              <option>Pending</option>
-              <option>Approved</option>
-              <option>Rejected</option>
-            </select>
-
-            <input
-              type="text"
-              className={styles.searchBar}
-              placeholder="🔍 Search candidates..."
-              value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                setCurrentPage(1);
-              }}
-            />
-          </div>
-        </div>
-
-        {/* Summary Cards */}
-        <div className={styles.summary}>
-          <button
-            className={`${styles.summaryCard} ${styles.total} ${
-              currentFilterCard === "total" ? styles.active : ""
-            }`}
-            onClick={() => handleCardClick("total")}
-          >
-            <h3>Total Candidates</h3>
-            <p>{totalItems}</p>
-          </button>
-          <button
-            className={`${styles.summaryCard} ${styles.applied} ${
-              currentFilterCard === "applied" ? styles.active : ""
-            }`}
-            onClick={() => handleCardClick("applied")}
-          >
-            <h3>Applied</h3>
-            <p>{appliedItems}</p>
-          </button>
-          <button
-            className={`${styles.summaryCard} ${styles.screening} ${
-              currentFilterCard === "screening" ? styles.active : ""
-            }`}
-            onClick={() => handleCardClick("screening")}
-          >
-            <h3>Screening</h3>
-            <p>{screeningItems}</p>
-          </button>
-          <button
-            className={`${styles.summaryCard} ${styles.interview} ${
-              currentFilterCard === "interview" ? styles.active : ""
-            }`}
-            onClick={() => handleCardClick("interview")}
-          >
-            <h3>Interview</h3>
-            <p>{interviewItems}</p>
-          </button>
-          <button
-            className={`${styles.summaryCard} ${styles.final} ${
-              currentFilterCard === "final" ? styles.active : ""
-            }`}
-            onClick={() => handleCardClick("final")}
-          >
-            <h3>Final Review</h3>
-            <p>{finalReviewItems}</p>
-          </button>
-        </div>
-
-        {/* Form Card */}
-        <div className={styles.card}>
-          <h2>Add New Candidate</h2>
-          <button
-            className={`${styles.showFormBtn} ${styles.submit}${
-              showForm ? styles.showing : ""
-            }`}
-            onClick={() => setShowForm(!showForm)}
-            type="button"
-            disabled={submitting}
-          >
-            {showForm ? "Hide Form" : "Add New Candidate"}
-          </button>
-
-          {/* Upload Progress Bar */}
-          {uploadProgress > 0 && uploadProgress < 100 && (
-            <div className={styles.progressBarContainer}>
-              <div
-                className={styles.progressBar}
-                style={{ width: `${uploadProgress}%` }}
+          {/* Top Controls */}
+          <div className={styles.topControls}>
+            <div className={styles.tableHeader}>
+              <select
+                className={styles.filterType}
+                value={filterStage}
+                onChange={(e) => {
+                  setFilterStage(e.target.value);
+                  setCurrentPage(1);
+                }}
               >
-                Uploading... {uploadProgress}%
+                <option value="">All Stages</option>
+                <option>Applied</option>
+                <option>Screening</option>
+                <option>Interview</option>
+                <option>Final Review</option>
+              </select>
+
+              <select
+                className={styles.filterType}
+                value={filterStatus}
+                onChange={(e) => {
+                  setFilterStatus(e.target.value);
+                  setCurrentPage(1);
+                }}
+              >
+                <option value="">All Status</option>
+                <option>Pending</option>
+                <option>Approved</option>
+                <option>Rejected</option>
+              </select>
+
+              <input
+                type="text"
+                className={styles.searchBar}
+                placeholder="🔍 Search candidates..."
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setCurrentPage(1);
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Summary Cards */}
+          <div className={styles.summary}>
+            <button
+              className={`${styles.summaryCard} ${styles.total} ${
+                currentFilterCard === "total" ? styles.active : ""
+              }`}
+              onClick={() => handleCardClick("total")}
+            >
+              <h3>Total Candidates</h3>
+              <p>{totalItems}</p>
+            </button>
+            <button
+              className={`${styles.summaryCard} ${styles.applied} ${
+                currentFilterCard === "applied" ? styles.active : ""
+              }`}
+              onClick={() => handleCardClick("applied")}
+            >
+              <h3>Applied</h3>
+              <p>{appliedItems}</p>
+            </button>
+            <button
+              className={`${styles.summaryCard} ${styles.screening} ${
+                currentFilterCard === "screening" ? styles.active : ""
+              }`}
+              onClick={() => handleCardClick("screening")}
+            >
+              <h3>Screening</h3>
+              <p>{screeningItems}</p>
+            </button>
+            <button
+              className={`${styles.summaryCard} ${styles.interview} ${
+                currentFilterCard === "interview" ? styles.active : ""
+              }`}
+              onClick={() => handleCardClick("interview")}
+            >
+              <h3>Interview</h3>
+              <p>{interviewItems}</p>
+            </button>
+            <button
+              className={`${styles.summaryCard} ${styles.final} ${
+                currentFilterCard === "final" ? styles.active : ""
+              }`}
+              onClick={() => handleCardClick("final")}
+            >
+              <h3>Final Review</h3>
+              <p>{finalReviewItems}</p>
+            </button>
+          </div>
+
+          {/* Form Card */}
+          <div className={styles.card}>
+            <h2>Add New Candidate</h2>
+            <button
+              className={`${styles.showFormBtn} ${styles.submit}${
+                showForm ? styles.showing : ""
+              }`}
+              onClick={() => setShowForm(!showForm)}
+              type="button"
+              disabled={submitting || initialLoading}
+            >
+              {showForm ? "Hide Form" : "Add New Candidate"}
+            </button>
+
+            {/* Upload Progress Bar */}
+            {uploadProgress > 0 && uploadProgress < 100 && (
+              <div className={styles.progressBarContainer}>
+                <div
+                  className={styles.progressBar}
+                  style={{ width: `${uploadProgress}%` }}
+                >
+                  Uploading... {uploadProgress}%
+                </div>
+              </div>
+            )}
+
+            <form
+              className={`${styles.form} ${styles.layout} ${
+                showForm ? styles.show : ""
+              }`}
+              onSubmit={handleSubmit}
+            >
+              {/* Left: Photo Section */}
+              <div className={styles.photoSection}>
+                <div className={styles.photoPreview}>
+                  {photoPreview ? (
+                    <img
+                      src={photoPreview}
+                      alt="Candidate preview"
+                      className={styles.photoImage}
+                    />
+                  ) : (
+                    <span>No Photo</span>
+                  )}
+                </div>
+                <div className={styles.fileUpload}>
+                  <label htmlFor="photo" className={styles.fileUploadLabel}>
+                    📂 Upload Photo (Max 5MB)
+                  </label>
+                  <input
+                    type="file"
+                    id="photo"
+                    accept="image/*"
+                    onChange={handlePhotoChange}
+                    disabled={submitting || initialLoading}
+                  />
+                  <span>
+                    {photoFile ? photoFile.name : "No photo selected"}
+                  </span>
+                </div>
+
+                {/* Resume Upload */}
+                <div
+                  className={styles.fileUpload}
+                  style={{ marginTop: "20px" }}
+                >
+                  <label htmlFor="resume" className={styles.fileUploadLabel}>
+                    📄 Upload Resume (PDF/DOC, Max 10MB)
+                  </label>
+                  <input
+                    type="file"
+                    id="resume"
+                    accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    onChange={handleResumeChange}
+                    disabled={submitting || initialLoading}
+                  />
+                  <span>{resumeFileName || "No resume selected"}</span>
+                </div>
+              </div>
+
+              {/* Right: Info fields - FIXED LAYOUT */}
+              <div className={styles.infoSection}>
+                {/* Row 1: Candidate Name and Position */}
+                <div className={styles.formRow}>
+                  <div className={styles.formGroup}>
+                    <div className={styles.floatingGroup}>
+                      <input
+                        type="text"
+                        id="candidate"
+                        className={styles.floatingInput}
+                        placeholder=" "
+                        value={addFormData.candidate}
+                        onChange={handleAddInputChange}
+                        required
+                        disabled={submitting || initialLoading}
+                      />
+                      <label
+                        htmlFor="candidate"
+                        className={styles.floatingLabel}
+                      >
+                        Candidate Name *
+                      </label>
+                    </div>
+                  </div>
+                  <div className={styles.formGroup}>
+                    <div className={styles.floatingGroup}>
+                      <input
+                        type="text"
+                        id="position"
+                        className={styles.floatingInput}
+                        placeholder=" "
+                        value={addFormData.position}
+                        onChange={handleAddInputChange}
+                        required
+                        disabled={submitting || initialLoading}
+                      />
+                      <label
+                        htmlFor="position"
+                        className={styles.floatingLabel}
+                      >
+                        Position *
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Row 2: Username and Password */}
+                <div className={styles.formRow}>
+                  <div className={styles.formGroup}>
+                    <div className={styles.floatingGroup}>
+                      <input
+                        type="text"
+                        id="username"
+                        className={styles.floatingInput}
+                        placeholder=" "
+                        value={addUsername}
+                        onChange={(e) => setAddUsername(e.target.value)}
+                        required
+                        disabled={submitting || initialLoading}
+                      />
+                      <label
+                        htmlFor="username"
+                        className={styles.floatingLabel}
+                      >
+                        Username *
+                      </label>
+                    </div>
+                  </div>
+                  <div className={styles.formGroup}>
+                    <div className={styles.floatingGroup}>
+                      <div className={styles.passwordInputGroup}>
+                        <input
+                          type={showPassword ? "text" : "password"}
+                          id="password"
+                          className={styles.floatingInput}
+                          placeholder=" "
+                          value={addPassword}
+                          onChange={(e) => setAddPassword(e.target.value)}
+                          required
+                          disabled={submitting || initialLoading}
+                        />
+                        <button
+                          type="button"
+                          className={styles.showPasswordBtn}
+                          onClick={() => setShowPassword(!showPassword)}
+                        >
+                          {showPassword ? "🙈" : "👁"}
+                        </button>
+                      </div>
+                      <label
+                        htmlFor="password"
+                        className={styles.floatingLabel}
+                      >
+                        Password *
+                      </label>
+                    </div>
+                    <button
+                      type="button"
+                      className={styles.generatePasswordBtn}
+                      onClick={handleGeneratePassword}
+                      disabled={submitting || initialLoading}
+                    >
+                      Generate
+                    </button>
+                  </div>
+                </div>
+
+                {/* Row 3: Application Date and Stage */}
+                <div className={styles.formRow}>
+                  <div className={styles.formGroup}>
+                    <div className={styles.floatingGroup}>
+                      <Flatpickr
+                        value={addFormData.applicationDate}
+                        onChange={([date]) =>
+                          setAddFormData((prev) => ({
+                            ...prev,
+                            applicationDate: date
+                              ? date.toISOString().split("T")[0]
+                              : "",
+                          }))
+                        }
+                        options={{
+                          dateFormat: "Y-m-d",
+                          maxDate: "today",
+                        }}
+                        className={styles.floatingInput}
+                        placeholder=" "
+                        disabled={submitting || initialLoading}
+                      />
+                      <label
+                        htmlFor="applicationDate"
+                        className={styles.floatingLabel}
+                      >
+                        Application Date
+                      </label>
+                    </div>
+                  </div>
+                  <div className={styles.formGroup}>
+                    <div className={styles.floatingGroup}>
+                      <select
+                        id="stage"
+                        className={styles.floatingSelect}
+                        value={addFormData.stage}
+                        onChange={handleAddInputChange}
+                        required
+                        disabled={submitting || initialLoading}
+                        style={{
+                          backgroundColor:
+                            getOptionColor("stage", addFormData.stage) ||
+                            "#fff",
+                          color: getOptionColor("stage", addFormData.stage)
+                            ? "#fff"
+                            : "#000",
+                        }}
+                      >
+                        <option value="" disabled></option>
+                        <option value="Applied">Applied</option>
+                        <option value="Screening">Screening</option>
+                        <option value="Interview">Interview</option>
+                        <option value="Final Review">Final Review</option>
+                      </select>
+                      <label htmlFor="stage" className={styles.floatingLabel}>
+                        Select Stage *
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Row 4: Interview Date and Status */}
+                <div className={styles.formRow}>
+                  <div className={styles.formGroup}>
+                    <div className={styles.floatingGroup}>
+                      <Flatpickr
+                        value={addFormData.interviewDate}
+                        onChange={([date]) =>
+                          setAddFormData((prev) => ({
+                            ...prev,
+                            interviewDate: date
+                              ? date.toISOString().split("T")[0]
+                              : "",
+                          }))
+                        }
+                        options={{
+                          dateFormat: "Y-m-d",
+                        }}
+                        className={styles.floatingInput}
+                        placeholder=" "
+                        disabled={submitting || initialLoading}
+                      />
+                      <label
+                        htmlFor="interviewDate"
+                        className={styles.floatingLabel}
+                      >
+                        Interview Date
+                      </label>
+                    </div>
+                  </div>
+                  <div className={styles.formGroup}>
+                    <div className={styles.floatingGroup}>
+                      <select
+                        id="status"
+                        className={styles.floatingSelect}
+                        value={addFormData.status}
+                        onChange={handleAddInputChange}
+                        required
+                        disabled={submitting || initialLoading}
+                        style={{
+                          backgroundColor:
+                            getOptionColor("status", addFormData.status) ||
+                            "#fff",
+                          color: getOptionColor("status", addFormData.status)
+                            ? "#fff"
+                            : "#000",
+                        }}
+                      >
+                        <option value="" disabled></option>
+                        <option value="Pending">Pending</option>
+                        <option value="Approved">Approved</option>
+                        <option value="Rejected">Rejected</option>
+                      </select>
+                      <label htmlFor="status" className={styles.floatingLabel}>
+                        Select Status *
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                <div className={styles.formActions}>
+                  <button
+                    type="button"
+                    className={styles.cancel}
+                    onClick={() => {
+                      resetAddForm();
+                      setShowForm(false);
+                    }}
+                    disabled={submitting || initialLoading}
+                  >
+                    Clear Information
+                  </button>
+                  <button
+                    type="submit"
+                    className={styles.submit}
+                    disabled={submitting || initialLoading}
+                  >
+                    {submitting ? "Processing..." : "Add Candidate"}
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+          {/* Table Section */}
+          <div className={styles.tableHeaderSection}>
+            <h2>All Recruitment Records</h2>
+            {renderPaginationButtons()}
+          </div>
+
+          {/* Table with Scrollbar Container */}
+          <div className={styles.tableBorder}>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th>Photo</th>
+                  <th>Candidate</th>
+                  <th>Position</th>
+                  <th>Username</th>
+                  <th>Password</th>
+                  <th>Application Date</th>
+                  <th>Stage</th>
+                  <th>Interview Date</th>
+                  <th>Status</th>
+                  <th>Resume</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {initialLoading ? (
+                  <tr>
+                    <td
+                      colSpan="11"
+                      style={{ textAlign: "center", padding: "40px" }}
+                    >
+                      <div style={{ fontSize: "48px", marginBottom: "16px" }}>
+                        ⏳
+                      </div>
+                      <h3
+                        style={{
+                          fontSize: "18px",
+                          fontWeight: "600",
+                          color: "#2b2b2b",
+                        }}
+                      >
+                        Loading recruitment data...
+                      </h3>
+                    </td>
+                  </tr>
+                ) : paginated.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan="11"
+                      style={{ textAlign: "center", padding: "40px" }}
+                    >
+                      <div style={{ fontSize: "48px", marginBottom: "16px" }}>
+                        📇
+                      </div>
+                      <h3
+                        style={{
+                          fontSize: "18px",
+                          fontWeight: "600",
+                          color: "#2b2b2b",
+                        }}
+                      >
+                        No Recruitment Records
+                      </h3>
+                      <p style={{ fontSize: "14px", color: "#999" }}>
+                        Add your first candidate to get started
+                      </p>
+                    </td>
+                  </tr>
+                ) : (
+                  paginated.map((record) => (
+                    <tr key={record.id}>
+                      <td>
+                        {record.photo_url ? (
+                          <div className={styles.photoCell}>
+                            <img
+                              src={record.photo_url}
+                              alt={record.candidate}
+                              className={styles.tablePhoto}
+                              onClick={() => viewPhoto(record.photo_url)}
+                              title="Click to view full photo"
+                            />
+                          </div>
+                        ) : (
+                          <div className={styles.noPhoto}>No Photo</div>
+                        )}
+                      </td>
+                      <td>{record.candidate}</td>
+                      <td>{record.position}</td>
+                      <td>{record.username || "N/A"}</td>
+                      <PasswordCell password={record.password} />
+                      <td>{formatDate(record.application_date)}</td>
+                      <td>
+                        <span
+                          className={styles.status}
+                          style={{
+                            backgroundColor: getOptionColor(
+                              "stage",
+                              record.stage
+                            ),
+                            color: "#fff",
+                            padding: "6px 12px",
+                            borderRadius: "20px",
+                            fontSize: "12px",
+                            fontWeight: "600",
+                          }}
+                        >
+                          {record.stage}
+                        </span>
+                      </td>
+                      <td>{formatDate(record.interview_date)}</td>
+                      <td>
+                        <span
+                          className={styles.status}
+                          style={{
+                            backgroundColor: getOptionColor(
+                              "status",
+                              record.status
+                            ),
+                            color: "#fff",
+                            padding: "6px 12px",
+                            borderRadius: "20px",
+                            fontSize: "12px",
+                            fontWeight: "600",
+                          }}
+                        >
+                          {record.status}
+                        </span>
+                      </td>
+                      <td>
+                        {record.resume_url ? (
+                          <div className={styles.resumeCell}>
+                            <button
+                              className={styles.resumeBtn}
+                              onClick={() => viewResume(record.resume_url)}
+                              title={`View ${getFileNameFromUrl(
+                                record.resume_url
+                              )}`}
+                            >
+                              📄 View Resume
+                            </button>
+                            <div className={styles.resumeInfo}>
+                              <small>
+                                {getFileNameFromUrl(record.resume_url)}
+                              </small>
+                            </div>
+                          </div>
+                        ) : (
+                          <span className={styles.noResume}>No Resume</span>
+                        )}
+                      </td>
+                      <td>
+                        <div className={styles.actionButtons}>
+                          <button
+                            className={styles.editBtn}
+                            onClick={() => handleEdit(record.id)}
+                            disabled={submitting || initialLoading}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            className={styles.deleteBtn}
+                            onClick={() => handleDelete(record.id)}
+                            disabled={submitting || initialLoading}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Delete Confirmation Modal */}
+          {showDeleteModal && (
+            <div className={`${styles.modal} ${styles.show}`}>
+              <div className={styles.modalContent}>
+                <div className={styles.modalHeader}>
+                  <h2>Confirm Deletion</h2>
+                  <button onClick={cancelDelete} className={styles.closeBtn}>
+                    &times;
+                  </button>
+                </div>
+                <div className={styles.modalBody}>
+                  <p>
+                    Are you sure you want to delete this candidate record? This
+                    will also delete associated files.
+                  </p>
+                  <div className={styles.modalActions}>
+                    <button onClick={cancelDelete} className={styles.cancelBtn}>
+                      Cancel
+                    </button>
+                    <button
+                      onClick={confirmDelete}
+                      className={styles.deleteConfirmBtn}
+                      disabled={submitting}
+                    >
+                      {submitting ? "Deleting..." : "Delete"}
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           )}
 
-          <form
-            className={`${styles.form} ${styles.layout} ${
-              showForm ? styles.show : ""
-            }`}
-            onSubmit={handleSubmit}
-          >
-            {/* Left: Photo Section */}
-            <div className={styles.photoSection}>
-              <div className={styles.photoPreview}>
-                {photoPreview ? (
-                  <img
-                    src={photoPreview}
-                    alt="Candidate preview"
-                    className={styles.photoImage}
-                  />
-                ) : (
-                  <span>No Photo</span>
-                )}
-              </div>
-              <div className={styles.fileUpload}>
-                <label htmlFor="photo" className={styles.fileUploadLabel}>
-                  📂 Upload Photo (Max 5MB)
-                </label>
-                <input
-                  type="file"
-                  id="photo"
-                  accept="image/*"
-                  onChange={handlePhotoChange}
-                  disabled={submitting}
-                />
-                <span>{photoFile ? photoFile.name : "No photo selected"}</span>
-              </div>
-
-              {/* Resume Upload */}
-              <div className={styles.fileUpload} style={{ marginTop: "20px" }}>
-                <label htmlFor="resume" className={styles.fileUploadLabel}>
-                  📄 Upload Resume (PDF/DOC, Max 10MB)
-                </label>
-                <input
-                  type="file"
-                  id="resume"
-                  accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                  onChange={handleResumeChange}
-                  disabled={submitting}
-                />
-                <span>{resumeFileName || "No resume selected"}</span>
-              </div>
-            </div>
-
-            {/* Right: Info fields */}
-            <div className={styles.infoSection}>
-              {/* Username and Password Fields */}
-              <div className={styles.formRow}>
-                <div className={styles.formGroup}>
-                  <div className={styles.floatingGroup}>
-                    <input
-                      type="text"
-                      id="username"
-                      className={styles.floatingInput}
-                      placeholder=" "
-                      value={username}
-                      onChange={(e) => setUsername(e.target.value)}
-                      required
-                      disabled={submitting}
-                    />
-                    <label htmlFor="username" className={styles.floatingLabel}>
-                      Username *
-                    </label>
-                  </div>
-                </div>
-                <div className={styles.formGroup}>
-                  <div className={styles.floatingGroup}>
-                    <div className={styles.passwordInputGroup}>
-                      <input
-                        type={showPassword ? "text" : "password"}
-                        id="password"
-                        className={styles.floatingInput}
-                        placeholder=" "
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        required
-                        disabled={submitting}
-                      />
-                      <button
-                        type="button"
-                        className={styles.showPasswordBtn}
-                        onClick={() => setShowPassword(!showPassword)}
-                      >
-                        {showPassword ? "🙈" : "👁"}
-                      </button>
-                    </div>
-                    <label htmlFor="password" className={styles.floatingLabel}>
-                      Password *
-                    </label>
-                  </div>
+          {/* EDIT MODAL */}
+          {showEditModal && (
+            <div className={`${styles.modal} ${styles.show}`}>
+              <div className={styles.modalContent}>
+                <div className={styles.modalHeader}>
+                  <h2>
+                    Edit Candidate - {editFormData.candidate || "Candidate"}
+                  </h2>
                   <button
-                    type="button"
-                    className={styles.generatePasswordBtn}
-                    onClick={handleGeneratePassword}
-                    disabled={submitting}
+                    className={styles.ShowEditModalCloseBtn}
+                    onClick={handleCloseEditModal}
                   >
-                    Generate
+                    &times;
                   </button>
                 </div>
-              </div>
 
-              <div className={styles.formRow}>
-                <div className={styles.formGroup}>
-                  <div className={styles.floatingGroup}>
-                    <input
-                      type="text"
-                      id="candidate"
-                      className={styles.floatingInput}
-                      placeholder=" "
-                      value={formData.candidate}
-                      onChange={handleInputChange}
-                      required
-                      disabled={submitting}
-                    />
-                    <label htmlFor="candidate" className={styles.floatingLabel}>
-                      Candidate Name
-                    </label>
-                  </div>
-                </div>
-                <div className={styles.formGroup}>
-                  <div className={styles.floatingGroup}>
-                    <input
-                      type="text"
-                      id="position"
-                      className={styles.floatingInput}
-                      placeholder=" "
-                      value={formData.position}
-                      onChange={handleInputChange}
-                      required
-                      disabled={submitting}
-                    />
-                    <label htmlFor="position" className={styles.floatingLabel}>
-                      Position
-                    </label>
-                  </div>
-                </div>
-              </div>
-
-              <div className={styles.formRow}>
-                <div className={styles.formGroup}>
-                  <div className={styles.floatingGroup}>
-                    <Flatpickr
-                      value={formData.applicationDate}
-                      onChange={([date]) =>
-                        setFormData((prev) => ({
-                          ...prev,
-                          applicationDate: date
-                            ? date.toISOString().split("T")[0]
-                            : "",
-                        }))
-                      }
-                      options={{
-                        dateFormat: "Y-m-d",
-                        maxDate: "today",
-                      }}
-                      className={styles.floatingInput}
-                      placeholder=" "
-                      disabled={submitting}
-                    />
-                    <label
-                      htmlFor="applicationDate"
-                      className={styles.floatingLabel}
-                    >
-                      Application Date
-                    </label>
-                  </div>
-                </div>
-                <div className={styles.formGroup}>
-                  <div className={styles.floatingGroup}>
-                    <select
-                      id="stage"
-                      className={styles.floatingSelect}
-                      value={formData.stage}
-                      onChange={handleInputChange}
-                      required
-                      disabled={submitting}
-                      style={{
-                        backgroundColor:
-                          getOptionColor("stage", formData.stage) || "#fff",
-                        color: getOptionColor("stage", formData.stage)
-                          ? "#fff"
-                          : "#000",
-                      }}
-                    >
-                      <option value="" disabled></option>
-                      <option value="Applied">Applied</option>
-                      <option value="Screening">Screening</option>
-                      <option value="Interview">Interview</option>
-                      <option value="Final Review">Final Review</option>
-                    </select>
-                    <label htmlFor="stage" className={styles.floatingLabel}>
-                      Select Stage
-                    </label>
-                  </div>
-                </div>
-              </div>
-
-              <div className={styles.formRow}>
-                <div className={styles.formGroup}>
-                  <div className={styles.floatingGroup}>
-                    <Flatpickr
-                      value={formData.interviewDate}
-                      onChange={([date]) =>
-                        setFormData((prev) => ({
-                          ...prev,
-                          interviewDate: date
-                            ? date.toISOString().split("T")[0]
-                            : "",
-                        }))
-                      }
-                      options={{
-                        dateFormat: "Y-m-d",
-                      }}
-                      className={styles.floatingInput}
-                      placeholder=" "
-                      disabled={submitting}
-                    />
-                    <label
-                      htmlFor="interviewDate"
-                      className={styles.floatingLabel}
-                    >
-                      Interview Date
-                    </label>
-                  </div>
-                </div>
-                <div className={styles.formGroup}>
-                  <div className={styles.floatingGroup}>
-                    <select
-                      id="status"
-                      className={styles.floatingSelect}
-                      value={formData.status}
-                      onChange={handleInputChange}
-                      required
-                      disabled={submitting}
-                      style={{
-                        backgroundColor:
-                          getOptionColor("status", formData.status) || "#fff",
-                        color: getOptionColor("status", formData.status)
-                          ? "#fff"
-                          : "#000",
-                      }}
-                    >
-                      <option value="" disabled></option>
-                      <option value="Pending">Pending</option>
-                      <option value="Approved">Approved</option>
-                      <option value="Rejected">Rejected</option>
-                    </select>
-                    <label htmlFor="status" className={styles.floatingLabel}>
-                      Select Status
-                    </label>
-                  </div>
-                </div>
-              </div>
-
-              <div className={styles.formActions}>
-                <button
-                  type="button"
-                  className={styles.cancel}
-                  onClick={() => {
-                    resetForm();
-                    setShowForm(false);
-                  }}
-                  disabled={submitting}
+                <form
+                  id="edit-form"
+                  onSubmit={handleUpdateCandidate}
+                  className={styles.prEditModalLayout}
                 >
-                  Clear Information
-                </button>
-                <button
-                  type="submit"
-                  className={styles.submit}
-                  disabled={submitting}
-                >
-                  {submitting
-                    ? "Processing..."
-                    : editId !== null
-                    ? "Update Candidate"
-                    : "Add Candidate"}
-                </button>
-              </div>
-            </div>
-          </form>
-        </div>
-
-        {/* Table Section */}
-        <div className={styles.tableHeaderSection}>
-          <h2>All Recruitment Records</h2>
-          {renderPaginationButtons()}
-        </div>
-
-        <div className={styles.tableBorder}>
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                <th>Photo</th>
-                <th>Candidate</th>
-                <th>Position</th>
-                <th>Username</th>
-                <th>Password</th>
-                <th>Application Date</th>
-                <th>Stage</th>
-                <th>Interview Date</th>
-                <th>Status</th>
-                <th>Resume</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td
-                    colSpan="11"
-                    style={{ textAlign: "center", padding: "40px" }}
-                  >
-                    <div style={{ fontSize: "48px", marginBottom: "16px" }}>
-                      ⏳
-                    </div>
-                    <h3
-                      style={{
-                        fontSize: "18px",
-                        fontWeight: "600",
-                        color: "#2b2b2b",
-                      }}
-                    >
-                      Loading recruitment data...
-                    </h3>
-                  </td>
-                </tr>
-              ) : paginated.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan="11"
-                    style={{ textAlign: "center", padding: "40px" }}
-                  >
-                    <div style={{ fontSize: "48px", marginBottom: "16px" }}>
-                      📇
-                    </div>
-                    <h3
-                      style={{
-                        fontSize: "18px",
-                        fontWeight: "600",
-                        color: "#2b2b2b",
-                      }}
-                    >
-                      No Recruitment Records
-                    </h3>
-                    <p style={{ fontSize: "14px", color: "#999" }}>
-                      Add your first candidate to get started
-                    </p>
-                  </td>
-                </tr>
-              ) : (
-                paginated.map((record) => (
-                  <tr key={record.id}>
-                    <td>
-                      {record.photo_url ? (
-                        <div className={styles.photoCell}>
-                          <img
-                            src={record.photo_url}
-                            alt={record.candidate}
-                            className={styles.tablePhoto}
-                            onClick={() => viewPhoto(record.photo_url)}
-                            title="Click to view full photo"
-                          />
-                        </div>
-                      ) : (
-                        <div className={styles.noPhoto}>No Photo</div>
-                      )}
-                    </td>
-                    <td>{record.candidate}</td>
-                    <td>{record.position}</td>
-                    <td>{record.username || "N/A"}</td>
-                    <PasswordCell password={record.password} />
-                    <td>{formatDate(record.application_date)}</td>
-                    <td>
-                      <span
-                        className={styles.status}
-                        style={{
-                          backgroundColor: getOptionColor(
-                            "stage",
-                            record.stage
-                          ),
-                          color: "#fff",
-                          padding: "6px 12px",
-                          borderRadius: "20px",
-                          fontSize: "12px",
-                          fontWeight: "600",
-                        }}
-                      >
-                        {record.stage}
-                      </span>
-                    </td>
-                    <td>{formatDate(record.interview_date)}</td>
-                    <td>
-                      <span
-                        className={styles.status}
-                        style={{
-                          backgroundColor: getOptionColor(
-                            "status",
-                            record.status
-                          ),
-                          color: "#fff",
-                          padding: "6px 12px",
-                          borderRadius: "20px",
-                          fontSize: "12px",
-                          fontWeight: "600",
-                        }}
-                      >
-                        {record.status}
-                      </span>
-                    </td>
-                    <td>
-                      {record.resume_url ? (
-                        <div className={styles.resumeCell}>
-                          <button
-                            className={styles.resumeBtn}
-                            onClick={() => viewResume(record.resume_url)}
-                            title={`View ${getFileNameFromUrl(
-                              record.resume_url
-                            )}`}
-                          >
-                            📄 View Resume
-                          </button>
-                          <div className={styles.resumeInfo}>
-                            <small>
-                              {getFileNameFromUrl(record.resume_url)}
-                            </small>
-                          </div>
-                        </div>
-                      ) : (
-                        <span className={styles.noResume}>No Resume</span>
-                      )}
-                    </td>
-                    <td>
-                      <div className={styles.actionButtons}>
-                        <button
-                          className={styles.editBtn}
-                          onClick={() => handleEdit(record.id)}
-                          disabled={submitting}
-                        >
-                          ✏️ Edit
-                        </button>
-                        <button
-                          className={styles.deleteBtn}
-                          onClick={() => handleDelete(record.id)}
-                          disabled={submitting}
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Delete Confirmation Modal */}
-        {showDeleteModal && (
-          <div className={`${styles.modal} ${styles.show}`}>
-            <div className={styles.modalContent}>
-              <div className={styles.modalHeader}>
-                <h2>Confirm Deletion</h2>
-                <button onClick={cancelDelete} className={styles.closeBtn}>
-                  &times;
-                </button>
-              </div>
-              <div className={styles.modalBody}>
-                <p>
-                  Are you sure you want to delete this candidate record? This
-                  will also delete associated files.
-                </p>
-                <div className={styles.modalActions}>
-                  <button onClick={cancelDelete} className={styles.cancelBtn}>
-                    Cancel
-                  </button>
-                  <button
-                    onClick={confirmDelete}
-                    className={styles.deleteConfirmBtn}
-                    disabled={submitting}
-                  >
-                    {submitting ? "Deleting..." : "Delete"}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Edit Modal */}
-        {showEditModal && (
-          <div className={`${styles.modal} ${styles.show}`}>
-            <div className={styles.modalContent}>
-              <div className={styles.modalHeader}>
-                <h2>Edit Candidate</h2>
-                <button
-                  onClick={() => setShowEditModal(false)}
-                  className={styles.closeBtn}
-                >
-                  &times;
-                </button>
-              </div>
-
-              {/* Upload Progress Bar for Edit Modal */}
-              {uploadProgress > 0 && uploadProgress < 100 && (
-                <div className={styles.progressBarContainer}>
-                  <div
-                    className={styles.progressBar}
-                    style={{ width: `${uploadProgress}%` }}
-                  >
-                    Uploading... {uploadProgress}%
-                  </div>
-                </div>
-              )}
-
-              <form
-                className={styles.editForm}
-                onSubmit={handleUpdateCandidate}
-              >
-                <div className={styles.editFormLayout}>
-                  {/* Left: Photo Section */}
-                  <div className={styles.editPhotoSection}>
-                    <div className={styles.photoPreview}>
-                      {photoPreview ? (
+                  {/* Photo Section */}
+                  <div className={styles.prEditModalPhotoSection}>
+                    <div className={styles.prEditModalPhotoPreview}>
+                      {editPhotoPreview || editFormData.photoUrl ? (
                         <img
-                          src={photoPreview}
+                          src={editPhotoPreview || editFormData.photoUrl}
                           alt="Candidate preview"
                           className={styles.photoImage}
                         />
                       ) : (
-                        <span>No Photo</span>
+                        <div className={styles.prNoPhotoPreview}>
+                          <span className={styles.prNoPhotoIcon}>📷</span>
+                          <span>No Photo</span>
+                        </div>
                       )}
                     </div>
-                    <div className={styles.fileUpload}>
+
+                    <div className={styles.prEditModalFileUpload}>
                       <label
-                        htmlFor="editPhoto"
-                        className={styles.fileUploadLabel}
+                        className={styles.prEditModalFileUploadLabel}
+                        htmlFor="edit-photo"
                       >
-                        📂 Change Photo
+                        <input
+                          type="file"
+                          id="edit-photo"
+                          ref={editPhotoInputRef}
+                          accept="image/*"
+                          onChange={handleEditPhotoChange}
+                          style={{ display: "none" }}
+                          disabled={isSavingEdit}
+                        />
+                        {editPhotoPreview || editFormData.photoUrl
+                          ? "Change Photo"
+                          : "Upload Photo"}
                       </label>
-                      <input
-                        type="file"
-                        id="editPhoto"
-                        accept="image/*"
-                        onChange={handlePhotoChange}
-                        disabled={submitting}
-                      />
                       <span>
-                        {photoFile ? photoFile.name : "Keep current photo"}
+                        {editPhotoFile
+                          ? editPhotoFile.name
+                          : editFormData.photoUrl
+                          ? "Current photo"
+                          : "No photo selected"}
                       </span>
+
+                      {(editPhotoPreview || editFormData.photoUrl) && (
+                        <button
+                          type="button"
+                          className={styles.prEditModalClearBtn}
+                          onClick={clearEditPhoto}
+                          disabled={isSavingEdit}
+                        >
+                          Remove Photo
+                        </button>
+                      )}
                     </div>
 
-                    {/* Resume Upload for Edit */}
+                    {/* Resume Upload Section */}
                     <div
-                      className={styles.fileUpload}
+                      className={styles.prEditModalFileUpload}
                       style={{ marginTop: "20px" }}
                     >
                       <label
-                        htmlFor="editResume"
-                        className={styles.fileUploadLabel}
+                        className={styles.prEditModalFileUploadLabel}
+                        htmlFor="edit-resume"
                       >
-                        📄 Change Resume
+                        <input
+                          type="file"
+                          id="edit-resume"
+                          ref={editResumeInputRef}
+                          accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                          onChange={handleEditResumeChange}
+                          style={{ display: "none" }}
+                          disabled={isSavingEdit}
+                        />
+                        {editResumeFile || editFormData.resumeUrl
+                          ? "Change Resume"
+                          : "Upload Resume"}
                       </label>
-                      <input
-                        type="file"
-                        id="editResume"
-                        accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                        onChange={handleResumeChange}
-                        disabled={submitting}
-                      />
-                      <span>{resumeFileName || "Keep current resume"}</span>
+                      <span>
+                        {editResumeFile
+                          ? editResumeFile.name
+                          : resumeFileName || "No resume selected"}
+                      </span>
                     </div>
                   </div>
 
-                  {/* Right: Form Fields */}
-                  <div className={styles.editFieldsSection}>
-                    {/* Username and Password Fields for Edit */}
+                  {/* Form Fields */}
+                  <div style={{ flex: 1 }}>
                     <div className={styles.formRow}>
                       <div className={styles.formGroup}>
-                        <label htmlFor="editUsername">Username</label>
-                        <input
-                          type="text"
-                          id="editUsername"
-                          value={username}
-                          onChange={(e) => setUsername(e.target.value)}
-                          required
-                          disabled={submitting}
-                        />
-                      </div>
-                      <div className={styles.formGroup}>
-                        <label htmlFor="editPassword">Password</label>
-                        <div className={styles.passwordInputGroup}>
+                        <div className={styles.floatingGroup}>
                           <input
-                            type={showPassword ? "text" : "password"}
-                            id="editPassword"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
+                            type="text"
+                            id="edit-candidate"
+                            className={styles.floatingInput}
+                            placeholder=" "
+                            value={editFormData.candidate}
+                            onChange={handleEditInputChange}
                             required
-                            disabled={submitting}
+                            disabled={isSavingEdit}
                           />
-                          <button
-                            type="button"
-                            className={styles.showPasswordBtn}
-                            onClick={() => setShowPassword(!showPassword)}
+                          <label
+                            htmlFor="edit-candidate"
+                            className={styles.floatingLabel}
                           >
-                            {showPassword ? "🙈" : "👁"}
-                          </button>
+                            Candidate Name *
+                          </label>
+                        </div>
+                      </div>
+
+                      <div className={styles.formGroup}>
+                        <div className={styles.floatingGroup}>
+                          <input
+                            type="text"
+                            id="edit-position"
+                            className={styles.floatingInput}
+                            placeholder=" "
+                            value={editFormData.position}
+                            onChange={handleEditInputChange}
+                            required
+                            disabled={isSavingEdit}
+                          />
+                          <label
+                            htmlFor="edit-position"
+                            className={styles.floatingLabel}
+                          >
+                            Position *
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className={styles.formRow}>
+                      <div className={styles.formGroup}>
+                        <div className={styles.floatingGroup}>
+                          <input
+                            type="text"
+                            id="edit-username"
+                            className={styles.floatingInput}
+                            placeholder=" "
+                            value={editUsername}
+                            onChange={(e) => setEditUsername(e.target.value)}
+                            required
+                            disabled={isSavingEdit}
+                          />
+                          <label
+                            htmlFor="edit-username"
+                            className={styles.floatingLabel}
+                          >
+                            Username *
+                          </label>
+                        </div>
+                      </div>
+
+                      {/* In your add form */}
+                      <div className={styles.formGroup}>
+                        <div className={styles.floatingGroup}>
+                          <div className={styles.passwordInputGroup}>
+                            <input
+                              type={showPassword ? "text" : "password"}
+                              id="password"
+                              className={styles.floatingInput}
+                              placeholder=" "
+                              value={addPassword}
+                              onChange={(e) => setAddPassword(e.target.value)}
+                              required
+                              disabled={submitting || initialLoading}
+                            />
+                            <button
+                              type="button"
+                              className={styles.showPasswordBtn}
+                              onClick={() => setShowPassword(!showPassword)}
+                            >
+                              {showPassword ? <FaEyeSlash /> : <FaEye />}
+                            </button>
+                          </div>
+                          <label
+                            htmlFor="password"
+                            className={styles.floatingLabel}
+                          >
+                            Password *
+                          </label>
                         </div>
                         <button
                           type="button"
                           className={styles.generatePasswordBtn}
                           onClick={handleGeneratePassword}
+                          disabled={submitting || initialLoading}
+                        >
+                          Generate
+                        </button>
+                      </div>
+
+                      {/* In your edit form (inside edit modal) */}
+                      <div className={styles.formGroup}>
+                        <div className={styles.floatingGroup}>
+                          <div className={styles.passwordInputGroup}>
+                            <input
+                              type={showPassword ? "text" : "password"}
+                              id="edit-password"
+                              className={styles.floatingInput}
+                              placeholder=" "
+                              value={editPassword}
+                              onChange={(e) => setEditPassword(e.target.value)}
+                              required
+                              disabled={isSavingEdit}
+                            />
+                            <button
+                              type="button"
+                              className={styles.showPasswordBtn}
+                              onClick={() => setShowPassword(!showPassword)}
+                              disabled={isSavingEdit}
+                            >
+                              {showPassword ? <FaEyeSlash /> : <FaEye />}
+                            </button>
+                          </div>
+                          <label
+                            htmlFor="edit-password"
+                            className={styles.floatingLabel}
+                          >
+                            Password *
+                          </label>
+                        </div>
+                        <button
+                          type="button"
+                          className={styles.generatePasswordBtn}
+                          onClick={handleGeneratePasswordEdit}
+                          disabled={isSavingEdit}
                           style={{ marginTop: "5px" }}
-                          disabled={submitting}
                         >
                           Generate New Password
                         </button>
@@ -1596,143 +1926,130 @@ const RecruitmentPersonnel = () => {
 
                     <div className={styles.formRow}>
                       <div className={styles.formGroup}>
-                        <label htmlFor="editCandidate">Candidate Name</label>
-                        <input
-                          type="text"
-                          id="editCandidate"
-                          value={formData.candidate}
-                          onChange={(e) =>
-                            setFormData((prev) => ({
-                              ...prev,
-                              candidate: e.target.value,
-                            }))
-                          }
-                          required
-                          disabled={submitting}
-                        />
+                        <div className={styles.floatingGroup}>
+                          <Flatpickr
+                            value={editFormData.applicationDate}
+                            onChange={([date]) =>
+                              setEditFormData((prev) => ({
+                                ...prev,
+                                applicationDate: date
+                                  ? date.toISOString().split("T")[0]
+                                  : "",
+                              }))
+                            }
+                            options={{
+                              dateFormat: "Y-m-d",
+                              maxDate: "today",
+                            }}
+                            className={styles.floatingInput}
+                            placeholder=" "
+                            disabled={isSavingEdit}
+                          />
+                          <label
+                            htmlFor="edit-applicationDate"
+                            className={styles.floatingLabel}
+                          >
+                            Application Date
+                          </label>
+                        </div>
                       </div>
+
                       <div className={styles.formGroup}>
-                        <label htmlFor="editPosition">Position</label>
-                        <input
-                          type="text"
-                          id="editPosition"
-                          value={formData.position}
-                          onChange={(e) =>
-                            setFormData((prev) => ({
-                              ...prev,
-                              position: e.target.value,
-                            }))
-                          }
-                          required
-                          disabled={submitting}
-                        />
+                        <div className={styles.floatingGroup}>
+                          <select
+                            id="edit-stage"
+                            className={styles.floatingSelect}
+                            value={editFormData.stage}
+                            onChange={handleEditInputChange}
+                            required
+                            disabled={isSavingEdit}
+                            style={{
+                              backgroundColor:
+                                getOptionColor("stage", editFormData.stage) ||
+                                "#fff",
+                              color: getOptionColor("stage", editFormData.stage)
+                                ? "#fff"
+                                : "#000",
+                            }}
+                          >
+                            <option value="" disabled></option>
+                            <option value="Applied">Applied</option>
+                            <option value="Screening">Screening</option>
+                            <option value="Interview">Interview</option>
+                            <option value="Final Review">Final Review</option>
+                          </select>
+                          <label
+                            htmlFor="edit-stage"
+                            className={styles.floatingLabel}
+                          >
+                            Select Stage *
+                          </label>
+                        </div>
                       </div>
                     </div>
 
                     <div className={styles.formRow}>
                       <div className={styles.formGroup}>
-                        <label htmlFor="editApplicationDate">
-                          Application Date
-                        </label>
-                        <Flatpickr
-                          value={formData.applicationDate}
-                          onChange={([date]) =>
-                            setFormData((prev) => ({
-                              ...prev,
-                              applicationDate: date
-                                ? date.toISOString().split("T")[0]
-                                : "",
-                            }))
-                          }
-                          options={{
-                            dateFormat: "Y-m-d",
-                            maxDate: "today",
-                          }}
-                          disabled={submitting}
-                        />
+                        <div className={styles.floatingGroup}>
+                          <Flatpickr
+                            value={editFormData.interviewDate}
+                            onChange={([date]) =>
+                              setEditFormData((prev) => ({
+                                ...prev,
+                                interviewDate: date
+                                  ? date.toISOString().split("T")[0]
+                                  : "",
+                              }))
+                            }
+                            options={{
+                              dateFormat: "Y-m-d",
+                            }}
+                            className={styles.floatingInput}
+                            placeholder=" "
+                            disabled={isSavingEdit}
+                          />
+                          <label
+                            htmlFor="edit-interviewDate"
+                            className={styles.floatingLabel}
+                          >
+                            Interview Date
+                          </label>
+                        </div>
                       </div>
-                      <div className={styles.formGroup}>
-                        <label htmlFor="editStage">Stage</label>
-                        <select
-                          id="editStage"
-                          value={formData.stage}
-                          onChange={(e) =>
-                            setFormData((prev) => ({
-                              ...prev,
-                              stage: e.target.value,
-                            }))
-                          }
-                          required
-                          disabled={submitting}
-                          style={{
-                            backgroundColor:
-                              getOptionColor("stage", formData.stage) || "#fff",
-                            color: getOptionColor("stage", formData.stage)
-                              ? "#fff"
-                              : "#000",
-                          }}
-                        >
-                          <option value="" disabled>
-                            Select Stage
-                          </option>
-                          <option value="Applied">Applied</option>
-                          <option value="Screening">Screening</option>
-                          <option value="Interview">Interview</option>
-                          <option value="Final Review">Final Review</option>
-                        </select>
-                      </div>
-                    </div>
 
-                    <div className={styles.formRow}>
                       <div className={styles.formGroup}>
-                        <label htmlFor="editInterviewDate">
-                          Interview Date
-                        </label>
-                        <Flatpickr
-                          value={formData.interviewDate}
-                          onChange={([date]) =>
-                            setFormData((prev) => ({
-                              ...prev,
-                              interviewDate: date
-                                ? date.toISOString().split("T")[0]
-                                : "",
-                            }))
-                          }
-                          options={{
-                            dateFormat: "Y-m-d",
-                          }}
-                          disabled={submitting}
-                        />
-                      </div>
-                      <div className={styles.formGroup}>
-                        <label htmlFor="editStatus">Status</label>
-                        <select
-                          id="editStatus"
-                          value={formData.status}
-                          onChange={(e) =>
-                            setFormData((prev) => ({
-                              ...prev,
-                              status: e.target.value,
-                            }))
-                          }
-                          required
-                          disabled={submitting}
-                          style={{
-                            backgroundColor:
-                              getOptionColor("status", formData.status) ||
-                              "#fff",
-                            color: getOptionColor("status", formData.status)
-                              ? "#fff"
-                              : "#000",
-                          }}
-                        >
-                          <option value="" disabled>
-                            Select Status
-                          </option>
-                          <option value="Pending">Pending</option>
-                          <option value="Approved">Approved</option>
-                          <option value="Rejected">Rejected</option>
-                        </select>
+                        <div className={styles.floatingGroup}>
+                          <select
+                            id="edit-status"
+                            className={styles.floatingSelect}
+                            value={editFormData.status}
+                            onChange={handleEditInputChange}
+                            required
+                            disabled={isSavingEdit}
+                            style={{
+                              backgroundColor:
+                                getOptionColor("status", editFormData.status) ||
+                                "#fff",
+                              color: getOptionColor(
+                                "status",
+                                editFormData.status
+                              )
+                                ? "#fff"
+                                : "#000",
+                            }}
+                          >
+                            <option value="" disabled></option>
+                            <option value="Pending">Pending</option>
+                            <option value="Approved">Approved</option>
+                            <option value="Rejected">Rejected</option>
+                          </select>
+                          <label
+                            htmlFor="edit-status"
+                            className={styles.floatingLabel}
+                          >
+                            Select Status *
+                          </label>
+                        </div>
                       </div>
                     </div>
 
@@ -1740,27 +2057,27 @@ const RecruitmentPersonnel = () => {
                       <button
                         type="button"
                         className={styles.cancel}
-                        onClick={() => setShowEditModal(false)}
-                        disabled={submitting}
+                        onClick={handleCloseEditModal}
+                        disabled={isSavingEdit}
                       >
                         Cancel
                       </button>
                       <button
                         type="submit"
                         className={styles.submit}
-                        disabled={submitting}
+                        disabled={isSavingEdit}
                       >
-                        {submitting ? "Saving..." : "Save Changes"}
+                        {isSavingEdit ? "Saving..." : "Save Changes"}
                       </button>
                     </div>
                   </div>
-                </div>
-              </form>
+                </form>
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
-    </div>
+    </>
   );
 };
 

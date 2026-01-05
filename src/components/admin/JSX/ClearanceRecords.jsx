@@ -8,6 +8,23 @@ import { Title, Meta } from "react-head";
 import { supabase } from "../../../lib/supabaseClient.js";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+// CORRECT THE IMPORT PATH BASED ON YOUR STRUCTURE
+import {
+  archiveWithEquipmentData,
+  deleteAfterArchive,
+  archiveAndDelete,
+  handleBatchArchive,
+  handleBatchArchiveAndDelete,
+  canArchiveClearance,
+  getArchiveEligibilityMessage,
+  formatCurrency,
+  getStatusClass, // This is from your utility
+  getArchiveMethodForClearance, // ADD THIS LINE
+  smartArchive, // ADD THIS LIN
+} from "../../utils/clearanceArchiveUtils.js"; // Adjust path as needed
+
+// IMPORT THE BFP PRELOADER
+import BFPPreloader from "../../BFPPreloader.jsx"; // Adjust the path based on your project structure
 
 const ClearanceRecords = () => {
   const [clearanceData, setClearanceData] = useState([]);
@@ -49,6 +66,313 @@ const ClearanceRecords = () => {
   const [selectedRecords, setSelectedRecords] = useState([]);
   const [isBulkDeleteMode, setIsBulkDeleteMode] = useState(false);
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
+
+  // ADD THIS MISSING STATE VARIABLE
+  const [batchArchiveMode, setBatchArchiveMode] = useState(false);
+
+  // Archive state - SIMPLIFIED VERSION
+  const [archiveState, setArchiveState] = useState({
+    archiving: false,
+    archivingId: null,
+    batchArchiving: false,
+    selectedForArchive: [],
+  });
+
+  // Custom archive hook (simplified)
+const useClearanceArchive = () => {
+  const toggleArchiveSelection = (id) => {
+    setArchiveState((prev) => ({
+      ...prev,
+      selectedForArchive: prev.selectedForArchive.includes(id)
+        ? prev.selectedForArchive.filter((itemId) => itemId !== id)
+        : [...prev.selectedForArchive, id],
+    }));
+  };
+
+  const selectAllForArchive = (clearanceList) => {
+    const archivableIds = clearanceList
+      .filter((item) => canArchiveClearance(item))
+      .map((item) => item.dbId || item.id);
+
+    setArchiveState((prev) => ({
+      ...prev,
+      selectedForArchive:
+        prev.selectedForArchive.length === archivableIds.length
+          ? []
+          : archivableIds,
+    }));
+  };
+
+  // In your useClearanceArchive hook, update handleSingleArchive:
+  const handleSingleArchive = async (clearanceId, record, onComplete) => {
+    setArchiveState((prev) => ({
+      ...prev,
+      archivingId: clearanceId,
+      archiving: true,
+    }));
+
+    try {
+      // Use smartArchive instead of archiveWithEquipmentData
+      const result = await smartArchive(clearanceId, record);
+      toast.success(result.message || "Archived successfully");
+
+      if (onComplete) {
+        onComplete();
+      }
+    } catch (error) {
+      console.error("Archive error:", error);
+      toast.error(error.message || "Failed to archive");
+    } finally {
+      setArchiveState((prev) => ({
+        ...prev,
+        archivingId: null,
+        archiving: false,
+      }));
+    }
+  };
+
+  const handleSingleArchiveAndDelete = async (
+    clearanceId,
+    record,
+    onComplete
+  ) => {
+    setArchiveState((prev) => ({
+      ...prev,
+      archivingId: clearanceId,
+      archiving: true,
+    }));
+
+    try {
+      const result = await archiveAndDelete(clearanceId, record);
+      toast.success(result.message || "Archived and deleted successfully");
+
+      if (onComplete) {
+        onComplete();
+      }
+    } catch (error) {
+      console.error("Archive and delete error:", error);
+      toast.error(error.message || "Failed to archive and delete");
+    } finally {
+      setArchiveState((prev) => ({
+        ...prev,
+        archivingId: null,
+        archiving: false,
+      }));
+    }
+  };
+
+  const handleBatchArchiveOperation = async (
+    selectedIds,
+    clearanceData,
+    operation,
+    onComplete
+  ) => {
+    setArchiveState((prev) => ({ ...prev, batchArchiving: true }));
+
+    try {
+      let result;
+      if (operation === "archive") {
+        result = await handleBatchArchive(selectedIds, clearanceData);
+      } else {
+        result = await handleBatchArchiveAndDelete(selectedIds, clearanceData);
+      }
+
+      // Clear selection
+      setArchiveState((prev) => ({ ...prev, selectedForArchive: [] }));
+
+      if (onComplete) {
+        onComplete(result);
+      }
+    } catch (error) {
+      console.error("Batch operation error:", error);
+      toast.error("Batch operation failed");
+    } finally {
+      setArchiveState((prev) => ({ ...prev, batchArchiving: false }));
+    }
+  };
+
+  return {
+    ...archiveState,
+    toggleArchiveSelection,
+    selectAllForArchive,
+    handleSingleArchive,
+    handleSingleArchiveAndDelete,
+    handleBatchArchiveOperation,
+    setSelectedForArchive: (selected) =>
+      setArchiveState((prev) => ({ ...prev, selectedForArchive: selected })),
+  };
+};
+
+const archiveHook = useClearanceArchive();
+  // Use the functions
+
+
+
+  const handleArchiveClick = async (record) => {
+    await archiveHook.handleSingleArchive(
+      record.dbId,
+      record,
+      loadClearanceData
+    );
+  };
+
+const handleArchiveDeleteClick = async (record) => {
+  await archiveHook.handleSingleArchiveAndDelete(
+    record.dbId,
+    record,
+    loadClearanceData
+  );
+};
+const renderArchiveDeleteButton = (record) => {
+  const isArchiving = archiveHook.archivingId === record.dbId;
+  const canArchive = canArchiveClearance(record);
+
+  if (!canArchive) return null;
+
+  return (
+    <button
+      className={styles.CRSarchiveDeleteBtn}
+      onClick={() =>
+        archiveHook.handleSingleArchiveAndDelete(
+          record.dbId,
+          record,
+          loadClearanceData
+        )
+      }
+      disabled={isArchiving}
+      title="Archive and delete from current requests"
+    >
+      {isArchiving ? (
+        <>
+          <span className={styles.spinner}></span>
+          Processing...
+        </>
+      ) : (
+        "🗑️ Archive & Delete"
+      )}
+    </button>
+  );
+};
+  const handleBatchOperation = async (operation, selectedIds) => {
+    await archiveHook.handleBatchArchiveOperation(
+      selectedIds,
+      clearanceData,
+      operation,
+      loadClearanceData
+    );
+  };
+
+  // Render functions
+const renderArchiveButton = (record) => {
+  const isArchiving = archiveHook.archivingId === record.dbId;
+  const canArchive = canArchiveClearance(record);
+
+  if (!canArchive) return null;
+
+  // Determine archive method
+  const archiveMethod = getArchiveMethodForClearance(record);
+  const methodIcon = archiveMethod === "equipment" ? "🛠️" : "📄";
+  const methodTitle =
+    archiveMethod === "equipment"
+      ? "Archive with equipment data"
+      : "Simple archive";
+
+  return (
+    <button
+      className={styles.CRSarchiveBtn}
+      onClick={() =>
+        archiveHook.handleSingleArchive(record.dbId, record, loadClearanceData)
+      }
+      disabled={isArchiving}
+      title={`${methodTitle}: ${getArchiveEligibilityMessage(record)}`}
+    >
+      {isArchiving ? (
+        <>
+          <span className={styles.spinner}></span>
+          Archiving...
+        </>
+      ) : (
+        <>{methodIcon} Archive</>
+      )}
+    </button>
+  );
+};
+
+
+  const renderBatchArchiveControls = () => {
+    const archivableClearances = clearanceData.filter(canArchiveClearance);
+
+    if (archivableClearances.length === 0) return null;
+
+    return (
+      <div className={styles.bulkDeleteControls}>
+        <div className={styles.bulkDeleteActive}>
+          <div className={styles.bulkSelectionInfo}>
+            <span className={styles.selectedCount}>
+              Selected: <strong>{archiveHook.selectedForArchive.length}</strong>
+            </span>
+            <span className={styles.selectedCount}>
+              Eligible: <strong>{archivableClearances.length}</strong>
+            </span>
+            <button
+              className={styles.selectAllBtn}
+              onClick={() => archiveHook.selectAllForArchive(clearanceData)}
+            >
+              {archiveHook.selectedForArchive.length ===
+              archivableClearances.length
+                ? "Deselect All"
+                : "Select All Eligible"}
+            </button>
+          </div>
+
+          <div className={styles.bulkActionButtons}>
+            <button
+              className={styles.bulkDeleteConfirmBtn}
+              onClick={() =>
+                handleBatchOperation("archive", archiveHook.selectedForArchive)
+              }
+              disabled={
+                archiveHook.selectedForArchive.length === 0 ||
+                archiveHook.batchArchiving
+              }
+            >
+              {archiveHook.batchArchiving ? (
+                <>
+                  <span className={styles.spinner}></span>
+                  Processing...
+                </>
+              ) : (
+                `Archive ${archiveHook.selectedForArchive.length} Record(s)`
+              )}
+            </button>
+
+            <button
+              className={styles.bulkDeleteConfirmBtn}
+              onClick={() =>
+                handleBatchOperation(
+                  "archiveDelete",
+                  archiveHook.selectedForArchive
+                )
+              }
+              disabled={
+                archiveHook.selectedForArchive.length === 0 ||
+                archiveHook.batchArchiving
+              }
+            >
+              {archiveHook.batchArchiving ? (
+                <>
+                  <span className={styles.spinner}></span>
+                  Processing...
+                </>
+              ) : (
+                `Archive & Delete ${archiveHook.selectedForArchive.length}`
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   useEffect(() => {
     loadClearanceData();
@@ -140,32 +464,80 @@ const ClearanceRecords = () => {
     }
   };
 
-  const loadCurrentClearanceRequests = async () => {
-    console.log("=== LOADING CURRENT CLEARANCE REQUESTS ===");
+const loadCurrentClearanceRequests = async () => {
+  console.log("=== LOADING CURRENT CLEARANCE REQUESTS ===");
 
-    const { data: clearanceRequests, error } = await supabase
-      .from("clearance_requests")
-      .select(
-        `
-      *,
-      personnel:personnel_id (
-        id,
-        first_name,
-        last_name,
-        rank,
-        username,
-        badge_number,
-        station
-      )
-      `
-      )
-      .order("created_at", { ascending: false });
+  try {
+    // Step 1: Try to fetch with archived_at filter (if column exists)
+    let clearanceRequests;
+    let error;
 
-    if (error) {
-      console.error("Error fetching clearance records:", error);
-      toast.error("Failed to load clearance records");
-      setNoData(true);
-      return;
+    try {
+      // First attempt: Try with archived_at filter
+      const { data, error: queryError } = await supabase
+        .from("clearance_requests")
+        .select(
+          `
+          *,
+          personnel:personnel_id (
+            id,
+            first_name,
+            last_name,
+            rank,
+            username,
+            badge_number,
+            station
+          )
+          `
+        )
+        .is("archived_at", null) // Try filtering by archived_at
+        .order("created_at", { ascending: false });
+
+      clearanceRequests = data;
+      error = queryError;
+
+      if (error && error.code === "42703") {
+        // Column doesn't exist error, try without filter
+        console.log(
+          "archived_at column doesn't exist, trying without filter..."
+        );
+        throw new Error("Column doesn't exist");
+      }
+
+      if (error) {
+        throw error;
+      }
+
+      console.log("Query with archived_at filter successful");
+    } catch (firstTryError) {
+      // Second attempt: Try without archived_at filter
+      console.log("Trying without archived_at filter...");
+      const { data: retryData, error: retryError } = await supabase
+        .from("clearance_requests")
+        .select(
+          `
+          *,
+          personnel:personnel_id (
+            id,
+            first_name,
+            last_name,
+            rank,
+            username,
+            badge_number,
+            station
+          )
+          `
+        )
+        .order("created_at", { ascending: false });
+
+      if (retryError) {
+        console.error("Error fetching clearance records:", retryError);
+        throw retryError;
+      }
+
+      clearanceRequests = retryData;
+      error = null;
+      console.log("Query without archived_at filter successful");
     }
 
     console.log(
@@ -174,12 +546,12 @@ const ClearanceRecords = () => {
     );
 
     if (!clearanceRequests || clearanceRequests.length === 0) {
-      console.log("No clearance requests found in database");
+      console.log("No current clearance requests found in database");
       setNoData(true);
       return;
     }
 
-    // Get all clearance request IDs
+    // Get all clearance request IDs for archive checking
     const requestIds = clearanceRequests.map((request) => request.id);
 
     // Batch check archive status for all requests
@@ -202,6 +574,7 @@ const ClearanceRecords = () => {
       });
     }
 
+    // Process the data
     const processedData = clearanceRequests.map((request, index) => {
       const personnel = request.personnel;
       const uniqueId = `current-${index}-${Date.now()}-${Math.random()
@@ -216,8 +589,37 @@ const ClearanceRecords = () => {
           })
         : "N/A";
 
-      // Check if archived using the Set
-      const isArchived = archivedIds.has(request.id);
+      // Check if archived using multiple methods
+      let isArchived = false;
+
+      // Method 1: Check if in clearance_records table
+      isArchived = archivedIds.has(request.id);
+
+      // Method 2: Check archived_at column if it exists
+      if (!isArchived && request.archived_at) {
+        isArchived = true;
+        console.log(`Request ${request.id} is archived via archived_at column`);
+      }
+
+      // Method 3: Check archive_status column if it exists
+      if (!isArchived && request.archive_status === "archived") {
+        isArchived = true;
+        console.log(
+          `Request ${request.id} is archived via archive_status column`
+        );
+      }
+
+      // DEBUG LOGGING - Only show if actually archived
+      if (isArchived) {
+        console.warn(
+          `Request ${request.id} is archived but still in clearance_requests`,
+          {
+            archivedAt: request.archived_at,
+            archiveStatus: request.archive_status,
+            inArchiveTable: archivedIds.has(request.id),
+          }
+        );
+      }
 
       return {
         id: uniqueId,
@@ -242,14 +644,134 @@ const ClearanceRecords = () => {
         isArchived: isArchived,
         documentUrl: request.document_url,
         documentPath: request.document_path,
+        archivedAt: request.archived_at,
+        archiveStatus: request.archive_status,
       };
     });
 
-    console.log("Processed current records:", processedData.length);
-    setClearanceData(processedData);
-    setNoData(processedData.length === 0);
-  };
+    // Filter out archived records from display
+    const filteredData = processedData.filter((record) => !record.isArchived);
 
+    console.log("Total after filtering archived:", filteredData.length);
+    console.log(
+      "Archived records filtered out:",
+      processedData.length - filteredData.length
+    );
+
+    setClearanceData(filteredData);
+    setNoData(filteredData.length === 0);
+  } catch (err) {
+    console.error("Error in loadCurrentClearanceRequests:", err);
+    toast.error("Failed to load clearance records");
+    setNoData(true);
+  }
+};
+
+const checkAndFixDatabaseSchema = async () => {
+  try {
+    console.log("🔧 Checking database schema...");
+
+    // Check if columns exist
+    const { data: columns, error } = await supabase
+      .from("information_schema.columns")
+      .select("column_name")
+      .eq("table_name", "clearance_requests")
+      .eq("table_schema", "public")
+      .in("column_name", ["archived_at", "archive_status"]);
+
+    if (error) {
+      console.error("Error checking columns:", error);
+      return { success: false, error: error.message };
+    }
+
+    const existingColumns = columns?.map((col) => col.column_name) || [];
+    const missingColumns = ["archived_at", "archive_status"].filter(
+      (col) => !existingColumns.includes(col)
+    );
+
+    if (missingColumns.length === 0) {
+      console.log("✅ All archive columns exist");
+      return { success: true, needsMigration: false };
+    }
+
+    console.log("Missing columns:", missingColumns);
+
+    // Ask user to run migration
+    const shouldMigrate = window.confirm(
+      `Your database needs migration.\n\n` +
+        `Missing columns: ${missingColumns.join(", ")}\n\n` +
+        `Would you like to open the SQL editor to run the migration?`
+    );
+
+    if (shouldMigrate) {
+      // Provide SQL for user to run
+      const sql = `
+-- Add archived_at column
+ALTER TABLE clearance_requests 
+ADD COLUMN archived_at TIMESTAMP WITH TIME ZONE;
+
+-- Add archive_status column  
+ALTER TABLE clearance_requests 
+ADD COLUMN archive_status VARCHAR(50) DEFAULT NULL;
+
+-- Create indexes
+CREATE INDEX idx_clearance_requests_archived_at 
+ON clearance_requests (archived_at);
+
+CREATE INDEX idx_clearance_requests_archive_status 
+ON clearance_requests (archive_status);
+
+-- Update existing archived records
+UPDATE clearance_requests cr
+SET 
+  archived_at = cr2.updated_at,
+  archive_status = 'archived'
+FROM clearance_records cr2
+WHERE cr.id = cr2.clearance_request_id
+AND cr.archived_at IS NULL;
+      `;
+
+      // Copy to clipboard
+      navigator.clipboard.writeText(sql).then(() => {
+        alert(
+          "Migration SQL copied to clipboard!\n\n" +
+            "1. Open Supabase SQL Editor\n" +
+            "2. Paste and run the SQL\n" +
+            "3. Refresh this page"
+        );
+      });
+    }
+
+    return { success: false, needsMigration: true, missingColumns };
+  } catch (error) {
+    console.error("Error in checkAndFixDatabaseSchema:", error);
+    return { success: false, error: error.message };
+  }
+};
+
+// Add a button to check schema
+const [checkingSchema, setCheckingSchema] = useState(false);
+
+const handleCheckSchema = async () => {
+  setCheckingSchema(true);
+  try {
+    const result = await checkAndFixDatabaseSchema();
+    if (result.success) {
+      toast.success("Database schema is up to date!");
+    } else if (result.needsMigration) {
+      toast.warning(
+        "Database needs migration - check console for instructions"
+      );
+    } else {
+      toast.error("Error checking schema: " + result.error);
+    }
+  } catch (error) {
+    console.error("Schema check error:", error);
+    toast.error("Failed to check database schema");
+  } finally {
+    setCheckingSchema(false);
+  }
+};
   const loadYearlyClearanceRecords = async () => {
     console.log("=== LOADING YEARLY RECORDS ===");
 
@@ -1508,19 +2030,7 @@ const ClearanceRecords = () => {
     }
   };
 
-  const getStatusClass = (status) => {
-    const statusMap = {
-      pending: styles.CRSpending,
-      completed: styles.CRScompleted,
-      rejected: styles.CRSrejected,
-      "in progress": styles.CRSpending,
-      cancelled: styles.CRSrejected,
-      cleared: styles.CRScompleted,
-      with_accountability: styles.CRSpending,
-      partial: styles.CRSpending,
-    };
-    return statusMap[status.toLowerCase()] || styles.CRSpending;
-  };
+
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat("en-PH", {
@@ -1750,11 +2260,17 @@ const ClearanceRecords = () => {
   };
 
   // NEW: Function to render table header with checkbox for bulk delete mode
-  const renderTableHeader = () => {
-    if (isBulkDeleteMode && viewMode === "yearly") {
-      return (
-        <tr>
-          <th style={{ width: "50px" }}>
+const renderTableHeader = () => {
+  const showCheckboxColumn =
+    (isBulkDeleteMode && viewMode === "yearly") ||
+    (batchArchiveMode && viewMode === "current");
+
+  if (showCheckboxColumn) {
+    return (
+      <tr>
+        <th style={{ width: "50px" }}>
+          {isBulkDeleteMode && viewMode === "yearly" ? (
+            // Bulk delete select all
             <input
               type="checkbox"
               checked={
@@ -1763,23 +2279,34 @@ const ClearanceRecords = () => {
               }
               onChange={toggleSelectAllOnPage}
               className={styles.bulkCheckbox}
+              title="Select/Deselect all"
             />
-          </th>
-          <th>Full Name</th>
-          <th>Rank</th>
-          <th>Badge No.</th>
-          <th>Station</th>
-          <th>Date</th>
-          <th>Clearance Type</th>
-          <th>Status</th>
-          <th>Archive Status</th>
-          <th>Actions</th>
-        </tr>
-      );
-    }
+          ) : batchArchiveMode && viewMode === "current" ? (
+            // Batch archive select all (only archivable)
+            <input
+              type="checkbox"
+              checked={
+                archiveHook.selectedForArchive.length ===
+                  paginated.filter(canArchiveClearance).length &&
+                paginated.length > 0
+              }
+              onChange={() => {
+                const archivableOnPage = paginated.filter(canArchiveClearance);
+                const archivableIds = archivableOnPage.map((item) => item.dbId);
 
-    return (
-      <tr>
+                if (
+                  archiveHook.selectedForArchive.length === archivableIds.length
+                ) {
+                  archiveHook.setSelectedForArchive([]);
+                } else {
+                  archiveHook.setSelectedForArchive(archivableIds);
+                }
+              }}
+              className={styles.bulkCheckbox}
+              title="Select/Deselect archivable records"
+            />
+          ) : null}
+        </th>
         <th>Full Name</th>
         <th>Rank</th>
         <th>Badge No.</th>
@@ -1791,75 +2318,82 @@ const ClearanceRecords = () => {
         <th>Actions</th>
       </tr>
     );
-  };
+  }
 
-  // NEW: Function to render table row with checkbox for bulk delete mode
-  const renderTableRow = (record) => {
-    const isSelected = selectedRecords.includes(record.id);
+  return (
+    <tr>
+      <th>Full Name</th>
+      <th>Rank</th>
+      <th>Badge No.</th>
+      <th>Station</th>
+      <th>Date</th>
+      <th>Clearance Type</th>
+      <th>Status</th>
+      <th>Archive Status</th>
+      <th>Actions</th>
+    </tr>
+  );
+};
 
-    if (isBulkDeleteMode && viewMode === "yearly") {
-      return (
-        <tr key={record.id} className={isSelected ? styles.selectedRow : ""}>
-          <td>
+const renderTableRow = (record) => {
+  const isSelectedForDelete = selectedRecords.includes(record.id);
+  const isSelectedForArchive = archiveHook.selectedForArchive.includes(
+    record.dbId || record.id
+  );
+  const canArchive = canArchiveClearance(record);
+
+  // Get status class
+  const statusClass = getStatusClass(record.status);
+  const cssStatusClass =
+    statusClass === "pending"
+      ? styles.CRSpending
+      : statusClass === "completed"
+      ? styles.CRScompleted
+      : statusClass === "rejected"
+      ? styles.CRSrejected
+      : styles.CRSpending;
+
+  // Determine if we should show checkbox column
+  const showCheckboxColumn =
+    (isBulkDeleteMode && viewMode === "yearly") ||
+    (batchArchiveMode && viewMode === "current" && canArchive);
+
+  if (showCheckboxColumn) {
+    return (
+      <tr
+        key={record.id}
+        className={
+          (isBulkDeleteMode && isSelectedForDelete) ||
+          (batchArchiveMode && isSelectedForArchive)
+            ? styles.selectedRow
+            : ""
+        }
+      >
+        <td>
+          {isBulkDeleteMode && viewMode === "yearly" ? (
+            // Bulk delete checkbox
             <input
               type="checkbox"
-              checked={isSelected}
+              checked={isSelectedForDelete}
               onChange={() => toggleRecordSelection(record.id)}
               className={styles.bulkCheckbox}
             />
-          </td>
-          <td>{record.fullName}</td>
-          <td>{record.rank}</td>
-          <td>{record.badgeNumber}</td>
-          <td>{record.station}</td>
-          <td>
-            {viewMode === "current" ? record.dateRequested : record.recordDate}
-          </td>
-          <td>{record.clearanceType}</td>
-          <td>
-            <span
-              className={`${styles.CRSstatus} ${getStatusClass(record.status)}`}
-            >
-              {record.status}
-            </span>
-          </td>
-          <td>
-            <span
-              className={`${styles.archiveStatusBadge} ${styles.archivedBadge}`}
-            >
-              📊 Archived ({record.year})
-            </span>
-          </td>
-          <td>
-            <div className={styles.CRSactionButtons}>
-              <button
-                className={styles.CRSviewBtndetails}
-                onClick={() => handleViewDetails(record)}
-                title="View Details"
-              >
-                👁️ View
-              </button>
-
-              {/* PDF Button */}
-              {getPdfButton(record)}
-
-              {/* Delete button for individual deletion */}
-              <button
-                className={styles.CRSdeleteBtn}
-                onClick={() => deleteClearanceRequest(record.id, record)}
-                title="Delete yearly record"
-              >
-                🗑️ Delete
-              </button>
-            </div>
-          </td>
-        </tr>
-      );
-    }
-
-    // Regular row (not in bulk delete mode)
-    return (
-      <tr key={record.id}>
+          ) : batchArchiveMode && viewMode === "current" ? (
+            // Batch archive checkbox (only if archivable)
+            canArchive ? (
+              <input
+                type="checkbox"
+                checked={isSelectedForArchive}
+                onChange={() => archiveHook.toggleArchiveSelection(record.dbId)}
+                className={styles.bulkCheckbox}
+                disabled={!canArchive}
+                title={getArchiveEligibilityMessage(record)}
+              />
+            ) : (
+              <span className={styles.cannotArchiveIcon}>⛔</span>
+            )
+          ) : null}
+        </td>
         <td>{record.fullName}</td>
         <td>{record.rank}</td>
         <td>{record.badgeNumber}</td>
@@ -1869,9 +2403,7 @@ const ClearanceRecords = () => {
         </td>
         <td>{record.clearanceType}</td>
         <td>
-          <span
-            className={`${styles.CRSstatus} ${getStatusClass(record.status)}`}
-          >
+          <span className={`${styles.CRSstatus} ${cssStatusClass}`}>
             {record.status}
           </span>
         </td>
@@ -1908,142 +2440,232 @@ const ClearanceRecords = () => {
               👁️ View
             </button>
 
+            {/* Archive buttons - hide in batch mode to reduce clutter */}
+            {!batchArchiveMode && renderArchiveButton(record)}
+            {!batchArchiveMode && renderArchiveDeleteButton(record)}
+
             {/* PDF Button */}
             {getPdfButton(record)}
 
             {record.recordType === "current" ? (
               <>
-                {/* Archive Button - Only for Completed/Rejected clearances */}
-                {!record.isArchived &&
+                {/* Delete Button - hide in batch mode */}
+                {!batchArchiveMode &&
                   (record.status === "Completed" ||
                     record.status === "Rejected" ||
                     record.status === "Cancelled") && (
                     <button
-                      className={styles.CRSarchiveBtn}
+                      className={styles.CRSdeleteBtn}
                       onClick={() =>
-                        manuallyArchiveSingleClearance(record.dbId, record)
+                        deleteClearanceRequest(record.dbId, record)
                       }
-                      disabled={archivingRecordId === record.dbId}
-                      title="Archive to yearly records"
+                      disabled={deletingRecordId === record.dbId}
+                      title="Delete clearance request"
                     >
-                      {archivingRecordId === record.dbId ? (
-                        <>⏳ Archiving...</>
+                      {deletingRecordId === record.dbId ? (
+                        <>⏳ Deleting...</>
                       ) : (
-                        <>📦 Archive</>
+                        <>🗑️ Delete</>
                       )}
                     </button>
                   )}
 
-                {/* Delete Button - Only for Completed/Rejected/Cancelled clearances */}
-                {(record.status === "Completed" ||
-                  record.status === "Rejected" ||
-                  record.status === "Cancelled") && (
-                  <button
-                    className={styles.CRSdeleteBtn}
-                    onClick={() => deleteClearanceRequest(record.dbId, record)}
-                    disabled={deletingRecordId === record.dbId}
-                    title="Delete clearance request"
-                  >
-                    {deletingRecordId === record.dbId ? (
-                      <>⏳ Deleting...</>
-                    ) : (
-                      <>🗑️ Delete</>
-                    )}
-                  </button>
-                )}
-
-                {/* Manage Button - Only for Pending/In Progress */}
-                {(record.status === "Pending" ||
-                  record.status === "In Progress") && (
-                  <button
-                    className={styles.CRSmanageBtn}
-                    onClick={() => handleManageClick(record)}
-                    title="Manage clearance"
-                  >
-                    ⚙️ Manage
-                  </button>
-                )}
+                {/* Manage Button - hide in batch mode */}
+                {!batchArchiveMode &&
+                  (record.status === "Pending" ||
+                    record.status === "In Progress") && (
+                    <button
+                      className={styles.CRSmanageBtn}
+                      onClick={() => handleManageClick(record)}
+                      title="Manage clearance"
+                    >
+                      ⚙️ Manage
+                    </button>
+                  )}
               </>
             ) : (
-              // Add delete button for yearly records
-              <button
-                className={styles.CRSdeleteBtn}
-                onClick={() => deleteClearanceRequest(record.id, record)}
-                title="Delete yearly record"
-              >
-                🗑️ Delete
-              </button>
+              // Delete button for yearly records - hide in bulk delete mode
+              !isBulkDeleteMode && (
+                <button
+                  className={styles.CRSdeleteBtn}
+                  onClick={() => deleteClearanceRequest(record.id, record)}
+                  title="Delete yearly record"
+                >
+                  🗑️ Delete
+                </button>
+              )
             )}
           </div>
         </td>
       </tr>
     );
-  };
+  }
 
-  // NEW: Render bulk delete controls
-  const renderBulkDeleteControls = () => {
-    if (viewMode !== "yearly" || filteredClearanceData.length === 0)
-      return null;
-
-    return (
-      <div className={styles.bulkDeleteControls}>
-        {!isBulkDeleteMode ? (
-          <>
-            <button
-              className={styles.bulkDeleteToggleBtn}
-              onClick={() => setIsBulkDeleteMode(true)}
-              title="Enable bulk selection for deletion"
+  // Regular row (not in batch mode) - FIX THIS SECTION
+  return (
+    <tr key={record.id}>
+      <td>{record.fullName}</td>
+      <td>{record.rank}</td>
+      <td>{record.badgeNumber}</td>
+      <td>{record.station}</td>
+      <td>
+        {viewMode === "current" ? record.dateRequested : record.recordDate}
+      </td>
+      <td>{record.clearanceType}</td>
+      <td>
+        <span className={`${styles.CRSstatus} ${cssStatusClass}`}>
+          {record.status}
+        </span>
+      </td>
+      <td>
+        {record.recordType === "current" ? (
+          record.isArchived ? (
+            <span
+              className={`${styles.archiveStatusBadge} ${styles.archivedBadge}`}
             >
-              🔲 Bulk Delete
-            </button>
-            {filteredClearanceData.length > 10 && (
-              <span className={styles.recordCountWarning}>
-                ({filteredClearanceData.length} records - consider using bulk
-                delete)
-              </span>
-            )}
-          </>
+              ✅ Archived
+            </span>
+          ) : (
+            <span
+              className={`${styles.archiveStatusBadge} ${styles.notArchivedBadge}`}
+            >
+              📝 Not Archived
+            </span>
+          )
         ) : (
-          <div className={styles.bulkDeleteActive}>
-            <div className={styles.bulkSelectionInfo}>
-              <span className={styles.selectedCount}>
-                {selectedRecords.length} of {filteredClearanceData.length}{" "}
-                selected
-              </span>
-              <button
-                className={styles.selectAllBtn}
-                onClick={toggleSelectAllFiltered}
-              >
-                {selectedRecords.length === filteredClearanceData.length
-                  ? "Deselect All"
-                  : "Select All Filtered"}
-              </button>
-            </div>
-
-            <div className={styles.bulkActionButtons}>
-              <button
-                className={styles.cancelBulkBtn}
-                onClick={() => {
-                  setIsBulkDeleteMode(false);
-                  setSelectedRecords([]);
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                className={styles.bulkDeleteConfirmBtn}
-                onClick={handleBulkDelete}
-                disabled={selectedRecords.length === 0}
-              >
-                🗑️ Delete Selected ({selectedRecords.length})
-              </button>
-            </div>
-          </div>
+          <span
+            className={`${styles.archiveStatusBadge} ${styles.archivedBadge}`}
+          >
+            📊 Archived ({record.year})
+          </span>
         )}
-      </div>
-    );
-  };
+      </td>
+      <td>
+        <div className={styles.CRSactionButtons}>
+          <button
+            className={styles.CRSviewBtndetails}
+            onClick={() => handleViewDetails(record)}
+            title="View Details"
+          >
+            👁️ View
+          </button>
 
+          {/* PDF Button */}
+          {getPdfButton(record)}
+
+          {record.recordType === "current" ? (
+            <>
+              {/* Archive buttons */}
+              {renderArchiveButton(record)}
+              {renderArchiveDeleteButton(record)}
+
+              {/* Delete Button */}
+              {(record.status === "Completed" ||
+                record.status === "Rejected" ||
+                record.status === "Cancelled") && (
+                <button
+                  className={styles.CRSdeleteBtn}
+                  onClick={() => deleteClearanceRequest(record.dbId, record)}
+                  disabled={deletingRecordId === record.dbId}
+                  title="Delete clearance request"
+                >
+                  {deletingRecordId === record.dbId ? (
+                    <>⏳ Deleting...</>
+                  ) : (
+                    <>🗑️ Delete</>
+                  )}
+                </button>
+              )}
+
+              {/* Manage Button */}
+              {(record.status === "Pending" ||
+                record.status === "In Progress") && (
+                <button
+                  className={styles.CRSmanageBtn}
+                  onClick={() => handleManageClick(record)}
+                  title="Manage clearance"
+                >
+                  ⚙️ Manage
+                </button>
+              )}
+            </>
+          ) : (
+            // Delete button for yearly records
+            <button
+              className={styles.CRSdeleteBtn}
+              onClick={() => deleteClearanceRequest(record.id, record)}
+              title="Delete yearly record"
+            >
+              🗑️ Delete
+            </button>
+          )}
+        </div>
+      </td>
+    </tr>
+  );
+};
+
+const renderBulkDeleteControls = () => {
+  if (viewMode !== "yearly" || filteredClearanceData.length === 0) return null;
+
+  return (
+    <div className={styles.bulkDeleteControls}>
+      {!isBulkDeleteMode ? (
+        <>
+          <button
+            className={styles.bulkDeleteToggleBtn}
+            onClick={() => setIsBulkDeleteMode(true)}
+            title="Enable bulk selection for deletion"
+          >
+            🔲 Bulk Delete
+          </button>
+          {filteredClearanceData.length > 10 && (
+            <span className={styles.recordCountWarning}>
+              ({filteredClearanceData.length} records - consider using bulk
+              delete)
+            </span>
+          )}
+        </>
+      ) : (
+        <div className={styles.bulkDeleteActive}>
+          <div className={styles.bulkSelectionInfo}>
+            <span className={styles.selectedCount}>
+              {selectedRecords.length} of {filteredClearanceData.length}{" "}
+              selected
+            </span>
+            <button
+              className={styles.selectAllBtn}
+              onClick={toggleSelectAllFiltered}
+            >
+              {selectedRecords.length === filteredClearanceData.length
+                ? "Deselect All"
+                : "Select All Filtered"}
+            </button>
+          </div>
+
+          <div className={styles.bulkActionButtons}>
+            <button
+              className={styles.cancelBulkBtn}
+              onClick={() => {
+                setIsBulkDeleteMode(false);
+                setSelectedRecords([]);
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              className={styles.bulkDeleteConfirmBtn}
+              onClick={handleBulkDelete}
+              disabled={selectedRecords.length === 0}
+            >
+              🗑️ Delete Selected ({selectedRecords.length})
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
   // NEW: Render bulk delete confirmation modal
   const renderBulkDeleteModal = () => {
     if (!showBulkDeleteConfirm) return null;
@@ -2993,366 +3615,404 @@ const ClearanceRecords = () => {
   };
   if (loading) {
     return (
-      <div className={`main-content ${isSidebarCollapsed ? "collapsed" : ""}`}>
-        <p>Loading clearance records...</p>
-      </div>
+      <>
+        <BFPPreloader 
+          loading={loading}
+          moduleTitle="CLEARANCE RECORDS • Validating Documents..."
+          onRetry={loadClearanceData}
+        />
+        <div className={`main-content ${isSidebarCollapsed ? "collapsed" : ""}`}>
+          <p>Loading clearance records...</p>
+        </div>
+      </>
     );
   }
 
   return (
-    <div className={styles.CRSappContainer}>
-      <Title>Clearance Records | BFP Villanueva</Title>
-      <Meta name="robots" content="noindex, nofollow" />
+    <>
+      {/* ADD BFP PRELOADER AT THE TOP OF THE COMPONENT */}
+      <BFPPreloader 
+        loading={loading || generatingPdf || generatingYearlyRecord}
+        moduleTitle="CLEARANCE RECORDS • Validating Documents..."
+        onRetry={loadClearanceData}
+      />
+    
+      <div className={styles.CRSappContainer}>
+        <Title>Clearance Records | BFP Villanueva</Title>
+        <Meta name="robots" content="noindex, nofollow" />
 
-      <Hamburger />
-      <Sidebar />
-      <ToastContainer />
+        <Hamburger />
+        <Sidebar />
+        <ToastContainer />
 
-      <div className={`main-content ${isSidebarCollapsed ? "collapsed" : ""}`}>
-        <div className={styles.CRSheaderContainer}>
-          <h1>Clearance Records</h1>
+        <div className={`main-content ${isSidebarCollapsed ? "collapsed" : ""}`}>
+          <div className={styles.CRSheaderContainer}>
+            <h1>Clearance Records</h1>
 
-          <div className={styles.CRSviewControls}>
-            <div className={styles.CRSviewToggle}>
-              <button
-                className={`${styles.CRSviewBtn} ${
-                  viewMode === "current" ? styles.CRSviewBtnActive : ""
-                }`}
-                onClick={() => setViewMode("current")}
-              >
-                Current Requests
-              </button>
-              <button
-                className={`${styles.CRSviewBtn} ${
-                  viewMode === "yearly" ? styles.CRSviewBtnActive : ""
-                }`}
-                onClick={() => setViewMode("yearly")}
-              >
-                Yearly Records
-              </button>
-            </div>
-            <button
-              onClick={manuallyArchiveAllForYear}
-              className={styles.CRSmanualArchiveBtn}
-              disabled={generatingYearlyRecord}
-              title="Manually archive ALL clearance records for a year"
-            >
-              {generatingYearlyRecord ? "Archiving..." : "📦 Manual Archive"}
-            </button>
-            {viewMode === "yearly" && (
-              <div className={styles.CRSyearSelector}>
-                <label>Year:</label>
-                <select
-                  value={selectedYear}
-                  onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-                  className={styles.CRSyearSelect}
+            <div className={styles.CRSviewControls}>
+              <div className={styles.CRSviewToggle}>
+                <button
+                  className={`${styles.CRSviewBtn} ${
+                    viewMode === "current" ? styles.CRSviewBtnActive : ""
+                  }`}
+                  onClick={() => setViewMode("current")}
                 >
-                  {availableYears.map((year) => (
-                    <option key={year} value={year}>
-                      {year}
-                    </option>
-                  ))}
-                  {availableYears.length === 0 && (
-                    <option value={new Date().getFullYear()}>
-                      {new Date().getFullYear()}
-                    </option>
-                  )}
-                </select>
+                  Current Requests
+                </button>
+                <button
+                  className={`${styles.CRSviewBtn} ${
+                    viewMode === "yearly" ? styles.CRSviewBtnActive : ""
+                  }`}
+                  onClick={() => setViewMode("yearly")}
+                >
+                  Yearly Records
+                </button>
               </div>
-            )}
-          </div>
-        </div>
 
-        {/* NEW: Bulk Delete Controls */}
-        {renderBulkDeleteControls()}
+              {/* Batch Archive Toggle Button */}
+              {viewMode === "current" && (
+                <button
+                  className={styles.batchArchiveToggleBtn}
+                  onClick={() => setBatchArchiveMode(!batchArchiveMode)}
+                  title="Toggle batch archive mode"
+                >
+                  {batchArchiveMode ? "❌ Cancel Batch" : "📦 Batch Archive"}
+                </button>
+              )}
 
-        {/* Top Controls - ADDED */}
-        <div className={styles.CRStopControls}>
-          <div className={styles.CRStableHeader}>
-            <select
-              className={styles.CRSfilterStatus}
-              value={filterStatus}
-              onChange={(e) => {
-                setFilterStatus(e.target.value);
-                setCurrentPage(1);
-              }}
-            >
-              <option value="">All Status</option>
-              <option>PENDING</option>
-              <option>IN_PROGRESS</option>
-              <option>COMPLETED</option>
-              <option>APPROVED</option>
-              <option>REJECTED</option>
-              <option>CANCELLED</option>
-              <option>CLEARED</option>
-              <option>WITH_ACCOUNTABILITY</option>
-              <option>PARTIAL</option>
-            </select>
-
-            <select
-              className={styles.CRSfilterType}
-              value={filterClearanceType}
-              onChange={(e) => {
-                setFilterClearanceType(e.target.value);
-                setCurrentPage(1);
-              }}
-            >
-              <option value="">All Clearance Types</option>
-              <option>Resignation</option>
-              <option>Retirement</option>
-              <option>Equipment Completion</option>
-              <option>Transfer</option>
-              <option>Promotion</option>
-              <option>Administrative</option>
-              <option>Others</option>
-            </select>
-
-            <input
-              type="text"
-              className={styles.CRSsearchBar}
-              placeholder="🔍 Search clearance records..."
-              value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                setCurrentPage(1);
-              }}
-            />
-          </div>
-        </div>
-
-        {/* Summary Cards - ADDED */}
-        <div className={styles.CRSsummary}>
-          <button
-            className={`${styles.CRSsummaryCard} ${styles.CRStotal} ${
-              currentFilterCard === "total" ? styles.CRSactive : ""
-            }`}
-            onClick={() => handleCardClick("total")}
-          >
-            <h3>Total Records</h3>
-            <p>{totalItems}</p>
-            {viewMode === "yearly" && <small>Year: {selectedYear}</small>}
-          </button>
-          <button
-            className={`${styles.CRSsummaryCard} ${styles.CRSpending} ${
-              currentFilterCard === "pending" ? styles.CRSactive : ""
-            }`}
-            onClick={() => handleCardClick("pending")}
-          >
-            <h3>Pending</h3>
-            <p>{pendingItems}</p>
-          </button>
-          <button
-            className={`${styles.CRSsummaryCard} ${styles.CRScompleted} ${
-              currentFilterCard === "completed" ? styles.CRSactive : ""
-            }`}
-            onClick={() => handleCardClick("completed")}
-          >
-            <h3>Completed</h3>
-            <p>{completedItems}</p>
-          </button>
-          <button
-            className={`${styles.CRSsummaryCard} ${styles.CRSrejected} ${
-              currentFilterCard === "rejected" ? styles.CRSactive : ""
-            }`}
-            onClick={() => handleCardClick("rejected")}
-          >
-            <h3>Rejected</h3>
-            <p>{rejectedItems}</p>
-          </button>
-        </div>
-
-        {/* Table Container */}
-        <div className={styles.CRStableContainer}>
-          {/* Top Pagination */}
-          <div className={styles.CRSpaginationContainer}>
-            {renderPaginationButtons()}
-          </div>
-
-          {/* Table Wrapper */}
-          <div className={styles.tableWrapper}>
-            <table className={styles.CRStable}>
-              <thead>{renderTableHeader()}</thead>
-              <tbody>
-                {paginated.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan={
-                        isBulkDeleteMode && viewMode === "yearly" ? "10" : "9"
-                      }
-                      className={styles.CRSnoRequestsTable}
-                    >
-                      <div style={{ fontSize: "48px", marginBottom: "16px" }}>
-                        <span className={styles.animatedEmoji}>💾</span>
-                      </div>
-                      <h3> No clearance records found </h3>
-                      <p>There are no clearance requests submitted yet.</p>
-                    </td>
-                  </tr>
-                ) : (
-                  paginated.map((record) => renderTableRow(record))
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Bottom Pagination */}
-          <div className={styles.CRSpaginationContainer}>
-            {renderPaginationButtons()}
-          </div>
-        </div>
-
-        {/* Details Modal */}
-        {renderDetailsModal()}
-
-        {/* NEW: Bulk Delete Modal */}
-        {renderBulkDeleteModal()}
-        {/* Manual Archive Modal */}
-        {renderManualArchiveModal()}
-        {/* PDF Progress Overlay */}
-        {renderPdfProgressOverlay()}
-      </div>
-      {isDeleteOpen && (
-        <div
-          className={styles.inventoryModalDeleteOverlay}
-          onClick={cancelDelete}
-        >
-          <div
-            className={styles.inventoryModalDeleteContent}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className={styles.inventoryModalDeleteHeader}>
-              <h2 style={{ marginLeft: "30px" }}>Confirm Deletion</h2>
-              <span
-                className={styles.inventoryModalDeleteCloseBtn}
-                onClick={cancelDelete}
+              <button
+                onClick={manuallyArchiveAllForYear}
+                className={styles.CRSmanualArchiveBtn}
+                disabled={generatingYearlyRecord}
+                title="Manually archive ALL clearance records for a year"
               >
-                &times;
-              </span>
+                {generatingYearlyRecord ? "Archiving..." : "📦 Manual Archive"}
+              </button>
+              {viewMode === "yearly" && (
+                <div className={styles.CRSyearSelector}>
+                  <label>Year:</label>
+                  <select
+                    value={selectedYear}
+                    onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                    className={styles.CRSyearSelect}
+                  >
+                    {availableYears.map((year) => (
+                      <option key={year} value={year}>
+                        {year}
+                      </option>
+                    ))}
+                    {availableYears.length === 0 && (
+                      <option value={new Date().getFullYear()}>
+                        {new Date().getFullYear()}
+                      </option>
+                    )}
+                  </select>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* NEW: Batch Archive Controls */}
+          {renderBatchArchiveControls()}
+
+          {/* Existing: Bulk Delete Controls */}
+          {renderBulkDeleteControls()}
+
+          {/* Top Controls */}
+          <div className={styles.CRStopControls}>
+            <div className={styles.CRStableHeader}>
+              <select
+                className={styles.CRSfilterStatus}
+                value={filterStatus}
+                onChange={(e) => {
+                  setFilterStatus(e.target.value);
+                  setCurrentPage(1);
+                }}
+              >
+                <option value="">All Status</option>
+                <option>PENDING</option>
+                <option>IN_PROGRESS</option>
+                <option>COMPLETED</option>
+                <option>APPROVED</option>
+                <option>REJECTED</option>
+                <option>CANCELLED</option>
+                <option>CLEARED</option>
+                <option>WITH_ACCOUNTABILITY</option>
+                <option>PARTIAL</option>
+              </select>
+
+              <select
+                className={styles.CRSfilterType}
+                value={filterClearanceType}
+                onChange={(e) => {
+                  setFilterClearanceType(e.target.value);
+                  setCurrentPage(1);
+                }}
+              >
+                <option value="">All Clearance Types</option>
+                <option>Resignation</option>
+                <option>Retirement</option>
+                <option>Equipment Completion</option>
+                <option>Transfer</option>
+                <option>Promotion</option>
+                <option>Administrative</option>
+                <option>Others</option>
+              </select>
+
+              <input
+                type="text"
+                className={styles.CRSsearchBar}
+                placeholder="🔍 Search clearance records..."
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setCurrentPage(1);
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Summary Cards */}
+          <div className={styles.CRSsummary}>
+            <button
+              className={`${styles.CRSsummaryCard} ${styles.CRStotal} ${
+                currentFilterCard === "total" ? styles.CRSactive : ""
+              }`}
+              onClick={() => handleCardClick("total")}
+            >
+              <h3>Total Records</h3>
+              <p>{totalItems}</p>
+              {viewMode === "yearly" && <small>Year: {selectedYear}</small>}
+            </button>
+            <button
+              className={`${styles.CRSsummaryCard} ${styles.CRSpending} ${
+                currentFilterCard === "pending" ? styles.CRSactive : ""
+              }`}
+              onClick={() => handleCardClick("pending")}
+            >
+              <h3>Pending</h3>
+              <p>{pendingItems}</p>
+            </button>
+            <button
+              className={`${styles.CRSsummaryCard} ${styles.CRScompleted} ${
+                currentFilterCard === "completed" ? styles.CRSactive : ""
+              }`}
+              onClick={() => handleCardClick("completed")}
+            >
+              <h3>Completed</h3>
+              <p>{completedItems}</p>
+            </button>
+            <button
+              className={`${styles.CRSsummaryCard} ${styles.CRSrejected} ${
+                currentFilterCard === "rejected" ? styles.CRSactive : ""
+              }`}
+              onClick={() => handleCardClick("rejected")}
+            >
+              <h3>Rejected</h3>
+              <p>{rejectedItems}</p>
+            </button>
+          </div>
+
+          {/* Table Container */}
+          <div className={styles.CRStableContainer}>
+            {/* Top Pagination */}
+            <div className={styles.CRSpaginationContainer}>
+              {renderPaginationButtons()}
             </div>
 
-            <div className={styles.inventoryModalDeleteBody}>
-              {deleteReason ? (
-                // Show warning if deletion is restricted
-                <div className={styles.deleteRestrictedWarning}>
-                  <div className={styles.inventoryDeleteWarningIcon}>⚠️</div>
-                  <h3>Deletion Restricted</h3>
-                  <p className={styles.deleteWarningText}>{deleteReason}</p>
-                  <div className={styles.clearanceDetails}>
-                    <p>
-                      <strong>Clearance Type:</strong>{" "}
-                      {deleteRecord?.clearanceType}
-                    </p>
-                    <p>
-                      <strong>Status:</strong> {deleteRecord?.status}
-                    </p>
-                    <p>
-                      <strong>Personnel:</strong> {deleteRecord?.fullName}
+            {/* Table Wrapper */}
+            <div className={styles.tableWrapper}>
+              <table className={styles.CRStable}>
+                <thead>{renderTableHeader()}</thead>
+                <tbody>
+                  {paginated.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={
+                          (isBulkDeleteMode && viewMode === "yearly") ||
+                          (batchArchiveMode && viewMode === "current")
+                            ? "10"
+                            : "9"
+                        }
+                        className={styles.CRSnoRequestsTable}
+                      >
+                        <div style={{ fontSize: "48px", marginBottom: "16px" }}>
+                          <span className={styles.animatedEmoji}>💾</span>
+                        </div>
+                        <h3> No clearance records found </h3>
+                        <p>There are no clearance requests submitted yet.</p>
+                      </td>
+                    </tr>
+                  ) : (
+                    paginated.map((record) => renderTableRow(record))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Bottom Pagination */}
+            <div className={styles.CRSpaginationContainer}>
+              {renderPaginationButtons()}
+            </div>
+          </div>
+
+          {/* Details Modal */}
+          {renderDetailsModal()}
+
+          {/* Bulk Delete Modal */}
+          {renderBulkDeleteModal()}
+
+          {/* Manual Archive Modal */}
+          {renderManualArchiveModal()}
+
+          {/* PDF Progress Overlay */}
+          {renderPdfProgressOverlay()}
+        </div>
+
+        {/* Delete Confirmation Modal */}
+        {isDeleteOpen && (
+          <div
+            className={styles.inventoryModalDeleteOverlay}
+            onClick={cancelDelete}
+          >
+            <div
+              className={styles.inventoryModalDeleteContent}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className={styles.inventoryModalDeleteHeader}>
+                <h2 style={{ marginLeft: "30px" }}>Confirm Deletion</h2>
+                <span
+                  className={styles.inventoryModalDeleteCloseBtn}
+                  onClick={cancelDelete}
+                >
+                  &times;
+                </span>
+              </div>
+
+              <div className={styles.inventoryModalDeleteBody}>
+                {deleteReason ? (
+                  // Show warning if deletion is restricted
+                  <div className={styles.deleteRestrictedWarning}>
+                    <div className={styles.inventoryDeleteWarningIcon}>⚠️</div>
+                    <h3>Deletion Restricted</h3>
+                    <p className={styles.deleteWarningText}>{deleteReason}</p>
+                    <div className={styles.clearanceDetails}>
+                      <p>
+                        <strong>Clearance Type:</strong>{" "}
+                        {deleteRecord?.clearanceType}
+                      </p>
+                      <p>
+                        <strong>Status:</strong> {deleteRecord?.status}
+                      </p>
+                      <p>
+                        <strong>Personnel:</strong> {deleteRecord?.fullName}
+                      </p>
+                    </div>
+                    <p className={styles.deleteInstructions}>
+                      To delete this clearance, you must first:
+                      <ul>
+                        <li>Settle all accountability records</li>
+                        <li>Complete equipment return procedures</li>
+                        <li>Or if rejected, no action needed</li>
+                      </ul>
                     </p>
                   </div>
-                  <p className={styles.deleteInstructions}>
-                    To delete this clearance, you must first:
-                    <ul>
-                      <li>Settle all accountability records</li>
-                      <li>Complete equipment return procedures</li>
-                      <li>Or if rejected, no action needed</li>
-                    </ul>
-                  </p>
-                </div>
-              ) : (
-                // Normal deletion confirmation
-                <div className={styles.inventoryDeleteConfirmationContent}>
-                  <div className={styles.inventoryDeleteWarningIcon}>⚠️</div>
-                  <p className={styles.inventoryDeleteConfirmationText}>
-                    Are you sure you want to delete the clearance record for
-                  </p>
-                  <p className={styles.inventoryDocumentNameHighlight}>
-                    "{deleteRecord?.fullName || "this record"}"?
-                  </p>
+                ) : (
+                  // Normal deletion confirmation
+                  <div className={styles.inventoryDeleteConfirmationContent}>
+                    <div className={styles.inventoryDeleteWarningIcon}>⚠️</div>
+                    <p className={styles.inventoryDeleteConfirmationText}>
+                      Are you sure you want to delete the clearance record for
+                    </p>
+                    <p className={styles.inventoryDocumentNameHighlight}>
+                      "{deleteRecord?.fullName || "this record"}"?
+                    </p>
 
-                  {deleteRecord && (
-                    <div className={styles.modalRecordDetails}>
-                      <p>
-                        <strong>Type:</strong> {deleteRecord.clearanceType}
-                      </p>
-                      <p>
-                        <strong>Status:</strong> {deleteRecord.status}
-                      </p>
-                      <p>
-                        <strong>Record Type:</strong>{" "}
-                        {deleteRecord.recordType === "current"
-                          ? "Current Request"
-                          : "Yearly Record"}
-                      </p>
+                    {deleteRecord && (
+                      <div className={styles.modalRecordDetails}>
+                        <p>
+                          <strong>Type:</strong> {deleteRecord.clearanceType}
+                        </p>
+                        <p>
+                          <strong>Status:</strong> {deleteRecord.status}
+                        </p>
+                        <p>
+                          <strong>Record Type:</strong>{" "}
+                          {deleteRecord.recordType === "current"
+                            ? "Current Request"
+                            : "Yearly Record"}
+                        </p>
 
-                      {/* Check for PDFs */}
-                      {(deleteRecord.documentUrl ||
-                        deleteRecord.documentPath) && (
-                        <div className={styles.pdfWarning}>
-                          <p>
-                            <strong>⚠️ PDF Alert:</strong> This record has a
-                            generated PDF in storage.
-                          </p>
-                          <p className={styles.pdfNote}>
-                            The PDF file will also be deleted from the
-                            clearance-documents bucket.
-                          </p>
-                        </div>
-                      )}
+                        {/* Check for PDFs */}
+                        {(deleteRecord.documentUrl ||
+                          deleteRecord.documentPath) && (
+                          <div className={styles.pdfWarning}>
+                            <p>
+                              <strong>⚠️ PDF Alert:</strong> This record has a
+                              generated PDF in storage.
+                            </p>
+                            <p className={styles.pdfNote}>
+                              The PDF file will also be deleted from the
+                              clearance-documents bucket.
+                            </p>
+                          </div>
+                        )}
 
-                      {/* Show accountability info if applicable */}
-                      {(deleteRecord.clearanceType?.includes("Resignation") ||
-                        deleteRecord.clearanceType?.includes("Retirement") ||
-                        deleteRecord.clearanceType?.includes(
-                          "Equipment Completion"
-                        )) &&
-                        deleteRecord.status !== "Rejected" && (
-                          <p className={styles.accountabilityNote}>
+                        {/* Show accountability info if applicable */}
+                        {(deleteRecord.clearanceType?.includes("Resignation") ||
+                          deleteRecord.clearanceType?.includes("Retirement") ||
+                          deleteRecord.clearanceType?.includes(
+                            "Equipment Completion"
+                          )) &&
+                          deleteRecord.status !== "Rejected" && (
+                            <p className={styles.accountabilityNote}>
+                              <em>
+                                Note: This clearance type may have associated
+                                accountability records.
+                              </em>
+                            </p>
+                          )}
+
+                        {deleteRecord.status === "Rejected" && (
+                          <p className={styles.rejectedNote}>
                             <em>
-                              Note: This clearance type may have associated
-                              accountability records.
+                              Note: Rejected clearances can be deleted without
+                              restrictions.
                             </em>
                           </p>
                         )}
+                      </div>
+                    )}
 
-                      {deleteRecord.status === "Rejected" && (
-                        <p className={styles.rejectedNote}>
-                          <em>
-                            Note: Rejected clearances can be deleted without
-                            restrictions.
-                          </em>
-                        </p>
-                      )}
-                    </div>
-                  )}
+                    <p className={styles.inventoryDeleteWarning}>
+                      This action cannot be undone. All associated data including
+                      PDF files will be permanently deleted.
+                    </p>
+                  </div>
+                )}
+              </div>
 
-                  <p className={styles.inventoryDeleteWarning}>
-                    This action cannot be undone. All associated data including
-                    PDF files will be permanently deleted.
-                  </p>
-                </div>
-              )}
-            </div>
-
-            <div className={styles.inventoryModalDeleteActions}>
-              <button
-                className={`${styles.inventoryModalDeleteBtn} ${styles.inventoryModalCancelBtn}`}
-                onClick={cancelDelete}
-              >
-                Cancel
-              </button>
-              {!deleteReason && (
+              <div className={styles.inventoryModalDeleteActions}>
                 <button
-                  className={`${styles.inventoryModalDeleteBtn} ${styles.inventoryDeleteConfirmBtn}`}
-                  onClick={performDelete}
+                  className={`${styles.inventoryModalDeleteBtn} ${styles.inventoryModalCancelBtn}`}
+                  onClick={cancelDelete}
                 >
-                  Delete
+                  Cancel
                 </button>
-              )}
+                {!deleteReason && (
+                  <button
+                    className={`${styles.inventoryModalDeleteBtn} ${styles.inventoryDeleteConfirmBtn}`}
+                    onClick={performDelete}
+                  >
+                    Delete
+                  </button>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </div>
+    </>
   );
 };
 

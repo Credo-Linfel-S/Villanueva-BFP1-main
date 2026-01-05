@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { supabase } from "../../../lib/supabaseClient.js";
+import BFPPreloader from "../../BFPPreloader.jsx";
 
 const MainContent = ({ isCollapsed }) => {
   // Add utility functions at the top (before state declarations)
@@ -275,6 +276,7 @@ const MainContent = ({ isCollapsed }) => {
 
   // Overall loading state
   const [overallLoading, setOverallLoading] = useState(true);
+  const [preloaderProgress, setPreloaderProgress] = useState(0);
 
   // State for live timestamp
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -628,19 +630,36 @@ const MainContent = ({ isCollapsed }) => {
   // Function to fetch all dashboard data
   const fetchDashboardData = async () => {
     setOverallLoading(true);
+    setPreloaderProgress(10);
+
     try {
-      await Promise.all([
-        fetchTotalPersonnel(),
-        fetchTotalInventory(),
-        fetchPendingLeaveRequests(),
-        fetchPendingClearanceRequests(),
-        fetchUpcomingInspections(),
-        fetchRecentActivities(),
-      ]);
+      // Update progress as each fetch completes
+      setPreloaderProgress(20);
+      await fetchTotalPersonnel();
+
+      setPreloaderProgress(35);
+      await fetchTotalInventory();
+
+      setPreloaderProgress(50);
+      await fetchPendingLeaveRequests();
+
+      setPreloaderProgress(65);
+      await fetchPendingClearanceRequests();
+
+      setPreloaderProgress(80);
+      await fetchUpcomingInspections();
+
+      setPreloaderProgress(95);
+      await fetchRecentActivities();
+
+      setPreloaderProgress(100);
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
     } finally {
-      setOverallLoading(false);
+      // Small delay to show 100% completion before hiding
+      setTimeout(() => {
+        setOverallLoading(false);
+      }, 500);
     }
   };
 
@@ -749,6 +768,18 @@ const MainContent = ({ isCollapsed }) => {
       clearInterval(timeIntervalId);
     };
   }, []);
+
+  // Show BFP Preloader while loading
+  if (overallLoading) {
+    return (
+      <BFPPreloader
+        loading={overallLoading}
+        progress={preloaderProgress}
+        moduleTitle="ADMIN DASHBOARD • Directing to Admin Dashboard Please wait..."
+        onRetry={fetchDashboardData}
+      />
+    );
+  }
 
   return (
     <div className={`main-content ${isCollapsed ? "collapsed" : ""}`}>
@@ -885,7 +916,7 @@ const MainContent = ({ isCollapsed }) => {
           <div className="stat-card">
             <div className="stat-icon leave-icon">📋</div>
             <div className="stat-content">
-              <h3>Total Recruited Applicants </h3>
+              <h3>Total Recruited Applicants</h3>
               <p className="stat-number">
                 {renderStatValue(
                   leaveLoading,

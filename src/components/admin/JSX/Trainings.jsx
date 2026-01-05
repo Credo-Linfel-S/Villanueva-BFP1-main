@@ -1,4 +1,3 @@
-// Trainings.jsx
 import React, { useState, useEffect } from "react";
 import styles from "../styles/Trainings.module.css";
 import Sidebar from "../../Sidebar.jsx";
@@ -6,12 +5,19 @@ import Hamburger from "../../Hamburger.jsx";
 import { useSidebar } from "../../SidebarContext.jsx";
 import { Title, Meta } from "react-head";
 import { supabase } from "../../../lib/supabaseClient.js";
-
+import BFPPreloader from "../../BFPPreloader.jsx";
+import { filterActivePersonnel } from "../../filterActivePersonnel.js"; // Import the utility
+import { ToastContainer, toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 const Trainings = () => {
   const [trainings, setTrainings] = useState([]);
   const [personnel, setPersonnel] = useState([]);
   const [loading, setLoading] = useState(true);
   const { isSidebarCollapsed } = useSidebar();
+
+  // Preloader state
+  const [showPreloader, setShowPreloader] = useState(true);
+  const [loadingProgress, setLoadingProgress] = useState(0);
 
   // State variables for table functionality
   const [currentPage, setCurrentPage] = useState(1);
@@ -43,13 +49,19 @@ const Trainings = () => {
     loadTrainings();
   }, []);
 
-  // Load personnel from Supabase
+  // Update loading progress
+  const updateLoadingProgress = (progress) => {
+    setLoadingProgress(progress);
+  };
+
+  // Load personnel from Supabase - UPDATED
   const loadPersonnel = async () => {
     try {
+      updateLoadingProgress(10);
+
       const { data, error } = await supabase
         .from("personnel")
         .select("*")
-        .eq("is_active", true)
         .order("last_name", { ascending: true });
 
       if (error) {
@@ -57,7 +69,16 @@ const Trainings = () => {
         return;
       }
 
-      setPersonnel(data || []);
+      // Filter out retired/resigned personnel using utility function
+      const activePersonnel = filterActivePersonnel(data || []);
+
+      console.log(
+        `Trainings System: Loaded ${
+          activePersonnel.length
+        } active personnel out of ${data?.length || 0} total`
+      );
+
+      setPersonnel(activePersonnel);
     } catch (error) {
       console.error("Error in loadPersonnel:", error);
     }
@@ -67,6 +88,7 @@ const Trainings = () => {
   const loadTrainings = async () => {
     try {
       setLoading(true);
+      updateLoadingProgress(20);
 
       // First, get all trainings
       const { data: trainingsData, error: trainingsError } = await supabase
@@ -79,16 +101,24 @@ const Trainings = () => {
 
         // Check if table doesn't exist
         if (trainingsError.message.includes("does not exist")) {
+          updateLoadingProgress(30);
           await createTrainingsTable();
           setTrainings([]);
           setLoading(false);
+          updateLoadingProgress(100);
+
+          setTimeout(() => {
+            setShowPreloader(false);
+          }, 500);
           return;
         }
 
         return;
       }
 
-      // Get personnel data for each training
+      updateLoadingProgress(40);
+
+      // Get personnel data for each training - ONLY active personnel
       const trainingsWithPersonnel = await Promise.all(
         (trainingsData || []).map(async (training) => {
           try {
@@ -115,8 +145,12 @@ const Trainings = () => {
                 personnelId: training.personnel_id,
                 certificateUrl: training.certificate_url || "",
                 created_at: training.created_at,
+                isActive: false, // Mark as inactive since we couldn't load personnel
               };
             }
+
+            // Check if personnel is active
+            const isActive = filterActivePersonnel([personnelData]).length > 0;
 
             const fullName = `${personnelData.first_name} ${
               personnelData.middle_name || ""
@@ -132,6 +166,7 @@ const Trainings = () => {
               personnelId: training.personnel_id,
               certificateUrl: training.certificate_url || "",
               created_at: training.created_at,
+              isActive: isActive, // Add active status for filtering
             };
           } catch (error) {
             console.error("Error processing training:", error);
@@ -145,17 +180,48 @@ const Trainings = () => {
               personnelId: training.personnel_id,
               certificateUrl: training.certificate_url || "",
               created_at: training.created_at,
+              isActive: false,
             };
           }
         })
       );
 
-      setTrainings(trainingsWithPersonnel);
+      updateLoadingProgress(80);
+
+      // Filter to show only trainings with active personnel (or all if needed)
+      const activeTrainings = trainingsWithPersonnel.filter(
+        (training) => training.isActive
+      );
+
+      console.log(
+        `Trainings: ${activeTrainings.length} active trainings out of ${trainingsWithPersonnel.length} total`
+      );
+
+      setTrainings(activeTrainings);
       setLoading(false);
+      updateLoadingProgress(90);
+
+      // Small delay to show completion
+      setTimeout(() => {
+        updateLoadingProgress(100);
+        // Hide preloader after a short delay to show completion
+        setTimeout(() => {
+          setShowPreloader(false);
+        }, 500);
+      }, 300);
     } catch (error) {
       console.error("Error in loadTrainings:", error);
       setLoading(false);
+      setShowPreloader(false);
     }
+  };
+
+  // Handle retry from preloader
+  const handleRetryFromPreloader = () => {
+    setShowPreloader(true);
+    setLoadingProgress(0);
+    loadPersonnel();
+    loadTrainings();
   };
 
   // Create trainings table if it doesn't exist
@@ -794,11 +860,15 @@ const Trainings = () => {
     return parts[parts.length - 1];
   };
 
-  if (loading) {
+  // Render BFP Preloader if still loading
+  if (showPreloader) {
     return (
-      <div className={`main-content ${isSidebarCollapsed ? "collapsed" : ""}`}>
-        <p>Loading training records...</p>
-      </div>
+      <BFPPreloader
+        loading={loading}
+        progress={loadingProgress}
+        moduleTitle="TRAINING SYSTEM • Loading Schedules..."
+        onRetry={handleRetryFromPreloader}
+      />
     );
   }
 
@@ -851,8 +921,11 @@ const Trainings = () => {
             }`}
             onClick={() => handleCardClick("total")}
           >
-            <h3>Total Trainings</h3>
+            <h3>Active Trainings</h3>
             <p>{totalItems}</p>
+            <small className={styles.summaryNote}>
+              (Retired/Resigned excluded)
+            </small>
           </button>
           <button
             className={`${styles.TSSummaryCard} ${styles.TSPending} ${
@@ -894,7 +967,7 @@ const Trainings = () => {
 
         {/* Add Training Button */}
         <button className={styles.TSAddBtn} onClick={addNewTraining}>
-          Add Training Personnel
+          Add Training for Personnel
         </button>
 
         {/* Table Container with Pagination */}
@@ -910,7 +983,7 @@ const Trainings = () => {
                 <th>Name</th>
                 <th>Rank</th>
                 <th>Training Date</th>
-                <th>Days</th>
+                <th>Duration</th>
                 <th>Status</th>
                 <th>Certificate</th>
                 <th>Manage</th>
@@ -924,7 +997,11 @@ const Trainings = () => {
                       📚
                     </div>
                     <h3>No Training Records Found</h3>
-                    <p>There are no training records added yet.</p>
+                    <p>
+                      There are no training records for active personnel.
+                      Retired and resigned personnel are excluded from training
+                      records.
+                    </p>
                   </td>
                 </tr>
               ) : (
@@ -933,7 +1010,9 @@ const Trainings = () => {
                     <td>{training.name}</td>
                     <td>{training.rank}</td>
                     <td>{training.date}</td>
-                    <td>{training.days}</td>
+                    <td>
+                      {training.days} {training.days === "1" ? "day" : "days"}
+                    </td>
                     <td>
                       <span
                         className={`${styles.TSStatus} ${
@@ -1053,6 +1132,9 @@ const Trainings = () => {
                       </option>
                     ))}
                   </select>
+                  <small className={styles.selectNote}>
+                    Only active (non-retired/non-resigned) personnel are shown
+                  </small>
                 </div>
               </div>
 
@@ -1243,6 +1325,9 @@ const Trainings = () => {
                           </option>
                         ))}
                       </select>
+                      <small className={styles.selectNote}>
+                        Only active personnel are shown
+                      </small>
                     </div>
                   </div>
 
@@ -1370,6 +1455,30 @@ const Trainings = () => {
             </div>
           </div>
         )}
+
+        {/* Bottom Pagination */}
+        <div className={styles.TSPaginationContainer}>
+          {renderPaginationButtons()}
+        </div>
+
+        {/* Information Note */}
+        <div className={styles.infoNote}>
+          <h3>Note:</h3>
+          <ul>
+            <li>
+              Only active (non-retired/non-resigned) personnel are shown in
+              training records
+            </li>
+            <li>
+              Trainings for retired/resigned personnel are excluded from this
+              view
+            </li>
+            <li>
+              Historical training records can be accessed through the History
+              system
+            </li>
+          </ul>
+        </div>
       </div>
     </div>
   );

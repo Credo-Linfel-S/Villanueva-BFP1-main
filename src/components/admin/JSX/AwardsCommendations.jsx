@@ -1,15 +1,23 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import styles from "../styles/AwardsCommendations.module.css";
 import Sidebar from "../../Sidebar";
 import Hamburger from "../../Hamburger";
 import { useSidebar } from "../../SidebarContext";
 import { Title, Meta } from "react-head";
 import { supabase } from "../../../lib/supabaseClient";
+import { toast, ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
+// Import the BFP preloader component and its styles
+import BFPPreloader from "../../BFPPreloader.jsx"; // Adjust path as needed
 
 const AwardsCommendations = () => {
   const [awards, setAwards] = useState([]);
   const [loading, setLoading] = useState(true);
   const { isSidebarCollapsed } = useSidebar();
+
+  // Preloader state
+  const [showPreloader, setShowPreloader] = useState(true);
+  const [loadingProgress, setLoadingProgress] = useState(0);
 
   // State variables for table functionality
   const [currentPage, setCurrentPage] = useState(1);
@@ -18,11 +26,17 @@ const AwardsCommendations = () => {
   const [filterAwardType, setFilterAwardType] = useState("");
   const [currentFilterCard, setCurrentFilterCard] = useState("total");
 
+  // Update loading progress
+  const updateLoadingProgress = (progress) => {
+    setLoadingProgress(progress);
+  };
+
   const loadAwards = async () => {
     try {
       console.log("Loading awards from Supabase...");
+      updateLoadingProgress(10);
 
-      // Fetch personnel with their award documents
+      // Fetch personnel with their award documents including rank_image
       const { data: personnelList, error: personnelError } = await supabase
         .from("personnel")
         .select("*")
@@ -32,6 +46,8 @@ const AwardsCommendations = () => {
         console.error("Error loading personnel:", personnelError);
         throw personnelError;
       }
+
+      updateLoadingProgress(30);
 
       // Fetch all award/commendation documents
       const { data: documentsData, error: documentsError } = await supabase
@@ -45,6 +61,8 @@ const AwardsCommendations = () => {
         throw documentsError;
       }
 
+      updateLoadingProgress(50);
+
       // Create a map of personnel by ID for quick lookup
       const personnelMap = {};
       personnelList?.forEach((personnel) => {
@@ -54,14 +72,14 @@ const AwardsCommendations = () => {
       const awardsData = [];
 
       // Process each award document
-      documentsData?.forEach((doc) => {
+      for (const doc of documentsData || []) {
         const personnel = personnelMap[doc.personnel_id];
 
         if (!personnel) {
           console.warn(
             `No personnel found for document ${doc.id}, personnel_id: ${doc.personnel_id}`
           );
-          return;
+          continue;
         }
 
         const fullName = `${personnel.first_name || ""} ${
@@ -69,6 +87,26 @@ const AwardsCommendations = () => {
         } ${personnel.last_name || ""}`.trim();
         const rank = personnel.rank || "N/A";
         const badge = personnel.badge_number || "N/A";
+
+        // Get rank image URL (same logic as medical records)
+        let rankImageUrl = "";
+        if (personnel.rank_image) {
+          try {
+            // Check if it's already a full URL
+            if (personnel.rank_image.startsWith("http")) {
+              rankImageUrl = personnel.rank_image;
+            } else {
+              // Get public URL from rank_images bucket
+              const { data: imageData } = supabase.storage
+                .from("rank_images")
+                .getPublicUrl(personnel.rank_image);
+              rankImageUrl = imageData?.publicUrl || "";
+            }
+          } catch (imgError) {
+            console.warn("Error loading rank image:", imgError);
+            rankImageUrl = "";
+          }
+        }
 
         // Determine award type - use record_type if available, otherwise infer from name
         let awardType = doc.record_type || "General";
@@ -100,38 +138,66 @@ const AwardsCommendations = () => {
         }
 
         // Format date
-        const dateTime = doc.uploaded_at
-          ? new Date(doc.uploaded_at).toLocaleString()
+        const dateUploaded = doc.uploaded_at
+          ? new Date(doc.uploaded_at).toLocaleDateString("en-US", {
+              year: "numeric",
+              month: "long",
+              day: "numeric",
+            })
           : "N/A";
 
         awardsData.push({
           id: doc.id,
           fullName,
           rank,
+          rankImage: rankImageUrl,
           badgeNumber: badge,
+          designation: personnel.designation || "N/A",
           awardName: doc.name,
           awardType: awardType,
-          dateTime,
+          dateUploaded,
           downloadUrl: doc.file_url,
           fileName: doc.name,
+          fileSize: doc.file_size,
           personnelId: doc.personnel_id,
           rawDocument: doc,
         });
-      });
+      }
+
+      updateLoadingProgress(80);
 
       console.log(`Loaded ${awardsData.length} awards from Supabase`);
       setAwards(awardsData);
-      setLoading(false);
+      updateLoadingProgress(90);
+
+      // Small delay to show completion
+      setTimeout(() => {
+        updateLoadingProgress(100);
+        setLoading(false);
+        // Hide preloader after a short delay to show completion
+        setTimeout(() => {
+          setShowPreloader(false);
+        }, 500);
+      }, 300);
     } catch (error) {
       console.error("Error loading awards:", error);
+      toast.error("Failed to load awards");
       setAwards([]);
       setLoading(false);
+      setShowPreloader(false);
     }
   };
 
   useEffect(() => {
     loadAwards();
   }, []);
+
+  // Handle retry from preloader
+  const handleRetryFromPreloader = () => {
+    setShowPreloader(true);
+    setLoadingProgress(0);
+    loadAwards();
+  };
 
   // Filtering & pagination logic
   function applyFilters(items) {
@@ -160,7 +226,7 @@ const AwardsCommendations = () => {
 
     filtered = filtered.filter((i) => {
       const text =
-        `${i.fullName} ${i.rank} ${i.badgeNumber} ${i.awardName} ${i.awardType} ${i.dateTime}`.toLowerCase();
+        `${i.fullName} ${i.rank} ${i.badgeNumber} ${i.designation} ${i.awardName} ${i.awardType} ${i.dateUploaded}`.toLowerCase();
       const typeMatch =
         !typeFilter || (i.awardType || "").toLowerCase().includes(typeFilter);
       const searchMatch = !s || text.includes(s);
@@ -228,21 +294,18 @@ const AwardsCommendations = () => {
       );
     }
 
-    // Show pages around current page (max 5 pages total including first and last)
+    // Show pages around current page
     let startPage = Math.max(2, currentPage - 1);
     let endPage = Math.min(pageCount - 1, currentPage + 1);
 
-    // Adjust if we're near the beginning
     if (currentPage <= 3) {
       endPage = Math.min(pageCount - 1, 4);
     }
 
-    // Adjust if we're near the end
     if (currentPage >= pageCount - 2) {
       startPage = Math.max(2, pageCount - 3);
     }
 
-    // Generate middle page buttons
     for (let i = startPage; i <= endPage; i++) {
       if (i > 1 && i < pageCount) {
         buttons.push(
@@ -260,7 +323,6 @@ const AwardsCommendations = () => {
       }
     }
 
-    // Show ellipsis before last page if needed
     if (currentPage < pageCount - 2) {
       buttons.push(
         <span key="ellipsis2" className={styles.ACSPaginationEllipsis}>
@@ -269,7 +331,6 @@ const AwardsCommendations = () => {
       );
     }
 
-    // Always show last page if there is more than 1 page
     if (pageCount > 1) {
       buttons.push(
         <button
@@ -302,6 +363,30 @@ const AwardsCommendations = () => {
     return buttons;
   };
 
+  // Handle download
+  const handleDownload = async (award) => {
+    try {
+      console.log("Downloading award:", award.id, award.fileName);
+
+      if (award.downloadUrl) {
+        // Create a temporary link and trigger download
+        const link = document.createElement("a");
+        link.href = award.downloadUrl;
+        link.download = award.fileName || "award_commendation";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        toast.success("Download started");
+      } else {
+        toast.error("No download URL available");
+      }
+    } catch (error) {
+      console.error("Error downloading file:", error);
+      toast.error("Error downloading file");
+    }
+  };
+
   // Summary numbers
   const totalItems = awards.length;
   const medalItems = awards.filter(
@@ -329,67 +414,80 @@ const AwardsCommendations = () => {
     setCurrentPage(1);
   }
 
-  const handleDownload = async (award) => {
-    try {
-      console.log("Downloading award:", award.id, award.fileName);
+  // Utility function for truncation
+  const truncateText = (text, maxLength = 30) => {
+    if (!text) return "";
+    if (text.length <= maxLength) return text;
+    return text.substring(0, maxLength) + "...";
+  };
 
-      if (award.downloadUrl) {
-        // Use the Supabase storage URL
-        const link = document.createElement("a");
-        link.href = award.downloadUrl;
-        link.download = award.fileName;
-        link.target = "_blank"; // Open in new tab for better UX
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      } else {
-        alert("Download link not available for this award.");
+  // Enhanced AwardNameCell with smart positioning (similar to Medical Records)
+  const AwardNameCell = ({ awardName, rowIndex, totalRows }) => {
+    const [isHovered, setIsHovered] = useState(false);
+    const [tooltipPosition, setTooltipPosition] = useState("bottom");
+    const cellRef = useRef(null);
+
+    // Calculate if we're near the bottom of the table
+    const isNearBottom = rowIndex > totalRows - 3;
+
+    // Update position on hover
+    useEffect(() => {
+      if (isHovered && cellRef.current) {
+        const rect = cellRef.current.getBoundingClientRect();
+        const viewportHeight = window.innerHeight;
+
+        // Check if there's enough space below the cell
+        const spaceBelow = viewportHeight - rect.bottom;
+        const tooltipHeight = 100;
+
+        // If near bottom of viewport OR near bottom of table, show tooltip on top
+        if (spaceBelow < tooltipHeight + 20 || isNearBottom) {
+          setTooltipPosition("top");
+        } else {
+          setTooltipPosition("bottom");
+        }
       }
-    } catch (error) {
-      console.error("Error downloading file:", error);
-      alert("Error downloading file. Please try again.");
-    }
-  };
+    }, [isHovered, rowIndex, isNearBottom]);
 
-  const formatDateTime = (dateTimeString) => {
-    if (!dateTimeString || dateTimeString === "N/A") return "N/A";
+    const showTooltip = awardName && awardName.length > 30 && isHovered;
 
-    try {
-      const date = new Date(dateTimeString);
-      return isNaN(date.getTime())
-        ? "N/A"
-        : date.toLocaleString("en-US", {
-            year: "numeric",
-            month: "short",
-            day: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-            hour12: true,
-          });
-    } catch {
-      return "N/A";
-    }
-  };
-
-  // Add a refresh button handler
-  const handleRefresh = async () => {
-    setLoading(true);
-    await loadAwards();
-  };
-
-  if (loading) {
     return (
-      <div className={styles.ACSAppContainer}>
-        <Hamburger />
-        <Sidebar />
+      <div ref={cellRef} className={styles.awardNameCell}>
         <div
-          className={`main-content ${isSidebarCollapsed ? "collapsed" : ""}`}
+          className={styles.awardNameWrapper}
+          onMouseEnter={() => setIsHovered(true)}
+          onMouseLeave={() => setIsHovered(false)}
+          title={awardName}
         >
-          <div className={styles.ACSLoading}>
-            <p>Loading awards and commendations...</p>
-          </div>
+          <span className={styles.truncatedText}>
+            {truncateText(awardName, 30)}
+          </span>
+          {awardName && awardName.length > 30 && (
+            <span className={styles.fullLengthIndicator}>…</span>
+          )}
         </div>
+
+        {showTooltip && (
+          <div className={`${styles.tooltip} ${styles[tooltipPosition]}`}>
+            <div className={styles.tooltipContent}>
+              <span className={styles.tooltipText}>{awardName}</span>
+              <span className={styles.tooltipArrow}></span>
+            </div>
+          </div>
+        )}
       </div>
+    );
+  };
+
+  // Render BFP Preloader if still loading
+  if (showPreloader) {
+    return (
+      <BFPPreloader
+        loading={loading}
+        progress={loadingProgress}
+        moduleTitle="AWARDS & COMMENDATIONS • Loading Achievements..."
+        onRetry={handleRetryFromPreloader}
+      />
     );
   }
 
@@ -400,17 +498,22 @@ const AwardsCommendations = () => {
 
       <Hamburger />
       <Sidebar />
+
+      <ToastContainer
+        position="top-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="light"
+      />
+
       <div className={`main-content ${isSidebarCollapsed ? "collapsed" : ""}`}>
-        <div className={styles.ACSHeader}>
-          <h1 className={styles.ACSTitle}>Awards & Commendations</h1>
-          <button
-            className={styles.ACSRefreshBtn}
-            onClick={handleRefresh}
-            title="Refresh awards list"
-          >
-            🔄 Refresh
-          </button>
-        </div>
+        <h1 className={styles.ACSTitle}>Awards & Commendations of Personnel</h1>
 
         {/* Top Controls */}
         <div className={styles.ACSTopControls}>
@@ -424,18 +527,18 @@ const AwardsCommendations = () => {
               }}
             >
               <option value="">All Award Types</option>
-              <option value="medal">Medal</option>
-              <option value="commendation">Commendation</option>
-              <option value="certificate">Certificate</option>
-              <option value="ribbon">Ribbon</option>
-              <option value="badge">Badge</option>
-              <option value="general">General</option>
+              <option value="Medal">Medal</option>
+              <option value="Commendation">Commendation</option>
+              <option value="Certificate">Certificate</option>
+              <option value="Ribbon">Ribbon</option>
+              <option value="Badge">Badge</option>
+              <option value="General">General</option>
             </select>
 
             <input
               type="text"
               className={styles.ACSSearchBar}
-              placeholder="🔍 Search awards..."
+              placeholder="🔍 Search awards & commendations..."
               value={search}
               onChange={(e) => {
                 setSearch(e.target.value);
@@ -503,49 +606,68 @@ const AwardsCommendations = () => {
           </button>
         </div>
 
-        {/* Table */}
-        <div className={styles.ACSTableContainer}>
-          <div className={styles.ACSPaginationContainer}>
-            {renderPaginationButtons()}
-          </div>
+        <div className={styles.ACSPaginationContainer}>
+          {renderPaginationButtons()}
+        </div>
 
+        {/* Table with Scrollable Container - Same as Medical Records */}
+        <div className={styles.ACSTableScrollContainer}>
           <table className={styles.ACSTable}>
             <thead>
               <tr>
-                <th>Employee Name</th>
                 <th>Rank</th>
+                <th>Name</th>
+                <th>Designation</th>
                 <th>Badge No.</th>
-                <th>Award/Commendation</th>
+                <th>Award Name</th>
                 <th>Award Type</th>
-                <th>Date & Time Uploaded</th>
+                <th>Date Awarded/Uploaded</th>
+                <th>File Size</th>
                 <th>Download</th>
               </tr>
             </thead>
             <tbody>
               {paginated.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className={styles.ACSNoAwardsTable}>
+                  <td colSpan="9" className={styles.ACSNoAwardsTable}>
                     <div style={{ fontSize: "48px", marginBottom: "16px" }}>
                       <span className={styles.animatedEmoji}>🏆</span>
                     </div>
                     <h3>No Awards & Commendations Found</h3>
                     <p>There are no awards or commendations uploaded yet.</p>
-                    <button
-                      className={styles.ACSRefreshBtn}
-                      onClick={handleRefresh}
-                      style={{ marginTop: "20px" }}
-                    >
-                      Refresh List
-                    </button>
                   </td>
                 </tr>
               ) : (
-                paginated.map((award) => (
+                paginated.map((award, index) => (
                   <tr key={award.id} className={styles.ACSTableRow}>
+                    <td className={styles.rankCellColumn}>
+                      <div className={styles.rankCell}>
+                        {award.rankImage ? (
+                          <img
+                            src={award.rankImage}
+                            alt={award.rank || "Rank"}
+                            className={styles.rankImage}
+                            onError={(e) => {
+                              e.target.onerror = null;
+                              e.target.style.display = "none";
+                            }}
+                          />
+                        ) : null}
+                        <span className={styles.rankText}>
+                          {award.rank || "No Rank"}
+                        </span>
+                      </div>
+                    </td>
                     <td>{award.fullName}</td>
-                    <td>{award.rank}</td>
+                    <td>{award.designation}</td>
                     <td>{award.badgeNumber}</td>
-                    <td className={styles.ACSAwardName}>{award.awardName}</td>
+                    <td className={styles.tableCellWithTooltip}>
+                      <AwardNameCell
+                        awardName={award.awardName}
+                        rowIndex={index}
+                        totalRows={paginated.length}
+                      />
+                    </td>
                     <td>
                       <span
                         className={`${styles.ACSStatus} ${
@@ -555,14 +677,17 @@ const AwardsCommendations = () => {
                         {award.awardType}
                       </span>
                     </td>
-                    <td className={styles.ACSDateTime}>
-                      {formatDateTime(award.dateTime)}
+                    <td>{award.dateUploaded}</td>
+                    <td>
+                      {award.fileSize
+                        ? `${Math.round(award.fileSize / 1024)} KB`
+                        : "N/A"}
                     </td>
                     <td>
                       <button
                         className={styles.ACSDownloadLink}
                         onClick={() => handleDownload(award)}
-                        title={`Download ${award.awardName}`}
+                        disabled={!award.downloadUrl}
                       >
                         📥 Download
                       </button>
@@ -572,25 +697,10 @@ const AwardsCommendations = () => {
               )}
             </tbody>
           </table>
-
-          {paginated.length > 0 && (
-            <div className={styles.ACSPaginationContainer}>
-              {renderPaginationButtons()}
-            </div>
-          )}
         </div>
 
-        {/* Info panel */}
-        <div className={styles.ACSInfoPanel}>
-          <p>
-            <strong>Total Records:</strong> {awards.length} awards
-          </p>
-          <p>
-            <strong>Filtered:</strong> {filteredAwardsData.length} awards
-          </p>
-          <p>
-            <strong>Current Page:</strong> {currentPage} of {totalPages}
-          </p>
+        <div className={styles.ACSPaginationContainerBottom}>
+          {renderPaginationButtons()}
         </div>
       </div>
     </div>

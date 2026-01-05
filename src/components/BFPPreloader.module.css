@@ -3,27 +3,32 @@
   position: fixed;
   top: 0;
   left: 0;
-  width: 100%;
-  height: 100%;
+  width: 100vw;
+  height: 100vh;
   background: linear-gradient(135deg, #1a237e 0%, #0d47a1 100%);
   display: flex;
   justify-content: center;
   align-items: center;
   z-index: 9999;
   transition: opacity 0.5s ease, visibility 0.5s ease;
+  padding: 20px;
+  box-sizing: border-box;
 }
 
 .preloaderContainer {
   text-align: center;
   color: white;
+  max-width: 800px;
+  width: 100%;
+  padding: 20px;
 }
 
-/* ===== ENHANCED BFP LOGO ANIMATION ===== */
+/* ===== RESPONSIVE BFP LOGO ANIMATION ===== */
 .bfpLogo {
   position: relative;
-  width: 200px;
-  height: 200px;
-  margin: 0 auto 30px;
+  width: clamp(120px, 25vw, 200px);
+  height: clamp(120px, 25vw, 200px);
+  margin: 0 auto clamp(20px, 4vh, 30px);
 }
 
 .bfpLogoInner {
@@ -40,13 +45,13 @@
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 120px;
-  height: 120px;
+  width: 60%;
+  height: 60%;
   border-radius: 50%;
   background: radial-gradient(circle, #ff4444 0%, #ff0000 70%, #cc0000 100%);
   box-shadow: 
-    0 0 30px rgba(255, 0, 0, 0.7),
-    inset 0 0 20px rgba(255, 100, 100, 0.5);
+    0 0 clamp(15px, 3vw, 30px) rgba(255, 0, 0, 0.7),
+    inset 0 0 clamp(10px, 2vw, 20px) rgba(255, 100, 100, 0.5);
   animation: firePulse 2s ease-in-out infinite;
   z-index: 2;
 }
@@ -58,17 +63,17 @@
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 160px;
-  height: 160px;
+  width: 80%;
+  height: 80%;
   border-radius: 50%;
-  border: 8px solid transparent;
+  border: clamp(4px, 0.8vw, 8px) solid transparent;
   border-top-color: #ff004c;
   border-right-color: rgba(255, 204, 0, 0.7);
   border-bottom-color: #ff004c;
   border-left-color: rgba(255, 204, 0, 0.7);
   box-shadow: 
-    0 0 20px rgba(165, 133, 2, 0.5),
-    inset 0 0 20px rgba(255, 204, 0, 0.2);
+    0 0 clamp(10px, 2vw, 20px) rgba(165, 133, 2, 0.5),
+    inset 0 0 clamp(10px, 2vw, 20px) rgba(255, 204, 0, 0.2);
   animation: spin 2s linear infinite;
   z-index: 1;
 }
@@ -80,41 +85,47 @@
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 180px;
-  height: 180px;
+  width: 90%;
+  height: 90%;
   border-radius: 50%;
-  border: 2px solid rgba(255, 204, 0, 0.3);
+  border: clamp(1px, 0.2vw, 2px) solid rgba(255, 204, 0, 0.3);
   box-shadow: 
-    0 0 30px rgba(255, 204, 0, 0.4),
-    inset 0 0 30px rgba(255, 204, 0, 0.2);
+    0 0 clamp(15px, 3vw, 30px) rgba(255, 204, 0, 0.4),
+    inset 0 0 clamp(15px, 3vw, 30px) rgba(255, 204, 0, 0.2);
   animation: glowPulse 3s ease-in-out infinite;
   z-index: 0;
 }
 
-/* BFP Text Animation */
+/* Responsive BFP Text */
 .bfpText {
-  font-size: 2.5rem;
+  font-size: clamp(1.5rem, 4vw, 2.5rem);
   font-weight: 700;
-  margin-bottom: 10px;
+  margin-bottom: clamp(5px, 1vh, 10px);
   background: linear-gradient(90deg, #ffcc00, #ff4444, #ffcc00);
   background-size: 200% auto;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
   animation: textShine 2s ease-in-out infinite alternate;
+  line-height: 1.3;
+  word-wrap: break-word;
+  padding: 0 10px;
 }
 
 .bfpSubtitle {
-  font-size: 1rem;
+  font-size: clamp(0.8rem, 1.5vw, 1rem);
   opacity: 0.8;
-  margin-bottom: 30px;
-  letter-spacing: 2px;
+  margin-bottom: clamp(15px, 3vh, 30px);
+  letter-spacing: clamp(1px, 0.1vw, 2px);
+  line-height: 1.4;
+  padding: 0 10px;
+  word-wrap: break-word;
 }
 
-/* Progress Bar */
+/* Responsive Progress Bar */
 .progressContainer {
-  width: 300px;
-  height: 4px;
+  width: min(90%, 300px);
+  height: clamp(3px, 0.5vh, 4px);
   background: rgba(255, 255, 255, 0.1);
   border-radius: 2px;
   margin: 0 auto;
@@ -130,14 +141,14 @@
   animation: progressLoad 2s ease-in-out infinite;
 }
 
-/* Fire Animation */
+/* Responsive Fire Animation */
 .fireAnimation {
   position: absolute;
-  bottom: 20px;
+  bottom: clamp(10px, 2vh, 20px);
   left: 50%;
   transform: translateX(-50%);
   display: flex;
-  gap: 8px;
+  gap: clamp(4px, 1vw, 8px);
 }
 
 .fireParticle {
@@ -157,31 +168,16 @@
   animation-delay: 0.4s;
   background: #ffcc00;
 }
-
-/* Loading Text */
-.loadingText {
-  font-size: 0.9rem;
-  opacity: 0.7;
-  margin-top: 20px;
-  font-style: italic;
-}
-
-/* Fade Out Animation */
-.fadeOut {
-  opacity: 0;
-  visibility: hidden;
-}
-
-/* ===== OFFLINE MODE STYLES ===== */
+/* ===== RESPONSIVE OFFLINE MODE STYLES ===== */
 .preloaderOverlay.offlineMode {
   background: linear-gradient(135deg, #2c3e50 0%, #1a252f 100%);
 }
 
 .offlineIcon {
   position: relative;
-  width: 200px;
-  height: 200px;
-  margin: 0 auto 30px;
+  width: clamp(120px, 25vw, 200px);
+  height: clamp(120px, 25vw, 200px);
+  margin: 0 auto clamp(15px, 3vh, 30px);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -189,42 +185,39 @@
 
 .wifiSignal {
   position: relative;
-  width: 120px;
-  height: 120px;
+  width: 60%;
+  height: 60%;
 }
 
 .wifiArc {
   position: absolute;
-  border: 4px solid #ecf0f1;
+  border: clamp(2px, 0.4vw, 4px) solid #ecf0f1;
   border-top-color: transparent;
   border-radius: 50%;
   animation: wifiPulse 2s ease-in-out infinite;
 }
 
 .wifiArc:nth-child(1) {
-  width: 120px;
-  height: 120px;
-  border-width: 4px;
+  width: 100%;
+  height: 100%;
   animation-delay: 0.1s;
   opacity: 0.3;
 }
 
 .wifiArc:nth-child(2) {
-  width: 80px;
-  height: 80px;
-  top: 20px;
-  left: 20px;
-  border-width: 4px;
+  width: 67%;
+  height: 67%;
+  top: 16.5%;
+  left: 16.5%;
   animation-delay: 0.2s;
   opacity: 0.5;
 }
 
 .wifiArc:nth-child(3) {
-  width: 40px;
-  height: 40px;
-  top: 40px;
-  left: 40px;
-  border-width: 4px;
+  width: 33%;
+  height: 33%;
+  top: 33.5%;
+  left: 33.5%;
   animation-delay: 0.3s;
   opacity: 0.7;
 }
@@ -244,116 +237,140 @@
 }
 
 .wifiCross::before {
-  width: 80px;
-  height: 8px;
-  top: 56px;
-  left: 20px;
+  width: 67%;
+  height: clamp(4px, 0.8vw, 8px);
+  top: 46.5%;
+  left: 16.5%;
   transform: rotate(45deg);
   animation: crossPulse 1.5s ease-in-out infinite;
 }
 
 .wifiCross::after {
-  width: 80px;
-  height: 8px;
-  top: 56px;
-  left: 20px;
+  width: 67%;
+  height: clamp(4px, 0.8vw, 8px);
+  top: 46.5%;
+  left: 16.5%;
   transform: rotate(-45deg);
   animation: crossPulse 1.5s ease-in-out infinite 0.2s;
 }
 
 .offlinePulse {
   position: absolute;
-  width: 180px;
-  height: 180px;
-  border: 2px solid rgba(231, 76, 60, 0.3);
+  width: 90%;
+  height: 90%;
+  border: clamp(1px, 0.2vw, 2px) solid rgba(231, 76, 60, 0.3);
   border-radius: 50%;
   animation: offlinePulse 2s ease-out infinite;
 }
 
 .offlineSubtitle {
-  font-size: 1rem;
-  margin-bottom: 25px;
-  letter-spacing: 1px;
+  font-size: clamp(0.8rem, 1.5vw, 1rem);
+  margin-bottom: clamp(15px, 3vh, 25px);
+  letter-spacing: clamp(0.5px, 0.05vw, 1px);
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  gap: 8px;
+  line-height: 1.4;
+  padding: 0 10px;
+}
+
+@media (min-width: 768px) {
+  .offlineSubtitle {
+    flex-direction: row;
+  }
 }
 
 .offlineBadge {
   background: #e74c3c;
   color: white;
-  padding: 4px 12px;
+  padding: clamp(3px, 0.5vw, 4px) clamp(8px, 1.5vw, 12px);
   border-radius: 20px;
-  font-size: 0.8rem;
+  font-size: clamp(0.7rem, 1.2vw, 0.8rem);
   font-weight: bold;
   animation: badgePulse 1.5s ease-in-out infinite;
+  white-space: nowrap;
 }
 
 .connectionStatus {
   background: rgba(255, 255, 255, 0.1);
   border-radius: 10px;
-  padding: 15px;
-  margin: 20px auto;
-  max-width: 400px;
+  padding: clamp(10px, 2vw, 15px);
+  margin: clamp(15px, 3vh, 20px) auto;
+  max-width: min(90%, 400px);
 }
 
 .statusIndicator {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  margin-bottom: 10px;
+  gap: clamp(5px, 1vw, 10px);
+  margin-bottom: 8px;
+  flex-wrap: wrap;
 }
 
 .statusDot {
-  width: 12px;
-  height: 12px;
+  width: clamp(8px, 1.2vw, 12px);
+  height: clamp(8px, 1.2vw, 12px);
   background: #e74c3c;
   border-radius: 50%;
   animation: statusBlink 1s infinite;
+  flex-shrink: 0;
 }
 
 .statusMessage {
-  font-size: 0.9rem;
+  font-size: clamp(0.8rem, 1.2vw, 0.9rem);
   opacity: 0.8;
   margin: 0;
+  line-height: 1.4;
 }
 
+/* Responsive Connection Bars */
 .connectionBars {
   display: flex;
   justify-content: center;
   align-items: flex-end;
-  height: 60px;
-  gap: 6px;
-  margin: 25px 0;
+  height: clamp(40px, 8vh, 60px);
+  gap: clamp(3px, 0.6vw, 6px);
+  margin: clamp(15px, 3vh, 25px) 0;
 }
 
 .signalBar {
-  width: 12px;
+  width: clamp(8px, 1.2vw, 12px);
   background: linear-gradient(to top, #3498db, #2ecc71);
   border-radius: 3px 3px 0 0;
   animation: signalScan 1.5s ease-in-out infinite;
 }
 
-.signalBar:nth-child(1) { height: 15px; animation-delay: 0.1s; }
-.signalBar:nth-child(2) { height: 25px; animation-delay: 0.2s; }
-.signalBar:nth-child(3) { height: 35px; animation-delay: 0.3s; }
-.signalBar:nth-child(4) { height: 25px; animation-delay: 0.4s; }
-.signalBar:nth-child(5) { height: 15px; animation-delay: 0.5s; }
+.signalBar:nth-child(1) { height: 25%; animation-delay: 0.1s; }
+.signalBar:nth-child(2) { height: 42%; animation-delay: 0.2s; }
+.signalBar:nth-child(3) { height: 58%; animation-delay: 0.3s; }
+.signalBar:nth-child(4) { height: 42%; animation-delay: 0.4s; }
+.signalBar:nth-child(5) { height: 25%; animation-delay: 0.5s; }
 
+/* Responsive Button Layout */
 .offlineActions {
   display: flex;
-  gap: 15px;
+  flex-direction: column;
+  gap: 12px;
   justify-content: center;
-  margin: 25px 0;
+  margin: clamp(15px, 3vh, 25px) 0;
+  width: 100%;
+  max-width: 400px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
-.retryButton {
-  background: linear-gradient(135deg, #3498db, #2980b9);
-  color: white;
-  border: none;
-  padding: 12px 24px;
+@media (min-width: 480px) {
+  .offlineActions {
+    flex-direction: row;
+  }
+}
+
+.retryButton,
+.checkNetworkButton {
+  padding: clamp(10px, 2vh, 12px) clamp(16px, 3vw, 24px);
   border-radius: 25px;
   font-weight: 600;
   cursor: pointer;
@@ -361,54 +378,39 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: clamp(5px, 1vw, 8px);
+  font-size: clamp(0.8rem, 1.2vw, 0.9rem);
+  border: none;
+  flex: 1;
+  min-width: 160px;
+  white-space: nowrap;
 }
 
-.retryButton:hover:not(:disabled) {
-  background: linear-gradient(135deg, #2980b9, #1c5a80);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 15px rgba(52, 152, 219, 0.3);
-}
-
-.retryButton:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+.retryButton {
+  background: linear-gradient(135deg, #3498db, #2980b9);
+  color: white;
 }
 
 .checkNetworkButton {
   background: transparent;
   color: #3498db;
   border: 2px solid #3498db;
-  padding: 12px 24px;
-  border-radius: 25px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
 }
 
-.checkNetworkButton:hover {
-  background: rgba(52, 152, 219, 0.1);
-  transform: translateY(-2px);
-}
-
-/* Network Tips */
+/* Responsive Network Tips */
 .networkTips {
   background: rgba(255, 255, 255, 0.05);
   border-radius: 10px;
-  padding: 15px;
-  margin: 20px auto;
-  max-width: 400px;
+  padding: clamp(10px, 2vw, 15px);
+  margin: clamp(15px, 3vh, 20px) auto;
+  max-width: min(90%, 400px);
   text-align: left;
 }
 
 .tipTitle {
   font-weight: 600;
-  margin-bottom: 10px;
-  font-size: 0.9rem;
+  margin-bottom: 8px;
+  font-size: clamp(0.8rem, 1.2vw, 0.9rem);
   color: #3498db;
 }
 
@@ -416,79 +418,61 @@
   list-style: none;
   padding: 0;
   margin: 0;
-  font-size: 0.85rem;
+  font-size: clamp(0.75rem, 1.1vw, 0.85rem);
   opacity: 0.8;
 }
 
 .tipList li {
-  padding: 4px 0;
+  padding: 3px 0;
   display: flex;
   align-items: center;
 }
 
-.tipList li:before {
-  content: "•";
-  color: #2ecc71;
-  font-weight: bold;
-  margin-right: 8px;
-}
-
 /* Last Check Time */
 .lastCheck {
-  font-size: 0.75rem;
+  font-size: clamp(0.7rem, 1vw, 0.75rem);
   opacity: 0.5;
-  margin-top: 15px;
+  margin-top: 10px;
   font-style: italic;
 }
 
-/* ===== ENHANCED STYLES ===== */
+/* ===== RESPONSIVE ENHANCEMENTS ===== */
 /* Weak Connection State */
 .weakConnection {
   background: linear-gradient(135deg, #1a237e 0%, #0d47a1 100%);
   animation: weakConnectionPulse 3s infinite;
 }
 
-@keyframes weakConnectionPulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.95; }
-}
-
 /* Retry Counter */
 .retryCounter {
   position: absolute;
-  bottom: -30px;
+  bottom: -25px;
   left: 50%;
   transform: translateX(-50%);
   background: rgba(255, 255, 255, 0.1);
-  padding: 4px 12px;
+  padding: 3px 10px;
   border-radius: 12px;
-  font-size: 0.8rem;
+  font-size: clamp(0.7rem, 1vw, 0.8rem);
   color: rgba(255, 255, 255, 0.8);
+  white-space: nowrap;
 }
 
 /* Connection Quality */
 .connectionQuality {
-  margin: 20px auto;
-  max-width: 300px;
+  margin: clamp(15px, 3vh, 20px) auto;
+  max-width: min(90%, 300px);
 }
 
 .qualityMeter {
-  height: 6px;
+  height: clamp(4px, 0.6vh, 6px);
   background: rgba(255, 255, 255, 0.1);
   border-radius: 3px;
   overflow: hidden;
-  margin-bottom: 8px;
-}
-
-.qualityBar {
-  height: 100%;
-  background: linear-gradient(90deg, #e74c3c, #f39c12, #2ecc71);
-  border-radius: 3px;
-  transition: width 0.5s ease;
+  margin-bottom: 6px;
 }
 
 .qualityLabel {
-  font-size: 0.8rem;
+  font-size: clamp(0.7rem, 1vw, 0.8rem);
   opacity: 0.7;
   text-align: center;
   display: block;
@@ -497,18 +481,22 @@
 /* Testing Spinner */
 .spinner {
   display: inline-block;
-  width: 16px;
-  height: 16px;
+  width: clamp(12px, 1.5vw, 16px);
+  height: clamp(12px, 1.5vw, 16px);
   border: 2px solid rgba(255, 255, 255, 0.3);
   border-top-color: white;
   border-radius: 50%;
   animation: spinLoader 0.6s linear infinite;
-  margin-right: 8px;
+  margin-right: clamp(5px, 1vw, 8px);
 }
 
-.retryButton.testing {
+/* Loading Text */
+.loadingText {
+  font-size: clamp(0.8rem, 1.2vw, 0.9rem);
   opacity: 0.7;
-  cursor: not-allowed;
+  margin-top: clamp(10px, 2vh, 20px);
+  font-style: italic;
+  padding: 0 10px;
 }
 
 /* ===== ALL ANIMATIONS ===== */
@@ -520,15 +508,9 @@
 @keyframes firePulse {
   0%, 100% { 
     transform: translate(-50%, -50%) scale(1);
-    box-shadow: 
-      0 0 30px rgba(255, 0, 0, 0.7),
-      inset 0 0 20px rgba(255, 100, 100, 0.5);
   }
   50% { 
     transform: translate(-50%, -50%) scale(1.1);
-    box-shadow: 
-      0 0 40px rgba(255, 0, 0, 0.9),
-      inset 0 0 25px rgba(255, 100, 100, 0.7);
   }
 }
 
@@ -657,3 +639,101 @@
   to { transform: rotate(360deg); }
 }
 
+@keyframes weakConnectionPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.95; }
+}
+
+/* ===== RESPONSIVE MEDIA QUERIES ===== */
+@media (max-height: 600px) {
+  .preloaderContainer {
+    transform: scale(0.9);
+  }
+}
+
+@media (max-height: 500px) {
+  .preloaderContainer {
+    transform: scale(0.8);
+  }
+  
+  .bfpLogo,
+  .offlineIcon {
+    margin-bottom: 15px;
+  }
+}
+
+@media (max-width: 480px) {
+  .bfpText {
+    font-size: 1.3rem;
+  }
+  
+  .offlineActions {
+    flex-direction: column;
+  }
+  
+  .retryButton,
+  .checkNetworkButton {
+    width: 100%;
+  }
+}
+
+/* Landscape orientation for mobile */
+@media (max-height: 500px) and (orientation: landscape) {
+  .preloaderContainer {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 20px;
+    padding: 10px;
+  }
+  
+  .bfpLogo,
+  .offlineIcon {
+    margin-bottom: 0;
+    flex-shrink: 0;
+    width: 80px;
+    height: 80px;
+  }
+  
+  .contentWrapper {
+    text-align: left;
+    flex: 1;
+  }
+  
+  .offlineSubtitle {
+    flex-direction: row;
+    justify-content: flex-start;
+  }
+  
+  .connectionBars {
+    height: 40px;
+  }
+}
+
+/* Ultra-wide screens */
+@media (min-width: 1920px) {
+  .preloaderContainer {
+    max-width: 1000px;
+  }
+}
+
+/* 4K Screens */
+@media (min-width: 3840px) {
+  .preloaderContainer {
+    max-width: 1200px;
+    transform: scale(1.2);
+  }
+}
+
+/* Touch device optimizations */
+@media (hover: none) and (pointer: coarse) {
+  .retryButton,
+  .checkNetworkButton {
+    min-height: 44px; /* Minimum touch target size */
+  }
+  
+  .retryButton:hover:not(:disabled),
+  .checkNetworkButton:hover {
+    transform: none; /* Disable hover effects on touch devices */
+  }
+}

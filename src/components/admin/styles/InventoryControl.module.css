@@ -657,12 +657,574 @@ text-indent: 90px;
   }
 
   /* Responsive */
-  @media (max-width: 768px) {
-    .inventoryRightSidebar {
-      width: 100%;
-    }
+/* ================================
+  INVENTORY RESPONSIVE DESIGN - 768px AND BELOW
+=============================== */
+@media screen and (max-width: 768px) {
+  /* Main content adjustments */
+  .main-content {
+    padding: 20px 15px !important;
+    padding-top: 80px !important;
+    margin-left: 0 !important;
   }
 
+  .main-content.collapsed {
+    margin-left: 0 !important;
+    padding-left: 20px !important;
+  }
+
+  /* Page title */
+  .main-content h1 {
+    font-size: 28px !important;
+    text-align: center;
+    margin-bottom: 25px !important;
+  }
+
+  /* Top controls section */
+  .inventoryTopControls {
+    flex-direction: column !important;
+    gap: 15px !important;
+    align-items: stretch !important;
+    margin-bottom: 20px !important;
+  }
+
+  #inventoryAddEquipmentBtn {
+    width: 100% !important;
+    padding: 12px !important;
+    font-size: 16px !important;
+    order: 1;
+  }
+
+  .inventoryTableHeader {
+    flex-direction: column !important;
+    gap: 10px !important;
+    order: 2;
+    width: 100%;
+  }
+
+  .inventoryFilterCategory,
+  .inventoryFilterStatus,
+  .inventorySearchBar {
+    width: 100% !important;
+    margin: 5px 0 !important;
+    padding: 10px !important;
+    font-size: 16px !important; /* Larger for touch */
+  }
+
+  /* Summary cards */
+  #inventorySummary {
+    flex-direction: column !important;
+    gap: 15px !important;
+    margin: 15px 0 !important;
+  }
+
+  .inventorySummaryCard {
+    width: 100% !important;
+    min-width: auto !important;
+    padding: 20px !important;
+  }
+
+  .inventorySummaryCard h3 {
+    font-size: 16px !important;
+  }
+
+  .inventorySummaryCard p {
+    font-size: 28px !important;
+  }
+
+  /* Table wrapper */
+  .tableWrapper {
+    width: 100% !important;
+    margin-left: 0 !important;
+    margin-top: 15px !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+    border-radius: 8px !important;
+  }
+
+  .inventoryTable {
+    min-width: 1200px !important; /* Force horizontal scroll on mobile */
+    font-size: 13px !important;
+    padding: 15px !important;
+  }
+
+  .inventoryTable th,
+  .inventoryTable td {
+    padding: 10px 8px !important;
+    font-size: 13px !important;
+  }
+
+  /* Adjust specific column widths for mobile */
+  .inventoryTable th:nth-child(1),
+  .inventoryTable td:nth-child(1) {
+    min-width: 180px !important;
+  }
+
+  .inventoryTable th:nth-child(2),
+  .inventoryTable td:nth-child(2) {
+    min-width: 200px !important;
+  }
+
+  .inventoryTable th:nth-child(5),
+  .inventoryTable td:nth-child(5),
+  .inventoryTable th:nth-child(7),
+  .inventoryTable td:nth-child(7) {
+    min-width: 150px !important;
+  }
+
+  .inventoryTable th:nth-child(12),
+  .inventoryTable td:nth-child(12) {
+    min-width: 150px !important;
+  }
+
+  /* Rank images on mobile */
+  .rankImage {
+    width: 35px !important;
+    height: 35px !important;
+  }
+
+  .rankPlaceholder {
+    width: 30px !important;
+    height: 30px !important;
+    font-size: 12px !important;
+  }
+
+  .rankText {
+    font-size: 12px !important;
+    min-width: 60px !important;
+  }
+
+  /* Barcode cell adjustments */
+  .barcodeCell {
+    flex-direction: column !important;
+    gap: 8px !important;
+  }
+
+  .barcodeViewBtn,
+  .barcodeDownloadBtn {
+    width: 100% !important;
+    padding: 6px !important;
+    font-size: 12px !important;
+  }
+
+  /* Action buttons */
+  .inventoryEditBtn,
+  .inventoryDeleteBtn {
+    width: 100% !important;
+    margin: 5px 0 !important;
+    padding: 8px !important;
+    font-size: 13px !important;
+  }
+
+  .inventoryEditBtn {
+    margin-right: 0 !important;
+  }
+
+  /* Pagination */
+  .inventoryPaginationContainer,
+  .tableBottomPagination {
+    justify-content: center !important;
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+    padding: 10px !important;
+  }
+
+  .inventoryPaginationBtn {
+    padding: 8px 12px !important;
+    font-size: 14px !important;
+    min-width: 40px !important;
+  }
+
+  /* Add sidebar (right sidebar) */
+  .inventoryRightSidebar {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .inventorySidebarForm {
+    padding: 15px !important;
+  }
+
+  .inventoryInputGroup {
+    margin-bottom: 15px !important;
+  }
+
+  .inventoryBarcodeGrid {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 10px !important;
+  }
+
+  .inventoryBarcodeGrid input {
+    width: 100% !important;
+  }
+
+  .inventoryQrScannerBtn {
+    position: static !important;
+    width: 100% !important;
+    margin-left: 0 !important;
+    transform: none !important;
+    padding: 12px !important;
+  }
+
+  .inventorySidebarActions {
+    flex-direction: column !important;
+    gap: 10px !important;
+  }
+
+  .inventorySidebarActions button {
+    width: 100% !important;
+  }
+
+  /* Edit modal */
+  .inventoryModalContainer {
+    width: 95% !important;
+    max-width: 95% !important;
+    max-height: 85vh !important;
+    margin: 10px !important;
+  }
+
+  .inventoryModalInputRow {
+    grid-template-columns: 1fr !important;
+    gap: 15px !important;
+  }
+
+  .inventoryModalBarcodeContainer {
+    grid-template-columns: 1fr !important;
+  }
+
+  .inventoryModalScanBtn {
+    width: 100% !important;
+    margin-top: 10px !important;
+  }
+
+  .inventoryModalActions {
+    flex-direction: column !important;
+    gap: 10px !important;
+    left: 0 !important;
+  }
+
+  .inventoryModalActions button {
+    width: 100% !important;
+    left: 0 !important;
+  }
+
+  /* Delete modal */
+  .inventoryModalDeleteContent {
+    width: 95% !important;
+    max-width: 95% !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+  }
+
+  .inventoryModalDeleteHeader h2 {
+    font-size: 20px !important;
+  }
+
+  .inventoryModalDeleteActions {
+    flex-direction: column !important;
+    gap: 10px !important;
+  }
+
+  .inventoryModalDeleteBtn {
+    width: 100% !important;
+  }
+
+  /* QR Scanner modal */
+  .inventoryQrScannerModal {
+    width: 95% !important;
+    height: 70vh !important;
+  }
+
+  .inventoryQrReader {
+    height: 300px !important;
+  }
+
+  /* Barcode display modal */
+  .barcodeModal {
+    width: 95% !important;
+    max-width: 95% !important;
+  }
+
+  .barcodeModalActions {
+    flex-direction: column !important;
+    gap: 10px !important;
+  }
+
+  .barcodeModalActions button {
+    width: 100% !important;
+  }
+
+  /* Floating labels adjustments */
+  .inventoryInputGroup h4,
+  .inventoryModalInputLabel {
+    font-size: 14px !important;
+  }
+
+  /* Inspection badge */
+  .inspectionBadge {
+    display: block !important;
+    width: fit-content !important;
+    margin: 5px auto !important;
+    font-size: 11px !important;
+  }
+
+  /* No data message */
+  .inventoryTable tbody td[colspan] {
+    padding: 30px 15px !important;
+  }
+
+  .animatedEmoji {
+    font-size: 36px !important;
+  }
+}
+
+/* ================================
+  VERY SMALL DEVICES - 480px AND BELOW
+=============================== */
+@media screen and (max-width: 480px) {
+  .main-content h1 {
+    font-size: 24px !important;
+  }
+
+  #inventoryAddEquipmentBtn {
+    font-size: 15px !important;
+    padding: 10px !important;
+  }
+
+  .inventoryTable {
+    min-width: 1400px !important; /* Even wider scroll on very small screens */
+    font-size: 12px !important;
+  }
+
+  .inventoryTable th,
+  .inventoryTable td {
+    padding: 8px 6px !important;
+    font-size: 12px !important;
+  }
+
+  .inventoryTable th:nth-child(1),
+  .inventoryTable td:nth-child(1) {
+    min-width: 150px !important;
+  }
+
+  .inventoryTable th:nth-child(2),
+  .inventoryTable td:nth-child(2) {
+    min-width: 180px !important;
+  }
+
+  .inventorySummaryCard {
+    padding: 15px !important;
+  }
+
+  .inventorySummaryCard h3 {
+    font-size: 14px !important;
+  }
+
+  .inventorySummaryCard p {
+    font-size: 24px !important;
+  }
+
+  /* Hide rank images on very small screens */
+  .rankImage {
+    display: none !important;
+  }
+
+  .rankPlaceholder {
+    display: none !important;
+  }
+
+  .rankText {
+    font-size: 11px !important;
+    min-width: 50px !important;
+  }
+
+  /* Compact barcode display */
+  .barcodeText {
+    font-size: 10px !important;
+  }
+
+  /* Smaller pagination buttons */
+  .inventoryPaginationBtn {
+    padding: 6px 10px !important;
+    font-size: 12px !important;
+    min-width: 35px !important;
+  }
+
+  /* Modal adjustments */
+  .inventoryModalTitle {
+    font-size: 18px !important;
+  }
+
+  .inventoryModalSection {
+    padding: 15px !important;
+  }
+
+  .inventoryModalSectionTitle {
+    font-size: 16px !important;
+  }
+}
+
+/* ================================
+  TABLET OPTIMIZATION - 600px to 768px
+=============================== */
+@media screen and (min-width: 600px) and (max-width: 768px) {
+  .inventoryTopControls {
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
+  }
+
+  #inventoryAddEquipmentBtn {
+    width: auto !important;
+    min-width: 200px !important;
+  }
+
+  .inventoryTableHeader {
+    flex-direction: row !important;
+    width: auto !important;
+  }
+
+  .inventoryFilterCategory,
+  .inventoryFilterStatus {
+    width: auto !important;
+    min-width: 150px !important;
+  }
+
+  .inventorySearchBar {
+    width: 250px !important;
+  }
+
+  #inventorySummary {
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
+  }
+
+  .inventorySummaryCard {
+    flex: 1 0 calc(50% - 10px) !important;
+    min-width: auto !important;
+  }
+}
+
+/* ================================
+  TOUCH DEVICE OPTIMIZATIONS
+=============================== */
+@media (hover: none) and (pointer: coarse) {
+  /* Larger touch targets */
+  .inventoryEditBtn,
+  .inventoryDeleteBtn,
+  .barcodeViewBtn,
+  .barcodeDownloadBtn,
+  .inventoryPaginationBtn {
+    min-height: 44px !important; /* Apple's recommended minimum touch target */
+    padding: 12px 16px !important;
+  }
+
+  /* Remove hover effects on touch devices */
+  .inventoryTable tbody tr:hover {
+    transform: none !important;
+    box-shadow: none !important;
+  }
+
+  .inventoryEditBtn:hover,
+  .inventoryDeleteBtn:hover,
+  .inventoryPaginationBtn:hover,
+  .inventorySummaryCard:hover {
+    transform: none !important;
+  }
+
+  /* Prevent accidental horizontal scroll on tables */
+  .tableWrapper {
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* ================================
+  LANDSCAPE ORIENTATION
+=============================== */
+@media screen and (max-width: 768px) and (orientation: landscape) {
+  .inventoryTable {
+    min-width: 1000px !important;
+  }
+
+  .tableWrapper {
+    max-height: 60vh !important;
+    overflow-y: auto !important;
+  }
+
+  .inventoryModalContainer,
+  .inventoryRightSidebar,
+  .inventoryQrScannerModal {
+    max-height: 90vh !important;
+  }
+}
+
+/* ================================
+  ACCESSIBILITY IMPROVEMENTS
+=============================== */
+@media screen and (max-width: 768px) {
+  /* Ensure sufficient contrast */
+  .inventoryTable th {
+    background: #085CB1 !important;
+    color: white !important;
+  }
+
+  /* Larger font sizes for readability */
+  .inventoryTable td {
+    font-size: 14px !important;
+  }
+
+  /* Better spacing for touch */
+  .inventoryTable tbody tr {
+    margin-bottom: 5px !important;
+  }
+
+  /* Clearance notice visibility */
+  .clearanceNotice {
+    font-size: 13px !important;
+    padding: 8px !important;
+    margin-top: 10px !important;
+  }
+}
+
+/* ================================
+  PRINT STYLES
+=============================== */
+@media print {
+  .hamburger,
+  .sidebar,
+  #inventoryAddEquipmentBtn,
+  .inventoryTopControls,
+  .inventoryEditBtn,
+  .inventoryDeleteBtn,
+  .inventoryPaginationContainer,
+  .tableBottomPagination {
+    display: none !important;
+  }
+
+  .main-content {
+    margin-left: 0 !important;
+    padding: 0 !important;
+  }
+
+  .tableWrapper {
+    overflow: visible !important;
+    box-shadow: none !important;
+  }
+
+  .inventoryTable {
+    width: 100% !important;
+    min-width: 100% !important;
+    box-shadow: none !important;
+    border: 1px solid #000 !important;
+  }
+
+  .inventoryTable th {
+    background: #f0f0f0 !important;
+    color: #000 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}
   /* ================================
       TABLE STYLES
     ================================ */
@@ -1751,21 +2313,7 @@ text-indent: 90px;
   }
 
   /* Responsive adjustments */
-  @media (max-width: 768px) {
-    .inventoryModalCloseBtn {
-      width: 36px;
-      height: 36px;
-      font-size: 18px;
-      top: 15px;
-      right: 15px;
-    }
-    
-    .inventoryCloseBtn {
-      width: 32px;
-      height: 32px;
-      font-size: 20px;
-    }
-  }
+
 
   @media (max-width: 480px) {
     .inventoryModalCloseBtn {
@@ -1915,36 +2463,6 @@ text-indent: 90px;
 
 
   /* Responsive Design */
-  @media (max-width: 768px) {
-    #inventoryEditModal .inventoryModalContent {
-      width: 95vw;
-      margin: 20px;
-    }
-    
-    .inventoryModalInputRow {
-      grid-template-columns: 1fr;
-      gap: 12px;
-    }
-    
-    .inventoryModalSection {
-      padding: 20px 15px;
-    }
-    
-    .inventoryModalActions {
-      padding: 20px 15px;
-      flex-direction: column;
-    }
-    
-    .inventoryModalSubmitBtn,
-    .inventoryModalCancelBtn {
-      min-width: auto;
-      width: 100%;
-    }
-    
-    .inventoryModalBarcodeContainer {
-      grid-template-columns: 1fr;
-    }
-  }
 
   @media (max-width: 480px) {
     .inventoryModalHeader {
@@ -2653,28 +3171,7 @@ text-indent: 90px;
 
 
 
-  /* Responsive Design */
-  @media (max-width: 768px) {
-    .inventoryModalContainer {
-      width: 95vw !important;
-      margin: 20px;
-    }
-    
-    .inventoryModalSection {
-      padding: 20px 15px;
-    }
-    
-    .inventoryModalActions {
-      padding: 20px 15px;
-      flex-direction: column;
-    }
-    
-    .inventoryModalSubmitBtn,
-    .inventoryModalCancelBtn {
-      min-width: auto;
-      width: 100%;
-    }
-  }
+
 
 /* Processing spinner styles */
 .inventorySpinner {

@@ -1,15 +1,29 @@
-import React, { useState, useEffect } from "react";
-import styles from "../styles/Placement.module.css"
+import React, { useState, useEffect, useMemo } from "react";
+import styles from "../styles/Placement.module.css";
 import Sidebar from "../../Sidebar.jsx";
 import Hamburger from "../../Hamburger.jsx";
 import { useSidebar } from "../../SidebarContext.jsx";
 import { Title, Meta } from "react-head";
 import { supabase } from "../../../lib/supabaseClient.js";
+// Import the BFP preloader component and its styles
+import BFPPreloader from "../../BFPPreloader.jsx";
+import { ToastContainer, toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
+// Import your utility functions
+import {
+  filterActivePersonnel,
+  getAssignablePersonnel,
+  isPersonnelActive,
+} from "../../filterActivePersonnel.js"; // Adjust path as needed
 
 const Placement = () => {
   const [personnel, setPersonnel] = useState([]);
   const [loading, setLoading] = useState(true);
   const { isSidebarCollapsed } = useSidebar();
+
+  // Preloader state
+  const [showPreloader, setShowPreloader] = useState(true);
+  const [loadingProgress, setLoadingProgress] = useState(0);
 
   // State variables for table functionality
   const [currentPage, setCurrentPage] = useState(1);
@@ -20,14 +34,38 @@ const Placement = () => {
   const [editingIndex, setEditingIndex] = useState(null);
   const [editData, setEditData] = useState({ designation: "", station: "" });
 
+  // Use useMemo to filter active personnel whenever personnel changes
+  const activePersonnel = useMemo(() => {
+    // Use the utility function to filter out inactive personnel
+    return filterActivePersonnel(personnel);
+  }, [personnel]);
+
+  // You can also use getAssignablePersonnel if you need sorted active personnel
+  const assignablePersonnel = useMemo(() => {
+    return getAssignablePersonnel(personnel);
+  }, [personnel]);
+
   // Load personnel data from Supabase on component mount
   useEffect(() => {
     loadPersonnelData();
   }, []);
 
+  // Update loading progress
+  const updateLoadingProgress = (progress) => {
+    setLoadingProgress(progress);
+  };
+
+  // Handle retry from preloader
+  const handleRetryFromPreloader = () => {
+    setShowPreloader(true);
+    setLoadingProgress(0);
+    loadPersonnelData();
+  };
+
   const loadPersonnelData = async () => {
     try {
       setLoading(true);
+      updateLoadingProgress(10);
 
       // Fetch personnel data from Supabase
       const { data: personnelData, error } = await supabase
@@ -40,17 +78,35 @@ const Placement = () => {
         throw error;
       }
 
+      updateLoadingProgress(50);
+
       console.log(
         "Loaded personnel data from Supabase:",
         personnelData?.length || 0,
         "records"
       );
 
+      // Log active vs inactive count for debugging
+      const activeCount = filterActivePersonnel(personnelData || []).length;
+      const totalCount = personnelData?.length || 0;
+      console.log(`Active personnel: ${activeCount}/${totalCount}`);
+
       setPersonnel(personnelData || []);
       setLoading(false);
+      updateLoadingProgress(80);
+
+      // Small delay to show completion
+      setTimeout(() => {
+        updateLoadingProgress(100);
+        // Hide preloader after a short delay to show completion
+        setTimeout(() => {
+          setShowPreloader(false);
+        }, 500);
+      }, 300);
     } catch (error) {
       console.error("Error loading personnel data:", error);
       setLoading(false);
+      setShowPreloader(false);
     }
   };
 
@@ -122,7 +178,7 @@ const Placement = () => {
   };
 
   const handleEdit = (index) => {
-    const person = personnel[index];
+    const person = activePersonnel[index];
     setEditingIndex(index);
     setEditData({
       designation: person.designation || "",
@@ -134,13 +190,12 @@ const Placement = () => {
     const { designation, station } = editData;
 
     if (!designation.trim() || !station.trim()) {
-      alert("Please fill in both designation and station/unit.");
+      toast.info("Please fill in both designation and station/unit.");
       return;
     }
 
     try {
-      const updatedPersonnel = [...personnel];
-      const personToUpdate = updatedPersonnel[index];
+      const personToUpdate = activePersonnel[index];
 
       // Prepare update data
       const updateData = {
@@ -162,16 +217,18 @@ const Placement = () => {
         throw error;
       }
 
-      // Update local state
-      updatedPersonnel[index] = data;
-      setPersonnel(updatedPersonnel);
+      // Update local state by mapping through personnel array
+      setPersonnel((prevPersonnel) =>
+        prevPersonnel.map((person) => (person.id === data.id ? data : person))
+      );
+
       setEditingIndex(null);
       setEditData({ designation: "", station: "" });
 
       console.log("Successfully updated personnel placement data");
     } catch (error) {
       console.error("Error saving personnel data:", error);
-      alert("Error saving changes. Please try again.");
+      toast.error("Error saving changes. Please try again.");
     }
   };
 
@@ -204,7 +261,7 @@ const Placement = () => {
     return person.last_promoted || person.date_hired;
   };
 
-  // Filtering & pagination logic
+  // Filtering & pagination logic - Use activePersonnel instead of personnel
   function applyFilters(items) {
     let filtered = [...items];
 
@@ -244,7 +301,8 @@ const Placement = () => {
     return filtered;
   }
 
-  const filteredPersonnel = applyFilters(personnel);
+  // Use activePersonnel for filtering and display
+  const filteredPersonnel = applyFilters(activePersonnel);
   const totalPages = Math.max(
     1,
     Math.ceil(filteredPersonnel.length / rowsPerPage)
@@ -373,9 +431,9 @@ const Placement = () => {
     return buttons;
   };
 
-  // Summary numbers
-  const totalItems = personnel.length;
-  const eligibleItems = personnel.filter((person) => {
+  // Summary numbers - Use activePersonnel
+  const totalItems = activePersonnel.length;
+  const eligibleItems = activePersonnel.filter((person) => {
     const lastPromoted = getLastPromotionDate(person);
     const years = calculateYears(lastPromoted);
     return years >= 2;
@@ -391,26 +449,15 @@ const Placement = () => {
     setCurrentPage(1);
   }
 
-  if (loading) {
+  // Render BFP Preloader if still loading
+  if (showPreloader) {
     return (
-      <div className={`main-content ${isSidebarCollapsed ? "collapsed" : ""}`}>
-        <div style={{ textAlign: "center", padding: "50px" }}>
-          <div style={{ fontSize: "48px", marginBottom: "16px" }}>👨‍🚒</div>
-          <h3
-            style={{
-              fontSize: "18px",
-              fontWeight: "600",
-              color: "#2b2b2b",
-              marginBottom: "8px",
-            }}
-          >
-            Loading Personnel Data
-          </h3>
-          <p style={{ fontSize: "14px", color: "#999" }}>
-            Please wait while we load placement information...
-          </p>
-        </div>
-      </div>
+      <BFPPreloader
+        loading={loading}
+        progress={loadingProgress}
+        moduleTitle="PLACEMENT SYSTEM • Assigning Positions..."
+        onRetry={handleRetryFromPreloader}
+      />
     );
   }
 
@@ -423,6 +470,11 @@ const Placement = () => {
       <Sidebar />
       <div className={`main-content ${isSidebarCollapsed ? "collapsed" : ""}`}>
         <h1 className={styles.PMTTitle}>Personnel Placement</h1>
+
+        {/* You can add a badge showing active personnel count */}
+        <div className={styles.PMTActiveBadge}>
+          Showing {activePersonnel.length} active personnel
+        </div>
 
         {/* Top Controls */}
         <div className={styles.PMTTopControls}>
@@ -466,7 +518,7 @@ const Placement = () => {
             }`}
             onClick={() => handleCardClick("total")}
           >
-            <h3>Total Personnel</h3>
+            <h3>Active Personnel</h3>
             <p>{totalItems}</p>
           </button>
           <button
@@ -515,21 +567,19 @@ const Placement = () => {
                     <div style={{ fontSize: "48px", marginBottom: "16px" }}>
                       👨‍🚒
                     </div>
-                    <h3>No Personnel Records Found</h3>
+                    <h3>No Active Personnel Records Found</h3>
                     <p>
-                      There are no personnel records matching your criteria.
+                      There are no active personnel records matching your
+                      criteria.
                     </p>
                   </td>
                 </tr>
               ) : (
                 paginated.map((person, index) => {
-                  const globalIndex = personnel.findIndex(
-                    (p) => p.id === person.id
-                  );
                   const lastPromoted = getLastPromotionDate(person);
                   const years = calculateYears(lastPromoted);
                   const isEligible = years >= 2;
-                  const isEditing = editingIndex === globalIndex;
+                  const isEditing = editingIndex === index;
 
                   return (
                     <tr key={person.id} className={styles.PMTRow}>
@@ -583,7 +633,7 @@ const Placement = () => {
                           <div className={styles.PMTActionGroup}>
                             <button
                               className={`${styles.PMTBtn} ${styles.PMTSaveBtn}`}
-                              onClick={() => handleSave(globalIndex)}
+                              onClick={() => handleSave(index)}
                             >
                               Save
                             </button>
@@ -597,7 +647,7 @@ const Placement = () => {
                         ) : (
                           <button
                             className={`${styles.PMTBtn} ${styles.PMTEditBtn}`}
-                            onClick={() => handleEdit(globalIndex)}
+                            onClick={() => handleEdit(index)}
                           >
                             ✏️ Edit
                           </button>

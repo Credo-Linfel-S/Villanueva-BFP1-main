@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react"; // Added useRef
+import React, { useState, useEffect, useRef } from "react";
 import styles from "../styles/MedicalRecords.module.css";
 import Sidebar from "../../Sidebar.jsx";
 import Hamburger from "../../Hamburger.jsx";
@@ -7,11 +7,18 @@ import { Title, Meta } from "react-head";
 import { supabase } from "../../../lib/supabaseClient.js";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+// Import the BFP preloader component and its styles
+import BFPPreloader from "../../BFPPreloader.jsx"; // Adjust path as needed
+// Make sure this path is correct
 
 const MedicalRecords = () => {
   const [medicalRecords, setMedicalRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const { isSidebarCollapsed } = useSidebar();
+
+  // Preloader state
+  const [showPreloader, setShowPreloader] = useState(true);
+  const [loadingProgress, setLoadingProgress] = useState(0);
 
   // State variables for table functionality
   const [currentPage, setCurrentPage] = useState(1);
@@ -25,10 +32,16 @@ const MedicalRecords = () => {
     loadMedicalRecords();
   }, []);
 
+  // Update loading progress
+  const updateLoadingProgress = (progress) => {
+    setLoadingProgress(progress);
+  };
+
   // Update the loadMedicalRecords function to properly fetch rank images
   const loadMedicalRecords = async () => {
     try {
       setLoading(true);
+      updateLoadingProgress(10);
 
       // Fetch only medical records (category = 'Medical Record')
       const { data, error } = await supabase
@@ -50,6 +63,8 @@ const MedicalRecords = () => {
         .order("uploaded_at", { ascending: false });
 
       if (error) throw error;
+
+      updateLoadingProgress(30);
 
       // Transform the data with rank images
       const transformedRecords = await Promise.all(
@@ -129,14 +144,34 @@ const MedicalRecords = () => {
         })
       );
 
+      updateLoadingProgress(70);
+
       console.log("Loaded medical records:", transformedRecords.length);
       setMedicalRecords(transformedRecords);
+      updateLoadingProgress(90);
+
+      // Small delay to show completion
+      setTimeout(() => {
+        updateLoadingProgress(100);
+        setLoading(false);
+        // Hide preloader after a short delay to show completion
+        setTimeout(() => {
+          setShowPreloader(false);
+        }, 500);
+      }, 300);
     } catch (error) {
       console.error("Error loading medical records:", error);
       toast.error("Failed to load medical records");
-    } finally {
       setLoading(false);
+      setShowPreloader(false);
     }
+  };
+
+  // Handle retry from preloader
+  const handleRetryFromPreloader = () => {
+    setShowPreloader(true);
+    setLoadingProgress(0);
+    loadMedicalRecords();
   };
 
   // Filtering & pagination logic
@@ -438,13 +473,15 @@ const MedicalRecords = () => {
     );
   };
 
-  if (loading) {
+  // Render BFP Preloader if still loading
+  if (showPreloader) {
     return (
-      <div className={`main-content ${isSidebarCollapsed ? "collapsed" : ""}`}>
-        <div className={styles.loadingContainer}>
-          <p>Loading medical records...</p>
-        </div>
-      </div>
+      <BFPPreloader
+        loading={loading}
+        progress={loadingProgress}
+        moduleTitle="MEDICAL RECORDS • Accessing Health Data..."
+        onRetry={handleRetryFromPreloader}
+      />
     );
   }
 

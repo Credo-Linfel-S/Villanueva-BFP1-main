@@ -86,6 +86,7 @@
   color: white;
   font-weight: 600;
   font-size: 14px;
+  text-align: center;
 }
 
 .IEITable tbody tr:nth-child(even) {
@@ -134,11 +135,6 @@
   background-color: #1e7e34;
 }
 
-/* Checkup Button */
-.IEICheckup {
-  background-color: #17a2b8 !important;
-  color: white;
-}
 
 /* Inspect Button */
 .IEIInspect {
@@ -713,12 +709,12 @@
   color: #333;
 }
 .inspectionForm,
-.checkupForm,
+
 .rescheduleForm {
   padding: 20px 0;
 }
 /* Checkup and Inspection Modal Styles */
-.checkupForm .IEIModalContent,
+.IEIModalContent,
 .inspectionForm .IEIModalContent {
   width: 700px !important;
   max-width: 90% !important;
@@ -875,7 +871,8 @@
   border: 1px solid #ffeaa7;
   cursor: help;
   display: flex;
-  align-items: center;
+  align-items: start;
+  justify-content: center;
   gap: 4px;
 }
 
@@ -1032,6 +1029,8 @@
 .equipmentTable td:nth-child(9) { /* Unassigned Date */
   font-size: 12px;
   color: #666;
+  min-width: 150px;
+
 }
 
 /* Make the table more compact to accommodate new columns */
@@ -3431,3 +3430,109 @@
   font-size: 12px;
   color: #666;
 }
+
+
+/* Add these styles to your InspectorEquipmentInspection.module.css */
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.refreshBtn {
+  background: #529ae1;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 16px;
+  transition: background 0.2s;
+}
+
+.refreshBtn:hover {
+  background: #3a7bc8;
+}
+
+.refreshBtn:disabled {
+  background: #cccccc;
+  cursor: not-allowed;
+}
+
+.smallSpinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: #fff;
+  animation: spin 1s ease-in-out infinite;
+}
+
+.realtimeStatus {
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.realtimeStatus.connected {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.realtimeStatus.disconnected {
+  background: #ffebee;
+  color: #c62828;
+}
+
+.refreshCounter {
+  font-size: 12px;
+  color: #666;
+  background: #f5f5f5;
+  padding: 2px 8px;
+  border-radius: 12px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Optional: Add a subtle animation for new items */
+@keyframes highlightNew {
+  0% { background-color: rgba(82, 154, 225, 0.1); }
+  100% { background-color: transparent; }
+}
+
+.clearanceCard.new {
+  animation: highlightNew 2s ease-out;
+}
+
+.submissionSpinner {
+  display: inline-block;
+  width: 16px;
+ height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: #fff;
+  animation: spin 1s ease-in-out infinite;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+

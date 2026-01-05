@@ -1,0 +1,615 @@
+/* AdminGearIcon.module.css - MINIMALIST VERSION */
+.gearIconContainer {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 99999;
+}
+
+/* Minimal gear icon */
+.gearIconButton {
+  background: transparent;
+  color: #666;
+  border: 1px solid #e0e0e0;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 18px;
+  transition: all 0.2s ease;
+  z-index: 99999;
+}
+
+.gearIconButton:hover {
+  color: #333;
+  border-color: #ccc;
+  background: #f8f8f8;
+}
+
+/* Minimal tooltip */
+.tooltip {
+  position: absolute;
+  top: 45px;
+  right: 0;
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  padding: 8px;
+  min-width: 160px;
+  z-index: 1001;
+}
+
+.tooltipButton {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 13px;
+  color: #333;
+  transition: background 0.2s;
+}
+
+.tooltipButton:hover {
+  background: #f5f5f5;
+}
+
+/* Minimal admin panel */
+.adminPanel {
+  position: fixed;
+  top: 80px;
+  right: 20px;
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  width: 700px;
+  max-height: 70vh;
+  z-index: 1002;
+  display: flex;
+  flex-direction: column;
+}
+
+.panelHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.panelHeader h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 500;
+  color: #333;
+}
+
+.closeButton {
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  color: #999;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+}
+
+.closeButton:hover {
+  color: #666;
+}
+
+.panelContent {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+.loading {
+  text-align: center;
+  padding: 40px;
+  color: #999;
+  font-size: 14px;
+}
+
+/* Minimal table */
+.adminTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  border: 1px solid #e0e0e0;
+}
+
+.adminTable th {
+  background: #f8f8f8;
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 500;
+  color: #666;
+  font-size: 12px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.adminTable td {
+  padding: 16px;
+  border-bottom: 1px solid #f0f0f0;
+  vertical-align: top;
+  background: white;
+}
+
+.adminTable tr:last-child td {
+  border-bottom: none;
+}
+
+/* Minimal assignments */
+.assignmentsContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.assignmentSection {
+  border: 1px solid #f0f0f0;
+  border-radius: 6px;
+  padding: 12px;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+  color: #333;
+  margin-bottom: 12px;
+  font-size: 13px;
+}
+
+.assignmentList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.assignmentItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 4px;
+  border: 1px solid #f0f0f0;
+  background: #fafafa;
+}
+
+.assignmentType {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: white;
+  color: #666;
+  font-size: 12px;
+  border: 1px solid #e0e0e0;
+}
+
+.personnelName {
+  font-weight: 400;
+  color: #333;
+  font-size: 13px;
+  flex: 1;
+}
+
+.personnelDetails {
+  font-size: 11px;
+  color: #999;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: white;
+  border: 1px solid #e0e0e0;
+}
+
+/* Minimal buttons */
+.addAssignmentButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 8px;
+  background: white;
+  color: #666;
+  border: 1px dashed #ccc;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.2s;
+}
+
+.addAssignmentButton:hover {
+  border-color: #999;
+  color: #333;
+}
+
+.removeAssignmentButton {
+  background: none;
+  color: #999;
+  border: 1px solid #e0e0e0;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  transition: all 0.2s;
+}
+
+.removeAssignmentButton:hover {
+  color: #666;
+  border-color: #ccc;
+}
+
+/* Minimal badges */
+.roleBadge {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.roleBadge.admin {
+  background: #f0f7ff;
+  color: #0066cc;
+  border: 1px solid #d1e6ff;
+}
+
+.roleBadge.inspector {
+  background: #f9f0ff;
+  color: #8a2be2;
+  border: 1px solid #e6d1ff;
+}
+
+.adminRoleBadge {
+  display: block;
+  padding: 3px 6px;
+  border-radius: 2px;
+  font-size: 10px;
+  background: #f5f5f5;
+  color: #666;
+  border-left: 2px solid #ccc;
+}
+
+.statusBadge {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.statusBadge.active {
+  background: #f0fff4;
+  color: #2e7d32;
+  border: 1px solid #c8e6c9;
+}
+
+.statusBadge.inactive {
+  background: #fff5f5;
+  color: #c62828;
+  border: 1px solid #ffcdd2;
+}
+
+/* Minimal action button */
+.editButton {
+  background: white;
+  color: #333;
+  border: 1px solid #e0e0e0;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  transition: all 0.2s;
+}
+
+.editButton:hover {
+  border-color: #ccc;
+  background: #f8f8f8;
+}
+
+/* Minimal modals */
+.modalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1003;
+}
+
+.modalContent {
+  background: white;
+  border-radius: 8px;
+  width: 500px;
+  max-width: 90vw;
+  max-height: 80vh;
+  overflow-y: auto;
+  border: 1px solid #e0e0e0;
+}
+
+.modalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.modalHeader h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 500;
+  color: #333;
+}
+
+.modalClose {
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  color: #999;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+}
+
+.modalClose:hover {
+  color: #666;
+}
+
+.editForm {
+  padding: 20px;
+}
+
+.formGroup {
+  margin-bottom: 16px;
+}
+
+.formGroup label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 500;
+  color: #333;
+  font-size: 13px;
+}
+
+.formGroup input,
+.formGroup select {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  font-size: 13px;
+  transition: border 0.2s;
+  background: white;
+}
+
+.formGroup input:focus,
+.formGroup select:focus {
+  outline: none;
+  border-color: #999;
+}
+
+.readOnlyInput {
+  background: #f8f8f8;
+  cursor: not-allowed;
+  color: #666;
+}
+
+.passwordInputGroup {
+  position: relative;
+}
+
+.passwordActions {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.iconButton {
+  background: #f0f0f0;
+  border: none;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 3px;
+  color: #666;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  width: 28px;
+  height: 28px;
+}
+
+.iconButton:hover {
+  background: #e0e0e0;
+}
+
+.generateButton {
+  background: #f0f0f0;
+  color: #333;
+  border: 1px solid #e0e0e0;
+  padding: 6px 10px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.2s;
+}
+
+.generateButton:hover {
+  background: #e0e0e0;
+}
+
+.checkboxLabel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-weight: 400;
+  padding: 8px;
+  background: #f8f8f8;
+  border-radius: 4px;
+  border: 1px solid #e0e0e0;
+}
+
+.checkboxLabel input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  cursor: pointer;
+}
+
+.userTypeDisplay, .assignmentTypeDisplay {
+  padding: 8px 12px;
+  background: #f8f8f8;
+  border-radius: 4px;
+  border: 1px solid #e0e0e0;
+  font-size: 13px;
+}
+
+.adminType, .inspectorType {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #666;
+}
+
+.availableCount {
+  font-size: 12px;
+  color: #666;
+  margin-top: 4px;
+  padding-left: 2px;
+}
+
+.currentAssignments {
+  margin-top: 20px;
+  padding: 16px;
+  background: #f8f8f8;
+  border-radius: 6px;
+  border: 1px solid #e0e0e0;
+}
+
+.currentAssignments h4 {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  color: #333;
+  font-weight: 500;
+}
+
+.formActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid #e0e0e0;
+}
+
+.cancelButton {
+  background: white;
+  color: #666;
+  border: 1px solid #e0e0e0;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.2s;
+}
+
+.cancelButton:hover {
+  background: #f8f8f8;
+  border-color: #ccc;
+}
+
+.saveButton {
+  background: #333;
+  color: white;
+  border: 1px solid #333;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.2s;
+}
+
+.saveButton:hover:not(:disabled) {
+  background: #666;
+}
+
+.saveButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .adminPanel {
+    width: 95vw;
+    right: 2.5vw;
+    left: 2.5vw;
+  }
+  
+  .adminTable {
+    display: block;
+    overflow-x: auto;
+  }
+}
+
+/* Minimal scrollbars */
+.panelContent::-webkit-scrollbar,
+.modalContent::-webkit-scrollbar {
+  width: 6px;
+}
+
+.panelContent::-webkit-scrollbar-track,
+.modalContent::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+.panelContent::-webkit-scrollbar-thumb,
+.modalContent::-webkit-scrollbar-thumb {
+  background: #ccc;
+  border-radius: 3px;
+}

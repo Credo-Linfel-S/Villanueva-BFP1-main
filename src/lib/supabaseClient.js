@@ -11,7 +11,24 @@ if (!supabaseUrl || !supabaseAnonKey) {
   console.error("❌ Missing Supabase environment variables!");
   throw new Error("Missing Supabase environment variables");
 }
-
+// In your lib/supabaseClient.js or similar
+export const setupClearanceRealtime = (callback) => {
+  const subscription = supabase
+    .channel('clearance-updates')
+    .on('postgres_changes', 
+      { 
+        event: '*', 
+        schema: 'public', 
+        table: 'clearance_requests' 
+      }, 
+      (payload) => {
+        callback(payload);
+      }
+    )
+    .subscribe();
+    
+  return subscription;
+};
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     persistSession: true,

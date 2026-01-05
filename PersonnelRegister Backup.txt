@@ -1596,14 +1596,14 @@ const handleSubmit = async (e) => {
       const file = photoInputRef.current.files[0];
 
       // Create personnel data object with name and rank
-      const personnelDataForUpload = {
-        id: personnelData.id,
-        first_name: formData.first_name.trim(),
-        last_name: formData.last_name.trim(),
-        rank: selectedRank,
-      };
+  const personnelDataForUpload = {
+    id: personnelData.id, // ← FIX: Use personnelData.id (newly created)
+    first_name: formData.first_name.trim(),
+    last_name: formData.last_name.trim(),
+    rank: selectedRank,
+  };
 
-      const uploadResult = await uploadImage(file, personnelDataForUpload);
+  const uploadResult = await uploadImage(file, personnelDataForUpload);
 
       if (uploadResult) {
         // Update personnel record with photo URL
@@ -1757,14 +1757,14 @@ const handleEditSubmit = async (e) => {
         const file = editPhotoInputRef.current.files[0];
 
         // Create personnel data object with current info
-        const personnelDataForUpload = {
-          id: editingPerson.id,
-          first_name: editFormData.first_name.trim(),
-          last_name: editFormData.last_name.trim(),
-          rank: editSelectedRank,
-        };
+const personnelDataForUpload = {
+  id: editingPerson.id,
+  first_name: editFormData.first_name.trim(),
+  last_name: editFormData.last_name.trim(),
+  rank: editSelectedRank,
+};
 
-        const uploadResult = await uploadImage(file, personnelDataForUpload);
+const uploadResult = await uploadImage(file, personnelDataForUpload);
 
         if (uploadResult) {
           await supabase
@@ -2171,106 +2171,35 @@ const openEdit = async (person) => {
 const PhotoCell = ({ person }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [imageSrc, setImageSrc] = useState("/bfp.jpg");
-  const [folderName, setFolderName] = useState("");
 
   useEffect(() => {
     const loadPhoto = async () => {
       setIsLoading(true);
 
       try {
-        let url = "/bfp.jpg";
-        let finalFolderName = "";
+        let url = "/bfp.jpg"; // Default fallback
 
-        // First, try the direct photo_url
-        if (person.photo_url) {
-          url = person.photo_url;
-
-          // Extract folder name from path if available
-          if (person.photo_path) {
-            const parts = person.photo_path.split("/");
-            if (parts.length >= 2) {
-              finalFolderName = parts[1]; // Get the folder name
+        // Check in order of priority
+        if (person.photo_url && person.photo_url.startsWith("http")) {
+          // Test if the photo_url is accessible
+          const isValid = await testImage(person.photo_url);
+          if (isValid) {
+            url = person.photo_url;
+          } else {
+            // Try photo_path as fallback
+            if (person.photo_path) {
+              const { data: urlData } = supabase.storage
+                .from("personnel-documents")
+                .getPublicUrl(person.photo_path);
+              url = urlData?.publicUrl || "/bfp.jpg";
             }
           }
-        }
-        // Then try to get from photo_path
-        else if (person.photo_path) {
+        } else if (person.photo_path) {
+          // Use photo_path if photo_url is not available
           const { data: urlData } = supabase.storage
             .from("personnel-documents")
             .getPublicUrl(person.photo_path);
           url = urlData?.publicUrl || "/bfp.jpg";
-
-          // Extract folder name
-          const parts = person.photo_path.split("/");
-          if (parts.length >= 2) {
-            finalFolderName = parts[1];
-          }
-        }
-        // If no photo in database, try to find by name
-        else if (person.first_name && person.last_name && person.rank) {
-          const foundPhoto = await findPhotoByName(person);
-          if (foundPhoto && foundPhoto.url) {
-            url = foundPhoto.url;
-
-            // Extract folder name from path
-            if (foundPhoto.path) {
-              const parts = foundPhoto.path.split("/");
-              if (parts.length >= 2) {
-                finalFolderName = parts[1];
-              }
-            }
-            try {
-              await supabase
-                .from("personnel")
-                .update({
-                  photo_url: foundPhoto.url,
-                  photo_path: foundPhoto.path,
-                  updated_at: new Date().toISOString(),
-                })
-                .eq("id", person.id);
-
-              console.log(
-                `✅ Auto-saved photo URL for ${person.first_name} ${person.last_name}`
-              );
-            } catch (dbError) {
-              console.error("Error saving photo URL to database:", dbError);
-            }
-          }
-        }
-
-        // Set folder name for display
-        if (
-          !finalFolderName &&
-          person.first_name &&
-          person.last_name &&
-          person.rank
-        ) {
-          const safeFirstName = person.first_name
-            .toLowerCase()
-            .replace(/[^a-z0-9]/g, "_");
-          const safeLastName = person.last_name
-            .toLowerCase()
-            .replace(/[^a-z0-9]/g, "_");
-          const safeRank = person.rank.toLowerCase().replace(/[^a-z0-9]/g, "_");
-
-          finalFolderName = `${safeLastName}_${safeFirstName}_${safeRank}`;
-        }
-        setFolderName(finalFolderName);
-
-        // Test if the URL is accessible (skip for default image)
-        if (url !== "/bfp.jpg") {
-          try {
-            const response = await fetch(url, { method: "HEAD" });
-            if (!response.ok) {
-              console.warn(
-                `Photo URL not accessible: ${url}, status: ${response.status}`
-              );
-              url = "/bfp.jpg";
-            }
-          } catch (error) {
-            console.warn(`Photo URL fetch error: ${error.message}`);
-            url = "/bfp.jpg";
-          }
         }
 
         setImageSrc(url);
@@ -2278,12 +2207,23 @@ const PhotoCell = ({ person }) => {
         console.error("Error loading photo:", error);
         setImageSrc("/bfp.jpg");
       } finally {
-        setIsLoading(false);
+        // Small delay to prevent flash
+        setTimeout(() => setIsLoading(false), 100);
       }
     };
 
     loadPhoto();
   }, [person]);
+
+  // Test if image URL is accessible
+  const testImage = (url) => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => resolve(true);
+      img.onerror = () => resolve(false);
+      img.src = url;
+    });
+  };
 
   return (
     <td className={styles.prPhotoCell}>
@@ -2296,7 +2236,7 @@ const PhotoCell = ({ person }) => {
         ) : (
           <img
             src={imageSrc}
-            alt={`${person.first_name || ""} ${person.last_name || ""} photo`}
+            alt={`${person.first_name || ""} ${person.last_name || ""}`}
             className={styles.prPhotoThumb}
             onError={(e) => {
               e.target.onerror = null;
@@ -2306,16 +2246,6 @@ const PhotoCell = ({ person }) => {
           />
         )}
       </div>
-      {/* Display folder name for debugging */}
-      {folderName && (
-        <div className={styles.photoFolderInfo} title={`Folder: ${folderName}`}>
-          <small>
-            {folderName.length > 20
-              ? `${folderName.substring(0, 20)}...`
-              : folderName}
-          </small>
-        </div>
-      )}
     </td>
   );
 };
@@ -2571,7 +2501,7 @@ const formatDateTimeHired = (person) => {
         <span>
           {formattedDate}
           <br />
-          <small style={{ color: "#666", fontSize: "0.9em" }}>
+          <small style={{ color: "#ff9500", fontSize: "0.9em", fontWeight: "700" }}>
             at {timeDisplay}
           </small>
         </span>
@@ -3457,36 +3387,43 @@ const formatDateTimeHired = (person) => {
 
                     console.log("✅ Update successful:", data);
 
-                    // Handle photo update
-                    if (editPhotoInputRef.current?.files?.[0]) {
-                      try {
-                        const file = editPhotoInputRef.current.files[0];
-                        const uploadResult = await uploadImage(
-                          file,
-                          editingPerson.id
-                        );
+            if (editPhotoInputRef.current?.files?.[0]) {
+              try {
+                const file = editPhotoInputRef.current.files[0];
+                // Create personnel data object with current info
+                const personnelDataForUpload = {
+                  id: editingPerson.id,
+                  first_name: editFormData.first_name.trim(),
+                  last_name: editFormData.last_name.trim(),
+                  rank: editSelectedRank,
+                };
 
-                        if (uploadResult) {
-                          await supabase
-                            .from("personnel")
-                            .update({
-                              photo_url: uploadResult.url,
-                              photo_path: uploadResult.path,
-                            })
-                            .eq("id", editingPerson.id);
-                        }
-                      } catch (photoError) {
-                        console.error("Photo error:", photoError);
-                      }
-                    } else if (isPhotoRemoved) {
-                      await supabase
-                        .from("personnel")
-                        .update({
-                          photo_url: null,
-                          photo_path: null,
-                        })
-                        .eq("id", editingPerson.id);
-                    }
+                const uploadResult = await uploadImage(
+                  file,
+                  personnelDataForUpload
+                );
+
+                if (uploadResult) {
+                  await supabase
+                    .from("personnel")
+                    .update({
+                      photo_url: uploadResult.url,
+                      photo_path: uploadResult.path,
+                    })
+                    .eq("id", editingPerson.id);
+                }
+              } catch (photoError) {
+                console.error("Photo error:", photoError);
+              }
+            } else if (isPhotoRemoved) {
+              await supabase
+                .from("personnel")
+                .update({
+                  photo_url: null,
+                  photo_path: null,
+                })
+                .eq("id", editingPerson.id);
+            }
 
                     // Handle leave credits
                     const currentYear = new Date().getFullYear();
@@ -4345,7 +4282,7 @@ const formatDateTimeHired = (person) => {
               className={`${styles.preModalContentDelete} ${
                 isSidebarCollapsed ? styles.deleteModalContentCollapsed : ""
               }`}
-              style={{ maxWidth: "950px" }}
+              style={{ maxWidth: "450px" }}
             >
               <div className={styles.preModalHeaderDelete}>
                 <h2 style={{ marginLeft: "30px" }}>Confirm Deletion</h2>

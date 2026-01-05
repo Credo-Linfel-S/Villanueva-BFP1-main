@@ -250,7 +250,7 @@
 =============================== */
 .sidebar a.no-hover,
 .sidebar a.no-hover:hover {
-  background: none !important;
+  background: none ;
   border: none !important;
   color: #000 !important;
   transform: none !important;
@@ -321,7 +321,7 @@ right: 175px;
   DROPDOWN CONTENT - FIXED FOR COLLAPSED STATE
 ================================================ */
 .personnel-records .dropdown-content a {
-  background: rgba(184, 6, 212, 0.85);
+  background: rgba(184, 6, 212, 0.85)!important;
   margin-bottom: 5px;
   border-left: 4px solid rgb(255, 255, 255) !important;
   border-bottom: 4px solid rgb(255, 255, 255) !important;
@@ -359,7 +359,7 @@ right: 175px;
    border-bottom: 4px solid rgba(0, 52, 136, 0.85) !important;
 }
 .personnel-records .dropdown-content {
- background: rgba(156, 156, 156, 0.2);
+ background: rgba(156, 156, 156, 0.2)!;
 backdrop-filter: blur(10px);
 -webkit-backdrop-filter: blur(10px);
 border: 1px solid rgba(255, 255, 255, 0.3);
@@ -725,6 +725,15 @@ box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
   border-left: 4px solid rgb(242, 0, 234) !important;
    border-bottom: 4px solid rgb(242, 0, 234) !important;
   animation: pulseGlow 1.6s ease-in-out infinite;
+}.sidebar.collapsed .personnel-records.dropdown-tooltip .tooltip-items a:hover {
+  background: linear-gradient(
+    135deg,
+    rgba(184, 6, 212, 0.95),
+    rgba(46, 0, 211, 0.9)
+  ) !important;
+  border-left: 4px solid rgb(242, 0, 234) !important;
+   border-bottom: 4px solid rgb(242, 0, 234) !important;
+  animation: pulseGlow 1.6s ease-in-out infinite;
 }
 
 /* Morale & Welfare Tooltip Items - BLUE */
@@ -850,4 +859,498 @@ box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
   padding-left: 40px;
   margin-top: 0px;
     transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+
+
+
+
+
+/* Tooltip for expanded sidebar state */
+.dropdown-tooltip.expanded-state {
+  margin-left: 0;
+  margin-top: -10px;
+  animation: fadeIn 0.2s ease;
+  z-index: 10000;
+}
+
+/* Remove the old dropdown content styles since we're using tooltips for both states */
+.dropdown-content {
+  display: none; /* Hide the old dropdown content */
+}
+
+/* Keep the tooltip positioning for collapsed state */
+.sidebar.collapsed .dropdown-tooltip.collapsed-state {
+  margin-right: -100px;
+  left: 100px;
+}
+
+/* Adjust tooltip positioning based on sidebar state */
+.sidebar:not(.collapsed) .dropdown-tooltip.expanded-state {
+  margin-left: 0;
+  left: auto;
+  right: auto;
+}
+
+/* Ensure the arrow rotates on hover */
+.dropdown-section:hover .arrow {
+  transform: rotate(270deg);
+  transition: transform 0.3s ease;
+}
+
+/* Style adjustments for dropdown sections when sidebar is expanded */
+.sidebar:not(.collapsed) .dropdown-section {
+  position: relative;
+}
+
+/* Remove any conflicting styles for the old dropdown content */
+.personnel-records .dropdown-content,
+.morale-records .dropdown-content,
+.hr-records .dropdown-content {
+  display: none;
+}
+
+/* Make sure the dropdown toggle has proper hover states */
+.dropdown-section:hover .dropdown-toggle {
+  position: relative;
+  z-index: 10001; /* Higher than tooltip to ensure hover works */
+}
+
+/* Prevent the old dropdown content from showing */
+.dropdown-section:hover .dropdown-content,
+.dropdown-content.show {
+  display: none; /* Hide old dropdown content */
+  opacity: 0 ;
+  pointer-events: none;
+}
+
+
+
+/* Different positioning for expanded vs collapsed tooltips */
+.dropdown-tooltip.collapsed-state {
+  left: 100px;
+  margin-right: -100px;
+}
+
+.dropdown-tooltip.expanded-state {
+  left: 280px; /* Adjusted for expanded sidebar width */
+  margin-left: 10px;
+}
+
+
+
+
+/* Tooltip items background for ALL states */
+.personnel-records.dropdown-tooltip .tooltip-items {
+  background: rgba(156, 156, 156, 0.2);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  border-radius: 5px;
+
+
+}
+
+.morale-records.dropdown-tooltip .tooltip-items {
+  background: rgba(156, 156, 156, 0.2);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  border-radius: 5px;
+
+
+}
+
+.hr-records.dropdown-tooltip .tooltip-items {
+  background: rgba(156, 156, 156, 0.2);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  border-radius: 5px;
+
+  text-align: left;
+}
+
+/* Link styles for ALL states */
+.personnel-records.dropdown-tooltip .tooltip-items a {
+  background: linear-gradient(
+    135deg,
+    rgba(184, 6, 212, 0.95),
+    rgba(148, 0, 211, 0.9)
+  );
+  border-left: 4px solid rgb(255, 255, 255);
+  border-bottom: 4px solid rgb(255, 255, 255);
+  display: flex;
+  gap: 12px;
+
+  color: white;
+  transition: all 0.2s ease;
+
+  margin: 2px 4px;
+  border-radius: 6px;
+  margin-bottom: 5px;
+  text-decoration: none;
+  position: relative;
+  overflow: hidden;
+}
+
+.personnel-records.dropdown-tooltip .tooltip-items a:hover {
+  background: linear-gradient(
+    135deg,
+    rgba(184, 6, 212, 0.95),
+    rgba(46, 0, 211, 0.9)
+  ) !important;
+  border-left: 4px solid rgb(242, 0, 234) !important;
+  border-bottom: 4px solid rgb(242, 0, 234) !important;
+  animation: pulseGlow 1.6s ease-in-out infinite;
+}
+
+/* Morale & Welfare Tooltip Items */
+.morale-records.dropdown-tooltip .tooltip-items a {
+  background: linear-gradient(135deg, #ff6384, #e6091b);
+  border-left: 4px solid #ffffff;
+  border-bottom: 4px solid #ffffff;
+  display: flex;
+  gap: 12px;
+
+  color: white;
+  transition: all 0.2s ease;
+
+
+  border-radius: 6px;
+  margin-bottom: 5px;
+  text-decoration: none;
+}
+
+.morale-records.dropdown-tooltip .tooltip-items a:hover {
+  background: linear-gradient(135deg, #ff6384, #ff9aa2) !important;
+  border-left: 4px solid #ff6384 !important;
+  border-bottom: 4px solid #ff6384 !important;
+  animation: heartbeat 1.4s ease-in-out infinite;
+  transform: translateY(-2px) scale(1.03);
+}
+
+/* HR Management Tooltip Items */
+.hr-records.dropdown-tooltip .tooltip-items a {
+  background: linear-gradient(135deg, #0280ff, #0004fb);
+  border-left: 4px solid #ffffff;
+  border-bottom: 4px solid #ffffff;
+  display: flex;
+
+
+  color: white;
+  transition: all 0.2s ease;
+
+
+  border-radius: 6px;
+  margin-bottom: 5px;
+  text-decoration: none;
+  position: relative;
+  overflow: hidden;
+}
+
+.hr-records.dropdown-tooltip .tooltip-items a:hover {
+  background: linear-gradient(135deg, #0280ff, #0004fb) !important;
+  border-left: 4px solid #3b82f6 !important;
+  border-bottom: 4px solid #3b82f6 !important;
+}
+
+.hr-records.dropdown-tooltip .tooltip-items a::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    115deg,
+    transparent,
+    rgba(255, 255, 255, 0.803),
+    transparent
+  );
+  opacity: 0.3;
+  transform: skewX(-20deg);
+  transition: left 0.6s ease;
+  z-index: 0;
+}
+
+.hr-records.dropdown-tooltip .tooltip-items a:hover::before {
+  left: 230px;
+}
+
+.hr-records.dropdown-tooltip .tooltip-items a:hover::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 8px;
+  box-shadow: 0 0 25px rgba(59, 130, 246, 0.4);
+  animation: floatPulse 2s ease-in-out infinite alternate;
+}
+
+/* Tooltip header styles for ALL states */
+.personnel-records .tooltip-header {
+  background: linear-gradient(
+    135deg,
+    rgba(184, 6, 212, 0.95),
+    rgba(46, 0, 211, 0.9)
+  ) !important;
+  padding: 12px 16px;
+  font-weight: bold;
+  font-size: 14px;
+  margin-bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: white;
+}
+
+.morale-records .tooltip-header {
+  background: linear-gradient(135deg, #ff6384, #ff9aa2) !important;
+  padding: 12px 16px;
+  font-weight: bold;
+  font-size: 14px;
+  margin-bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: white;
+}
+
+.hr-records .tooltip-header {
+  background: linear-gradient(135deg, #0665ff, #2563eb) !important;
+  padding: 12px 16px;
+  font-weight: bold;
+  font-size: 14px;
+  margin-bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: white;
+}
+
+/* Different positioning for collapsed vs expanded states */
+.sidebar.collapsed .dropdown-tooltip {
+  left: 100px !important;
+  margin-right: -100px;
+}
+
+.sidebar:not(.collapsed) .dropdown-tooltip {
+  left: 280px !important; /* Adjusted for expanded sidebar width */
+  margin-left: 10px;
+}
+
+/* Ensure tooltip items are visible */
+.tooltip-items a span {
+  display: inline !important;
+  color: white !important;
+  position: relative;
+  z-index: 1;
+}
+
+/* ================================
+  RESPONSIVE DESIGN - 768px AND BELOW
+=============================== */
+@media screen and (max-width: 768px) {
+  /* Hamburger menu adjustments */
+  .hamburger {
+    top: 10px;
+    left: 10px;
+    width: 32px;
+    height: 24px;
+    padding: 5px;
+  }
+
+  .hamburger .bar {
+    height: 3px;
+  }
+
+  .hamburger.active .top {
+    transform: translateY(8px) rotate(45deg);
+  }
+
+  .hamburger.active .bottom {
+    transform: translateY(-8px) rotate(-45deg);
+  }
+
+  /* Sidebar adjustments for mobile */
+  .sidebar {
+    width: 200% !important;
+    max-width: 300px;
+    left: 0% !important;
+    transition: left 0.4s ease, background 0.3s ease;
+    padding-top: 60px;
+    box-shadow: 3px 0 15px rgba(0, 0, 0, 0.5);
+  }
+
+  .sidebar.active {
+    left: 0 !important;
+  }
+
+  /* When sidebar is active, add overlay */
+  .sidebar.active::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 999;
+    pointer-events: none;
+  }
+
+  /* Collapsed state adjustments for mobile */
+  .sidebar.collapsed {
+    width: 100% !important;
+    max-width: 80px;
+    left: -100%!important;
+  }
+
+  /* Theme toggle adjustments */
+  .sidebar .theme-toggle {
+    top: 10px;
+    right: 10px;
+  }
+
+  .sidebar .theme-toggle button {
+    width: 32px;
+    height: 32px;
+    font-size: 18px;
+  }
+
+  /* Adjust main content for mobile */
+  .main-content {
+    margin-left: 0 !important;
+    padding: 20px 15px !important;
+    padding-top: 70px !important;
+  }
+
+  .main-content.collapsed {
+    margin-left: 0 !important;
+    padding-left: 20px !important;
+  }
+
+  /* Dropdown tooltips adjustments for mobile */
+  .dropdown-tooltip {
+    position: fixed !important;
+    left: 50% !important;
+    top: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    margin: 0 !important;
+    width: 90% !important;
+    max-width: 320px !important;
+    max-height: 80vh;
+    overflow-y: auto;
+    z-index: 10010 !important;
+  }
+
+  .sidebar.collapsed .dropdown-tooltip,
+  .sidebar:not(.collapsed) .dropdown-tooltip {
+    left: 50% !important;
+    top: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    margin: 0 !important;
+  }
+
+  /* Adjust tooltip items for mobile */
+  .tooltip-items a {
+    width: 100% !important;
+    max-width: none !important;
+    box-sizing: border-box;
+  }
+
+  .sidebar.collapsed .morale-records.dropdown-tooltip .tooltip-items a,
+  .sidebar.collapsed .hr-records.dropdown-tooltip .tooltip-items a {
+    width: 100% !important;
+    max-width: none !important;
+  }
+
+  /* No-hover links adjustments */
+  .sidebar a.no-hover {
+    width: 100% !important;
+    max-width: none !important;
+  }
+
+  .sidebar.collapsed a.no-hover {
+    right: 0 !important;
+    width: 100% !important;
+  }
+
+  /* Ensure sidebar inner scrolls properly on mobile */
+  .sidebar-inner {
+    height: calc(100vh - 60px);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Adjust font sizes for better mobile readability */
+  .sidebar h2 {
+    font-size: 20px;
+  }
+
+  .sidebar a {
+    font-size: 14px;
+    padding: 10px 12px;
+    margin: 6px -1px;
+  }
+
+  /* Disable hover effects on touch devices */
+  @media (hover: none) and (pointer: coarse) {
+    .sidebar a:hover {
+      transform: none !important;
+    }
+    
+    .dropdown-toggle:hover {
+      transform: none !important;
+    }
+    
+    .sidebar .theme-toggle button:hover {
+      transform: none !important;
+    }
+  }
+
+}
+
+/* ================================
+  VERY SMALL DEVICES - 480px AND BELOW
+=============================== */
+@media screen and (max-width: 480px) {
+  .sidebar {
+    max-width: 280px;
+  }
+
+  .sidebar.collapsed {
+    max-width: 70px;
+  }
+
+  .hamburger {
+    top: 8px;
+    left: 8px;
+    width: 30px;
+    height: 22px;
+  }
+
+  .sidebar .theme-toggle button {
+    width: 28px;
+    height: 28px;
+    font-size: 16px;
+  }
+
+  .dropdown-tooltip {
+    width: 95% !important;
+    max-width: 280px !important;
+  }
+
+  .tooltip-header {
+    font-size: 13px;
+    padding: 10px 14px;
+  }
+
+  .tooltip-items a {
+    padding: 8px 12px;
+    font-size: 13px;
+  }
 }

@@ -10,16 +10,16 @@
 }
 
 .tablePhoto {
-  width: 50px;
-  height: 50px;
+  width: 70px;
+  height: 70px;
   border-radius: 4px;
   object-fit: cover;
   border: 1px solid #ddd;
 }
 
 .noPhoto {
-  width: 50px;
-  height: 50px;
+  width: 70px;
+  height: 70px;
   background-color: #f5f5f5;
   border: 1px solid #ddd;
   border-radius: 4px;
@@ -79,6 +79,8 @@
   border: none;
   cursor: pointer;
   font-size: 12px;
+  text-align: center!important;
+  justify-content: center;
   transition: background-color 0.3s;
 }
 
@@ -259,12 +261,21 @@ h1 {
 
 /* Form Card */
 .card {
-  background: white;
-  padding: 30px;
-  border-radius: 10px;
-  margin-bottom: 30px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  background: rgb(255, 249, 249);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 30px; /* Reduced from 50px */
+  box-shadow: 0 5px 4px rgba(16, 95, 175, 0.597);
+  position: relative;
+  margin-left: -3px;
+  padding-top: 65px;
+  width: 101%;
+  box-sizing: border-box;
+  min-height: auto; /* Changed from height: 100vh */
+  max-height: none; /* Remove max height */
+  overflow: visible; /* Changed from hidden */
 }
+
 
 .card h2 {
   margin-top: 0;
@@ -295,13 +306,16 @@ h1 {
 /* Form Layout */
 .form.layout {
   display: none;
-  grid-template-columns: 200px 1fr;
+  flex-direction: row;
   gap: 30px;
   margin-top: 30px;
+  max-height: 600px; /* Limit height */
+  overflow-y: auto; /* Add scroll if needed */
+  padding-right: 10px;
 }
 
 .form.layout.show {
-  display: grid;
+  display: flex;
 }
 
 .photoSection {
@@ -365,10 +379,11 @@ h1 {
 
 /* Form Fields */
 .infoSection {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
+  margin-bottom: 20px; /* Reduced from 100px */
+  flex: 1;
+  padding-bottom: 80px; /* Space for buttons */
 }
+
 
 .formRow {
   display: grid;
@@ -483,9 +498,16 @@ h1 {
   box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 }
 
-.table {
-  width: 100%;
-  border-collapse: collapse;
+.tableBorder {
+  width: 101%;
+  overflow-x: auto; /* Enable horizontal scrolling */
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+  border-radius: 12px;
+  box-shadow: 0 5px 4px rgba(16, 95, 175, 0.597);
+  background: #fff;
+  position: relative;
+  margin-bottom: 20px;
 }
 
 .table th {
@@ -1114,31 +1136,38 @@ h1 {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin: 20px 0 10px 0;
+ 
   font-size: 17px;
   border-left: 4px solid #085CB1;
   color: black;
-  padding-left: 10px;
+
+ 
 }
 
 .tableBorder {
-  width: 102.6%;
+  width: 101%;
+  right: 5px;
 }
 
 .table {
-  width: 98.5%;
+  width: 1200px; /* Change from fixed width to auto */
+
   padding: 20px;
   border-collapse: separate;
   border-spacing: 0;
   font-size: 14px;
-  margin-left: -5px;
+  margin-left: 0px; /* Remove negative margin */
   background: #fff;
   border-radius: 12px;
-  overflow: hidden;
   text-align: center;
-  position: relative;
-  top: -0.6vh;
-  box-shadow: 0 5px 4px rgba(16, 95, 175, 0.597);
+  min-width: 1250px; /* Increase to accommodate all columns */
+  box-shadow: none; /* Remove shadow since container has it */
+}
+
+.table thead {
+  position: sticky;
+  top: 0;
+  z-index: 1;
 }
 
 .table thead tr {
@@ -1148,6 +1177,7 @@ h1 {
 .table thead td {
   border-bottom: 3px solid var(--border);
 }
+
 
 .table th {
   padding: 14px 16px;
@@ -1160,17 +1190,176 @@ h1 {
   top: 0;
   z-index: 2;
   background: #529ae1;
+  white-space: nowrap; /* Prevent header text from wrapping */
 }
-
 .table tbody td {
   background: var(--bg-main);
-  border-bottom: 1px solid rgb(0, 0, 0);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.585);
   color: var(--text-primary);
   transition: background 0.25s ease;
   padding: 12px 16px;
   text-align: center;
+  white-space: nowrap; /* Prevent cell content from wrapping */
+}
+.tableBorder::-webkit-scrollbar {
+  height: 20px;
 }
 
+.tableBorder::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 0 0 20px 20px;
+}
+
+.tableBorder::-webkit-scrollbar-thumb {
+  background: #529ae1;
+  border-radius: 10px;
+  display: none;
+  height: 101px;
+}
+
+.tableBorder::-webkit-scrollbar-thumb:hover {
+  background: #1060af;
+}
+
+/* Firefox Scrollbar */
+.tableBorder {
+  
+  scrollbar-color: #529ae1 #f1f1f1;
+}
+
+/* Column width adjustments for better scrolling */
+.table th:nth-child(1), /* Photo */
+.table td:nth-child(1) {
+  min-width: 80px;
+  max-width: 100px;
+}
+
+.table th:nth-child(2), /* Candidate */
+.table td:nth-child(2) {
+  min-width: 150px;
+  max-width: 200px;
+}
+
+.table th:nth-child(3), /* Position */
+.table td:nth-child(3) {
+  min-width: 150px;
+  max-width: 200px;
+}
+
+.table th:nth-child(4), /* Username */
+.table td:nth-child(4) {
+  min-width: 120px;
+  max-width: 150px;
+}
+
+.table td:nth-child(5), /* Password */
+.table tr:nth-child(5) {
+  min-width: 290px;
+  max-width: 290px;
+  width: 100%;
+
+}
+
+.table th:nth-child(6), /* Application Date */
+.table td:nth-child(6) {
+  min-width: 120px;
+  max-width: 150px;
+}
+
+.table th:nth-child(7), /* Stage */
+.table td:nth-child(7) {
+  min-width: 100px;
+  max-width: 120px;
+}
+
+.table th:nth-child(8), /* Interview Date */
+.table td:nth-child(8) {
+  min-width: 120px;
+  max-width: 150px;
+}
+
+.table th:nth-child(9), /* Status */
+.table td:nth-child(9) {
+  min-width: 100px;
+  max-width: 120px;
+}
+
+.table th:nth-child(10), /* Resume */
+.table td:nth-child(10) {
+  min-width: 120px;
+  max-width: 150px;
+}
+
+.table th:nth-child(11), /* Actions */
+.table td:nth-child(11) {
+  min-width: 120px;
+  max-width: 150px;
+}
+.table th:nth-child(12), /* Actions */
+.table td:nth-child(12) {
+  min-width: 120px;
+  max-width: 150px;
+}
+
+/* Row alternating colors */
+.table tbody tr:nth-child(even) td {
+  background: #81878c;
+  color: var(--text-secondary);
+}
+
+.table tbody tr:nth-child(even):hover td {
+  background: var(--accent);
+}
+
+.table tbody tr:nth-child(odd) td {
+  background: rgba(255, 255, 255, 0.95);
+}
+
+.table tbody tr:nth-child(odd):hover td {
+  background: var(--accent);
+}
+
+/* Row hover effects */
+.table tbody tr {
+  transition: transform 0.25s ease, box-shadow 0.25s ease, background 0.25s ease;
+}
+
+.table tbody tr:hover {
+  background: #549ee9;
+  color: #fff;
+  transform: translateY(-2px) scale(1.01);
+  box-shadow: 0 4px 8px rgba(33, 17, 17, 0.2), 0 8px 16px rgba(0, 0, 0, 0.1);
+  z-index: 5;
+  position: relative;
+}
+
+.table tbody tr:hover td {
+  background: #549ee9 !important;
+  color: #fff;
+}
+
+.table tbody tr:has(+ tr:hover),
+.table tbody tr:hover + tr {
+  background: rgba(255, 215, 0, 0.06);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .tableBorder {
+    width: 98%;
+    margin: 0 auto;
+  }
+  
+  .table {
+    min-width: 900px; /* Smaller min-width for mobile */
+    font-size: 13px;
+  }
+  
+  .table th,
+  .table td {
+    padding: 10px 12px;
+  }
+}
 /* Row alternating colors */
 .table tbody tr:nth-child(even) td {
   background: #81878c;
@@ -1681,4 +1870,331 @@ h1 {
   .table td {
     padding: 8px 6px;
   }
+}
+
+/* Edit Modal Layout */
+.prEditModalLayout {
+  display: flex;
+  gap: 30px;
+  align-items: flex-start;
+}
+
+.prEditModalPhotoSection {
+  flex: 0 0 160px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+
+.prEditModalPhotoPreview {
+  width: 170px;
+  height: 200px;
+  border: 2px dashed #ccc;
+  margin-top: 24px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: #f9f9f9;
+  font-size: 14px;
+  color: #666;
+  transition: all 0.25s ease;
+}
+
+.prEditModalPhotoPreview:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+}
+
+.prEditModalPhotoPreview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.prEditModalFileUpload {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  width: 100%;
+}
+
+.prEditModalFileUpload input[type="file"] {
+  display: none;
+}
+
+.prEditModalFileUploadLabel {
+  background: linear-gradient(135deg, #1060af, #529ae1);
+  color: white;
+  padding: 10px 16px;
+  border-radius: 6px;
+  width: 150px;
+  font-weight: bold;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  text-align: center;
+}
+
+.prEditModalFileUploadLabel:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.623);
+}
+
+.prEditModalFileUpload span {
+  font-size: 10px;
+  color: var(--text-primary);
+  font-style: italic;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 170px;
+  text-align: center;
+}
+
+.prEditModalClearBtn {
+  background-color: red;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: bold;
+  transition: all 0.25s ease;
+  margin-top: 5px;
+  width: 150px;
+}
+
+.prEditModalClearBtn:hover {
+  color: rgb(0, 0, 0);
+  transform: translateY(-2px);
+  transition: ease 0.3s;
+}
+
+.prNoPhotoPreview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  color: #666;
+}
+
+.prNoPhotoIcon {
+  font-size: 48px;
+  margin-bottom: 10px;
+}
+
+/* Fix for floating labels positioning */
+.floatingGroup {
+  position: relative;
+  width: 100%;
+  margin-bottom: 25px; /* Add spacing between form groups */
+}
+
+.floatingLabel {
+  position: absolute;
+  top: 50%;
+  left: 12px;
+  transform: translateY(-50%);
+  background: #fff;
+  padding: 0 5px;
+  color: #666;
+  font-size: 14px;
+  pointer-events: none;
+  transition: all 0.2s ease;
+  z-index: 1;
+}
+
+.floatingInput:focus + .floatingLabel,
+.floatingInput:not(:placeholder-shown) + .floatingLabel,
+.floatingSelect:focus + .floatingLabel,
+.floatingSelect:not(:invalid) + .floatingLabel {
+  top: 0;
+  font-size: 12px;
+  color: #3498db;
+  transform: translateY(-50%);
+  background: #fff;
+  padding: 0 8px;
+}
+
+/* Ensure form rows have proper spacing */
+.formRow {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+.formGroup {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Fix for password input group */
+.passwordInputGroup {
+  position: relative;
+}
+
+.showPasswordBtn {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  padding: 5px;
+}
+
+.generatePasswordBtn {
+  margin-top: 5px;
+  padding: 6px 12px;
+  background: #3498db;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.generatePasswordBtn:hover {
+  background: #2980b9;
+}/* ================================
+    PASSWORD CELL STYLES (From Personnel Register)
+  =============================== */
+.passwordCell {
+  position: relative;
+  padding: px 4px !important;
+}
+
+.passwordContainer {
+  display: flex;
+
+  gap: 8px;
+  justify-content: center;
+  text-align: center;
+  position: relative;
+  align-items: center!important;
+  min-height: 36px;
+}
+
+.passwordMask {
+  font-family: "Courier New", monospace;
+  font-size: 14px;
+  letter-spacing: 1px;
+  padding: 4px 8px;
+  background: #f5f5f500;
+  border-radius: 4px;
+  border: 1px solid #000000;
+  min-width: 80px;
+  flex: 1;
+  display: inline-block;
+  word-break: break-all;
+}
+
+.passwordActions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.passwordToggle,
+.copyBtn {
+  background: var(--bg-buttons);
+  border: none;
+  color: white;
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  padding: 0;
+}
+
+.passwordToggle:hover,
+.copyBtn:hover {
+  background: var(--bg-buttons_active);
+  transform: scale(1.05);
+}
+
+.passwordIcon,
+.copyIcon {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.copiedText {
+  position: absolute;
+  top: -20px;
+  right: 0;
+  background: #4caf50;
+  color: white;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 11px;
+  animation: fadeInOut 2s ease-in-out;
+}
+
+@keyframes fadeInOut {
+  0% {
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Remove the old password cell styles */
+.passwordCell {
+  /* Remove previous styles */
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  top: 0px;
+  height: 100px;
+}
+
+.togglePassword {
+  /* Remove previous styles */
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 4px;
+}
+
+/* Add this for the password input in forms */
+.passwordInputGroup {
+  position: relative;
+  width: 100%;
+}
+
+.showPasswordBtn {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  padding: 5px;
+  z-index: 2;
 }

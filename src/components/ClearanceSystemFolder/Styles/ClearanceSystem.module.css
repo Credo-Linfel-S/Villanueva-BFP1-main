@@ -767,7 +767,189 @@ padding-top: 0px;
     transform: translateY(-10px);
   }
 }
+/* Lost Equipment Styles */
+.lostEquipmentBadge {
+  background: linear-gradient(135deg, #f97316, #ea580c);
+  color: white;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  margin-left: 12px;
+  animation: pulse 2s infinite;
+}
 
+.lostEquipmentSection {
+  background: linear-gradient(135deg, #fff7ed, #ffedd5);
+  border: 2px solid #fdba74;
+  border-radius: 12px;
+  padding: 20px;
+  margin: 20px;
+  box-shadow: 0 4px 6px rgba(249, 115, 22, 0.1);
+}
+
+.lostEquipmentTitle {
+  color: #ea580c;
+  font-size: 18px;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lostEquipmentTable {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 16px;
+}
+
+.lostEquipmentTable th {
+  background: #fed7aa;
+  color: #9a3412;
+  padding: 12px;
+  text-align: left;
+  font-weight: 600;
+  border-bottom: 2px solid #fb923c;
+}
+
+.lostEquipmentTable td {
+  padding: 12px;
+  border-bottom: 1px solid #fdba74;
+}
+
+.lostEquipmentRow:hover {
+  background: #ffedd5;
+}
+
+.lostEquipmentSummary {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  margin-top: 20px;
+  padding: 16px;
+  background: white;
+  border-radius: 8px;
+  border: 1px solid #fdba74;
+}
+
+.lostEquipmentSummary p {
+  margin: 0;
+  font-size: 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.clearedYes {
+  color: #16a34a;
+  font-weight: bold;
+  background: #dcfce7;
+  padding: 4px 12px;
+  border-radius: 20px;
+}
+
+.clearedNo {
+  color: #dc2626;
+  font-weight: bold;
+  background: #fee2e2;
+  padding: 4px 12px;
+  border-radius: 20px;
+}
+
+.settled {
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.pending {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.returned {
+  color: #16a34a;
+  font-weight: 600;
+}
+
+.notReturned {
+  color: #dc2626;
+  font-weight: 600;
+}
+
+/* Lost equipment status in table */
+.lostEquipmentStatus {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.lostEquipmentBadge {
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.lostEquipmentSettled {
+  background: #dcfce7;
+  color: #166534;
+  border: 1px solid #86efac;
+}
+
+.lostEquipmentUnsettled {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fcd34d;
+}
+
+.lostEquipmentWarningText {
+  font-size: 10px;
+  color: #dc2626;
+}
+
+.noLostEquipment {
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.lostEquipmentStatusBadge {
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.lostEquipmentWarning {
+  background: #fef3c7;
+  border: 1px solid #fbbf24;
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: #92400e;
+}
+
+@keyframes pulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.7; }
+  100% { opacity: 1; }
+}
+
+/* Additional table column styles */
+.clearanceTable th:nth-child(8) {
+  width: 120px;
+}
+
+.clearanceTable td:nth-child(8) {
+  text-align: center;
+}
 
 
 .submissionSpinner {
@@ -2760,10 +2942,15 @@ background: linear-gradient(135deg, #f59e0b, #d97706) !important;
 .clearanceTable th:nth-child(9),
 .clearanceTable td:nth-child(9) {
   min-width: 210px; /* Reduced from 250px if needed */
+  padding: 30px !important;
+  text-align: center;
+}
+.clearanceTable th:nth-child(10),
+.clearanceTable td:nth-child(10) {
+  min-width: 210px; /* Reduced from 250px if needed */
   padding: 0px !important;
   text-align: center;
 }
-
 /* Keep all your existing row styling, hover effects, etc. */
 .clearanceTable tbody tr:nth-child(odd) td {
   background: #ffffff;
@@ -2792,7 +2979,154 @@ background: linear-gradient(135deg, #f59e0b, #d97706) !important;
 .equipmentPreviewTable thead {
   background: linear-gradient(135deg, #1060af, #529ae1);
 }
+/* Additional styles for clearance-linked lost equipment */
+.clearanceLinkInfo {
+  font-size: 12px;
+  color: #6b7280;
+  margin-left: 12px;
+  font-weight: normal;
+}
 
+.linked {
+  color: #16a34a;
+  font-weight: 600;
+  background: #dcfce7;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+}
+
+.notLinked {
+  color: #dc2626;
+  font-weight: 600;
+  background: #fee2e2;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+}
+
+.clearanceLinkStatus {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+}
+
+.linkAllBtn {
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.linkAllBtn:hover {
+  background: linear-gradient(135deg, #2563eb, #1e40af);
+}
+
+.lostEquipmentHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+/* Lost Equipment Manager Styles */
+.lostEquipmentManager {
+  margin: 20px 0;
+  padding: 20px;
+  background: #f9fafb;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+}
+
+.addLostItemForm {
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  margin-bottom: 20px;
+}
+
+.formGroup {
+  margin-bottom: 16px;
+}
+
+.formGroup label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.formGroup input,
+.formGroup select,
+.formGroup textarea {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.formActions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.cancelBtn {
+  background: #f3f4f6;
+  color: #374151;
+  border: 1px solid #d1d5db;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.submitBtn {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.actionButtons {
+  display: flex;
+  gap: 8px;
+}
+
+.settleBtn {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: white;
+  border: none;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.removeBtn {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  color: white;
+  border: none;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.noLostItems {
+  text-align: center;
+  color: #6b7280;
+  padding: 40px;
+  font-style: italic;
+}
 .equipmentPreviewTable th {
   padding: 10px 12px;
   text-align: left;
@@ -4313,3 +4647,170 @@ position: relative;
   }
 }
 /* Add to your ClearanceSystem.module.css */
+/* Inspection Status Badges with Styles */
+.inspectionStatus {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  text-align: center;
+  min-width: 120px;
+}
+
+/* Pending States */
+.inspectionStatus.pending-awaiting {
+  background-color: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fbbf24;
+}
+
+.inspectionStatus.pending-needsaccountability {
+  background-color: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fbbf24;
+  border-left: 4px solid #ef4444;
+}
+
+/* In Progress States */
+.inspectionStatus.inprogress-scheduled {
+  background-color: #dbeafe;
+  color: #1e40af;
+  border: 1px solid #60a5fa;
+}
+
+.inspectionStatus.inprogress-accountability {
+  background-color: #dbeafe;
+  color: #1e40af;
+  border: 1px solid #60a5fa;
+  border-left: 4px solid #f59e0b;
+}
+
+.inspectionStatus.inprogress-needsaccountability {
+  background-color: #dbeafe;
+  color: #1e40af;
+  border: 1px solid #60a5fa;
+  border-left: 4px solid #ef4444;
+}
+
+/* DONE/Completed States */
+.inspectionStatus.done-completed {
+  background-color: #d1fae5;
+  color: #065f46;
+  border: 1px solid #10b981;
+}
+
+/* PASS States */
+.inspectionStatus.pass-settled {
+  background-color: #d1fae5;
+  color: #065f46;
+  border: 1px solid #10b981;
+  border-left: 4px solid #059669;
+}
+
+/* FAIL States */
+.inspectionStatus.fail-accountability {
+  background-color: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #f87171;
+}
+
+/* Other States */
+.inspectionStatus.notyetadded {
+  background-color: #f3f4f6;
+  color: #6b7280;
+  border: 1px solid #d1d5db;
+}
+
+.inspectionStatus.noequipment {
+  background-color: #f3f4f6;
+  color: #6b7280;
+  border: 1px solid #d1d5db;
+  font-style: italic;
+}
+
+.inspectionStatus.notapplicable {
+  background-color: #f3f4f6;
+  color: #6b7280;
+  border: 1px dashed #d1d5db;
+}
+
+/* Status badges with icons */
+.inspectionStatus::before {
+  margin-right: 4px;
+  font-size: 10px;
+}
+/* PASS status without settlement */
+.inspectionStatus.pass {
+  background-color: #d1fae5;
+  color: #065f46;
+  border: 1px solid #10b981;
+  
+}
+
+
+/*
+.inspectionStatus.pending-awaiting::before {
+  content: "⏳";
+}
+.inspectionStatus.pass::before {
+  content: "✅";
+}
+.inspectionStatus.inprogress-scheduled::before {
+  content: "🔍";
+}
+
+.inspectionStatus.inprogress-accountability::before {
+  content: "⚖️";
+}
+
+.inspectionStatus.inprogress-needsaccountability::before {
+  content: "🔍⚖️";
+}
+
+.inspectionStatus.done-completed::before {
+  content: "✅";
+}
+
+.inspectionStatus.pass-settled::before {
+  content: "✅";
+}
+
+.inspectionStatus.fail-accountability::before {
+  content: "❌";
+}
+
+.inspectionStatus.pending-needsaccountability::before {
+  content: "⚖️";
+}
+
+ Status tooltips on hover */
+.inspectionStatus {
+  position: relative;
+  cursor: help;
+}
+
+.inspectionStatus:hover::after {
+  content: attr(title);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: #333;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  white-space: nowrap;
+  z-index: 1000;
+  margin-bottom: 5px;
+}
+
+/* Status descriptions */
+.inspectionStatus .statusDescription {
+  display: block;
+  font-size: 10px;
+  color: #666;
+  margin-top: 2px;
+  font-style: italic;
+}

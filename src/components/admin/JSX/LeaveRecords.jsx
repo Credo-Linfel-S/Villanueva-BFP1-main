@@ -14,10 +14,13 @@ import {
   saveLeaveDocumentMetadata,
 } from "../../utils/leaveDocumentUpload.js";
 import { fillLeaveFormEnhanced } from "../../utils/pdfLeaveFormFiller.js";
+import BFPPreloader from "../../BFPPreloader.jsx";
+
 const LeaveRecords = () => {
   const [leaveData, setLeaveData] = useState([]);
   const [yearlyRecords, setYearlyRecords] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [preloaderProgress, setPreloaderProgress] = useState(0);
   const [noData, setNoData] = useState(false);
   const [viewMode, setViewMode] = useState("current");
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -74,18 +77,28 @@ const LeaveRecords = () => {
 
   const loadLeaveData = async () => {
     setLoading(true);
+    setPreloaderProgress(10);
+
     try {
       if (viewMode === "current") {
+        setPreloaderProgress(30);
         await loadCurrentLeaveRequests();
+        setPreloaderProgress(60);
       } else {
+        setPreloaderProgress(30);
         await loadYearlyLeaveRecords();
+        setPreloaderProgress(60);
       }
+      setPreloaderProgress(100);
     } catch (err) {
       console.error("[LeaveRecords] error loading", err);
       toast.error("An unexpected error occurred");
       setNoData(true);
     } finally {
-      setLoading(false);
+      // Small delay to show 100% completion
+      setTimeout(() => {
+        setLoading(false);
+      }, 500);
     }
   };
 
@@ -2145,14 +2158,15 @@ const LeaveRecords = () => {
     );
   };
 
+  // Show BFP Preloader while loading
   if (loading) {
     return (
-      <div className={`main-content ${isSidebarCollapsed ? "collapsed" : ""}`}>
-        <div className={styles.loadingContainer}>
-          <div className={styles.loadingSpinner}></div>
-          <p>Loading leave records...</p>
-        </div>
-      </div>
+      <BFPPreloader
+        loading={loading}
+        progress={preloaderProgress}
+        moduleTitle="LEAVE RECORDS • Retrieving History..."
+        onRetry={loadLeaveData}
+      />
     );
   }
 
@@ -3190,24 +3204,12 @@ const LeaveRecords = () => {
                   ) : (
                     availableYears.map((year) => (
                       <option key={year} value={year}>
-                        {year} {year === selectedYear ? "(Loading...)" : ""}
+                        {year} {year === selectedYear ? "" : ""}
                       </option>
                     ))
                   )}
                 </select>
-                <button
-                  onClick={() => {
-                    console.log("Current state:", {
-                      selectedYear,
-                      availableYears,
-                      leaveData,
-                    });
-                    loadYearlyLeaveRecords();
-                  }}
-                  className={styles.refreshBtn}
-                >
-                  🔄
-                </button>
+              
               </div>
             )}
           </div>

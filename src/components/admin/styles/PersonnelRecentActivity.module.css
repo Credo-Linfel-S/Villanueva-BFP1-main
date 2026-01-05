@@ -524,3 +524,183 @@
     display: none;
   }
 } 
+
+/* Priority Notice */
+.priorityNotice {
+  background: #fff3cd;
+  color: #856404;
+  padding: 10px 15px;
+  border-radius: 8px;
+  margin-bottom: 15px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 500;
+  border-left: 4px solid #ffc107;
+}
+
+.priorityIcon {
+  font-size: 1.2rem;
+}
+
+/* For equipment and recruitment status */
+.statusAdded {
+  background: #e6ccff;
+  color: #6f42c1;
+  border: 1px solid #d9b8ff;
+}
+
+.statusHired {
+  background: #ccf2f0;
+  color: #20c997;
+  border: 1px solid #b3ece6;
+}
+/* Admin Info Styles */
+.adminInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 4px;
+}
+
+.adminInfoInline {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.adminRoleBadge {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-size: 0.65rem;
+  font-weight: bold;
+  text-transform: uppercase;
+  display: inline-block;
+}
+
+.adminRank {
+  color: #7f8c8d;
+  font-size: 0.7rem;
+}
+
+/* Action By Cell enhancements */
+.actionByCell small {
+  font-size: 0.7rem;
+  display: block;
+  margin-top: 2px;
+}
+
+/* Priority Notice */
+.priorityNotice {
+  background: #fff3cd;
+  color: #856404;
+  padding: 10px 15px;
+  border-radius: 8px;
+  margin-bottom: 15px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 500;
+  border-left: 4px solid #ffc107;
+}
+
+.priorityIcon {
+  font-size: 1.2rem;
+}
+
+/* For equipment and recruitment status */
+.statusAdded {
+  background: #e6ccff;
+  color: #6f42c1;
+  border: 1px solid #d9b8ff;
+}
+
+.statusHired {
+  background: #ccf2f0;
+  color: #20c997;
+  border: 1px solid #b3ece6;
+}
+
+/* Admin Info Styles */
+.adminInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 4px;
+}
+
+.adminInfoInline {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.adminRoleBadge {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-size: 0.65rem;
+  font-weight: bold;
+  text-transform: uppercase;
+  display: inline-block;
+}
+
+.adminRank {
+  color: #7f8c8d;
+  font-size: 0.7rem;
+}
+
+/* Priority Notice */
+.priorityNotice {
+  background: #fff3cd;
+  color: #856404;
+  padding: 10px 15px;
+  border-radius: 8px;
+  margin-bottom: 15px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 500;
+  border-left: 4px solid #ffc107;
+}
+
+.priorityIcon {
+  font-size: 1.2rem;
+}
+
+/* Inventory-specific status styles */
+.statusAdded {
+  background: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
+
+.statusUpdated {
+  background: #d1ecf1;
+  color: #0c5460;
+  border: 1px solid #bee5eb;
+}
+
+.statusDeleted {
+  background: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+}
+
+.statusHired {
+  background: #ccf2f0;
+  color: #20c997;
+  border: 1px solid #b3ece6;
+}
+
+/* Action By Cell enhancements */
+.actionByCell small {
+  font-size: 0.7rem;
+  display: block;
+  margin-top: 2px;
+}
