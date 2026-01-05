@@ -9,6 +9,7 @@ const MainContent = ({ isCollapsed }) => {
     const phTime = new Date(date.getTime() + 8 * 60 * 60 * 1000); // UTC+8
     return phTime;
   };
+
   // Function to format time difference (e.g., "5 minutes ago")
   const formatTimeAgo = (date) => {
     const now = new Date();
@@ -274,6 +275,14 @@ const MainContent = ({ isCollapsed }) => {
   const [clearanceLoading, setClearanceLoading] = useState(true);
   const [clearanceError, setClearanceError] = useState(null);
 
+  // NEW: State for recruitment applicants
+  const [totalRecruitedApplicants, setTotalRecruitedApplicants] = useState(0);
+  const [recruitmentLoading, setRecruitmentLoading] = useState(true);
+  const [recruitmentError, setRecruitmentError] = useState(null);
+  const [newApplicantNotifications, setNewApplicantNotifications] = useState(
+    []
+  );
+
   // Overall loading state
   const [overallLoading, setOverallLoading] = useState(true);
   const [preloaderProgress, setPreloaderProgress] = useState(0);
@@ -362,6 +371,25 @@ const MainContent = ({ isCollapsed }) => {
     }
   };
 
+  // NEW: Function to fetch total recruited applicants count
+  const fetchTotalRecruitedApplicants = async () => {
+    try {
+      // Count all active recruitment personnel
+      const { count, error } = await supabase
+        .from("recruitment_personnel")
+        .select("*", { count: "exact", head: true })
+        .eq("is_active", true);
+
+      if (error) throw error;
+      setTotalRecruitedApplicants(count || 0);
+    } catch (error) {
+      console.error("Error fetching recruited applicants count:", error);
+      setRecruitmentError("Failed to load recruited applicants");
+    } finally {
+      setRecruitmentLoading(false);
+    }
+  };
+
   // Function to fetch upcoming inspections
   const fetchUpcomingInspections = async () => {
     try {
@@ -416,11 +444,12 @@ const MainContent = ({ isCollapsed }) => {
       const oneWeekAgoString = oneWeekAgo.toISOString();
 
       // Fetch activities from multiple sources with date filter
-      const [inspections, leaves, clearances] = await Promise.all([
-        supabase
-          .from("inspections")
-          .select(
-            `
+      const [inspections, leaves, clearances, recruitmentActivities] =
+        await Promise.all([
+          supabase
+            .from("inspections")
+            .select(
+              `
           id,
           schedule_inspection_date,
           inspector_name,
@@ -429,30 +458,30 @@ const MainContent = ({ isCollapsed }) => {
           updated_at,
           inventory:equipment_id(item_name)
         `
-          )
-          .gte("created_at", oneWeekAgoString) // Only get activities from last week
-          .order("created_at", { ascending: false }) // Most recent first
-          .limit(15), // Get more to allow for filtering
+            )
+            .gte("created_at", oneWeekAgoString) // Only get activities from last week
+            .order("created_at", { ascending: false }) // Most recent first
+            .limit(15), // Get more to allow for filtering
 
-        supabase
-          .from("leave_requests")
-          .select(
-            `
+          supabase
+            .from("leave_requests")
+            .select(
+              `
           id,
           personnel_id,
           status,
           created_at,
           personnel:personnel_id(first_name, last_name)
         `
-          )
-          .gte("created_at", oneWeekAgoString) // Only get activities from last week
-          .order("created_at", { ascending: false }) // Most recent first
-          .limit(15),
+            )
+            .gte("created_at", oneWeekAgoString) // Only get activities from last week
+            .order("created_at", { ascending: false }) // Most recent first
+            .limit(15),
 
-        supabase
-          .from("clearance_requests")
-          .select(
-            `
+          supabase
+            .from("clearance_requests")
+            .select(
+              `
           id,
           personnel_id,
           status,
@@ -460,11 +489,33 @@ const MainContent = ({ isCollapsed }) => {
           created_at,
           personnel:personnel_id(first_name, last_name)
         `
-          )
-          .gte("created_at", oneWeekAgoString) // Only get activities from last week
-          .order("created_at", { ascending: false }) // Most recent first
-          .limit(15),
-      ]);
+            )
+            .gte("created_at", oneWeekAgoString) // Only get activities from last week
+            .order("created_at", { ascending: false }) // Most recent first
+            .limit(15),
+
+          // NEW: Fetch recruitment activities
+          supabase
+            .from("recruitment_personnel")
+            .select(
+              `
+          id,
+          candidate,
+          full_name,
+          position,
+          stage,
+          status,
+          application_date,
+          interview_date,
+          resume_url,
+          created_at,
+          updated_at
+        `
+            )
+            .gte("created_at", oneWeekAgoString) // Only get activities from last week
+            .order("created_at", { ascending: false }) // Most recent first
+            .limit(15),
+        ]);
 
       let allActivities = [];
 
@@ -609,6 +660,104 @@ const MainContent = ({ isCollapsed }) => {
         });
       }
 
+      // NEW: Process recruitment activities
+      if (recruitmentActivities.data) {
+        recruitmentActivities.data.forEach((applicant) => {
+          const phTime = convertToPHTime(applicant.created_at);
+
+          // Skip if not within last week (extra safety check)
+          if (!isWithinLastWeek(phTime)) return;
+
+          const timeAgo = formatTimeAgo(phTime);
+          const timestamp = formatPHTimestamp(applicant.created_at);
+
+          const applicantName =
+            applicant.full_name || applicant.candidate || "New applicant";
+          let activityText = "";
+          let activityIcon = "👤";
+
+          // Check if applicant uploaded resume
+          if (applicant.resume_url) {
+            activityText = `${applicantName} uploaded a resume`;
+            activityIcon = "📄";
+          }
+          // Check if application date was set
+          else if (applicant.application_date) {
+            const appDate = new Date(applicant.application_date);
+            const formattedDate = appDate.toLocaleDateString("en-US", {
+              month: "long",
+              day: "numeric",
+              year: "numeric",
+            });
+            activityText = `${applicantName} applied on ${formattedDate}`;
+            activityIcon = "📅";
+          }
+          // Check if interview date was set
+          else if (applicant.interview_date) {
+            const interviewDate = new Date(applicant.interview_date);
+            const formattedDate = interviewDate.toLocaleDateString("en-US", {
+              month: "long",
+              day: "numeric",
+              year: "numeric",
+            });
+            activityText = `${applicantName} scheduled interview on ${formattedDate}`;
+            activityIcon = "🎯";
+          }
+          // Check stage changes
+          else if (applicant.stage) {
+            activityText = `${applicantName} moved to ${applicant.stage} stage`;
+
+            switch (applicant.stage) {
+              case "Applied":
+                activityIcon = "📝";
+                break;
+              case "Screening":
+                activityIcon = "🔍";
+                break;
+              case "Interview":
+                activityIcon = "💬";
+                break;
+              case "Assessment":
+                activityIcon = "📊";
+                break;
+              case "Background Check":
+                activityIcon = "🔎";
+                break;
+              case "Final Review":
+                activityIcon = "👨‍⚖️";
+                break;
+              case "Offered":
+                activityIcon = "📜";
+                break;
+              case "Hired":
+                activityIcon = "🎉";
+                break;
+              case "Rejected":
+                activityIcon = "❌";
+                break;
+              default:
+                activityIcon = "👤";
+            }
+          }
+          // Default new applicant
+          else {
+            activityText = `New applicant: ${applicantName}`;
+            activityIcon = "👤";
+          }
+
+          allActivities.push({
+            id: `applicant-${applicant.id}`,
+            time: timeAgo,
+            timestamp: timestamp,
+            text: activityText,
+            icon: activityIcon,
+            phTime: phTime,
+            type: "recruitment",
+            rawTime: phTime.getTime(), // For sorting
+          });
+        });
+      }
+
       // Sort all activities by time (most recent first - descending)
       allActivities.sort((a, b) => b.rawTime - a.rawTime);
 
@@ -624,6 +773,86 @@ const MainContent = ({ isCollapsed }) => {
       setActivitiesError("Failed to load recent activities");
     } finally {
       setActivitiesLoading(false);
+    }
+  };
+
+  // NEW: Function to check for new applicant notifications
+  const checkNewApplicantNotifications = async () => {
+    try {
+      // Get the last 24 hours
+      const twentyFourHoursAgo = new Date();
+      twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 24);
+      const twentyFourHoursAgoString = twentyFourHoursAgo.toISOString();
+
+      // Fetch new applicants from the last 24 hours
+      const { data, error } = await supabase
+        .from("recruitment_personnel")
+        .select(
+          `
+          id,
+          candidate,
+          full_name,
+          position,
+          stage,
+          status,
+          application_date,
+          interview_date,
+          resume_url,
+          created_at
+        `
+        )
+        .gte("created_at", twentyFourHoursAgoString) // Last 24 hours
+        .order("created_at", { ascending: false }); // Most recent first
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        const notifications = data.map((applicant) => {
+          const phTime = convertToPHTime(applicant.created_at);
+          const applicantName =
+            applicant.full_name || applicant.candidate || "New applicant";
+
+          let notificationText = `New applicant: ${applicantName}`;
+          let notificationType = "new_applicant";
+
+          if (applicant.resume_url) {
+            notificationText = `${applicantName} uploaded resume`;
+            notificationType = "resume_uploaded";
+          } else if (applicant.application_date) {
+            notificationText = `${applicantName} submitted application`;
+            notificationType = "application_submitted";
+          }
+
+          return {
+            id: applicant.id,
+            text: notificationText,
+            type: notificationType,
+            timestamp: formatPHTimestamp(applicant.created_at),
+            phTime: phTime,
+            applicantName: applicantName,
+            stage: applicant.stage,
+            status: applicant.status,
+          };
+        });
+
+        setNewApplicantNotifications(notifications);
+
+        // Show browser notification if there are new applicants
+        if (
+          notifications.length > 0 &&
+          "Notification" in window &&
+          Notification.permission === "granted"
+        ) {
+          notifications.forEach((notification) => {
+            new Notification("New Recruitment Activity", {
+              body: notification.text,
+              icon: "/firefighter-icon.png", // Add your icon path here
+            });
+          });
+        }
+      }
+    } catch (error) {
+      console.error("Error checking new applicant notifications:", error);
     }
   };
 
@@ -646,11 +875,17 @@ const MainContent = ({ isCollapsed }) => {
       setPreloaderProgress(65);
       await fetchPendingClearanceRequests();
 
-      setPreloaderProgress(80);
+      setPreloaderProgress(75);
+      await fetchTotalRecruitedApplicants(); // NEW: Fetch recruited applicants
+
+      setPreloaderProgress(85);
       await fetchUpcomingInspections();
 
       setPreloaderProgress(95);
       await fetchRecentActivities();
+
+      // NEW: Check for new applicant notifications
+      await checkNewApplicantNotifications();
 
       setPreloaderProgress(100);
     } catch (error) {
@@ -663,7 +898,23 @@ const MainContent = ({ isCollapsed }) => {
     }
   };
 
+  // NEW: Function to request notification permission
+  const requestNotificationPermission = () => {
+    if ("Notification" in window) {
+      if (Notification.permission === "default") {
+        Notification.requestPermission().then((permission) => {
+          if (permission === "granted") {
+            console.log("Notification permission granted");
+          }
+        });
+      }
+    }
+  };
+
   useEffect(() => {
+    // Request notification permission on component mount
+    requestNotificationPermission();
+
     // Live timestamp interval
     const timeIntervalId = setInterval(() => {
       setCurrentTime(new Date());
@@ -672,7 +923,7 @@ const MainContent = ({ isCollapsed }) => {
     // Fetch initial data
     fetchDashboardData();
 
-    // Optional: Set up real-time subscriptions
+    // Set up real-time subscriptions
     const setupRealtimeSubscriptions = () => {
       // Subscribe to personnel changes
       const personnelChannel = supabase
@@ -748,24 +999,61 @@ const MainContent = ({ isCollapsed }) => {
         )
         .subscribe();
 
+      // NEW: Subscribe to recruitment personnel changes
+      const recruitmentChannel = supabase
+        .channel("recruitment-changes")
+        .on(
+          "postgres_changes",
+          { event: "INSERT", schema: "public", table: "recruitment_personnel" },
+          (payload) => {
+            console.log("New recruitment applicant:", payload.new);
+            fetchTotalRecruitedApplicants();
+            fetchRecentActivities();
+            checkNewApplicantNotifications();
+          }
+        )
+        .on(
+          "postgres_changes",
+          { event: "UPDATE", schema: "public", table: "recruitment_personnel" },
+          (payload) => {
+            console.log("Updated recruitment applicant:", payload.new);
+            fetchTotalRecruitedApplicants();
+            fetchRecentActivities();
+
+            // Check if resume was uploaded
+            if (
+              payload.new.resume_url &&
+              (!payload.old.resume_url ||
+                payload.old.resume_url !== payload.new.resume_url)
+            ) {
+              checkNewApplicantNotifications();
+            }
+          }
+        )
+        .subscribe();
+
       return () => {
         personnelChannel.unsubscribe();
         inventoryChannel.unsubscribe();
         leaveChannel.unsubscribe();
         clearanceChannel.unsubscribe();
         inspectionChannel.unsubscribe();
+        recruitmentChannel.unsubscribe();
       };
     };
 
-    // Uncomment to enable real-time updates
-    // const cleanup = setupRealtimeSubscriptions();
-    // return () => {
-    //   cleanup();
-    //   clearInterval(timeIntervalId);
-    // };
+    // Enable real-time updates
+    const cleanup = setupRealtimeSubscriptions();
+
+    // Set interval to check for new applicants every 5 minutes
+    const notificationInterval = setInterval(() => {
+      checkNewApplicantNotifications();
+    }, 5 * 60 * 1000); // 5 minutes
 
     return () => {
+      cleanup();
       clearInterval(timeIntervalId);
+      clearInterval(notificationInterval);
     };
   }, []);
 
@@ -786,6 +1074,18 @@ const MainContent = ({ isCollapsed }) => {
       <div className="header">
         <h1>Admin Dashboard</h1>
         <p className="pp">Welcome, Admin User</p>
+
+        {/* NEW: Notification badge */}
+        {newApplicantNotifications.length > 0 && (
+          <div className="notification-badge">
+            <span className="notification-count">
+              {newApplicantNotifications.length}
+            </span>
+            <span className="notification-text">
+              New Recruitment Activities
+            </span>
+          </div>
+        )}
       </div>
 
       <div className="dashboard-content">
@@ -912,26 +1212,38 @@ const MainContent = ({ isCollapsed }) => {
               )}
           </div>
 
-          {/* Recruitment module */}
+          {/* NEW: Total Recruited Applicants Card */}
           <div className="stat-card">
-            <div className="stat-icon leave-icon">🤝</div>
+            <div className="stat-icon recruitment-icon">🤝</div>
             <div className="stat-content">
               <h3>Total Recruited Applicants</h3>
               <p className="stat-number">
                 {renderStatValue(
-                  leaveLoading,
-                  leaveError,
-                  pendingLeaveRequests
+                  recruitmentLoading,
+                  recruitmentError,
+                  totalRecruitedApplicants
                 )}
               </p>
               <div className="stat-subtitle">
-                {!leaveLoading && !leaveError && (
-                  <span className="stat-info">Station Applicants</span>
+                {!recruitmentLoading && !recruitmentError && (
+                  <span className="stat-info">
+                    Active recruitment applicants
+                  </span>
                 )}
               </div>
             </div>
-            {!leaveLoading && !leaveError && pendingLeaveRequests > 0 && (
-              <div className="stat-alert">!</div>
+            {!recruitmentLoading &&
+              !recruitmentError &&
+              totalRecruitedApplicants > 0 && (
+                <div className="stat-alert recruitment-alert">
+                  {totalRecruitedApplicants > 99
+                    ? "99+"
+                    : totalRecruitedApplicants}
+                </div>
+              )}
+            {/* NEW: Show notification dot if there are recent applicant activities */}
+            {newApplicantNotifications.length > 0 && (
+              <div className="notification-dot"></div>
             )}
           </div>
         </div>
@@ -970,6 +1282,33 @@ const MainContent = ({ isCollapsed }) => {
                     {pendingClearanceRequests}
                   </span>
                 </div>
+              </div>
+            )}
+          </div>
+
+          {/* NEW: Recruitment Stats */}
+          <div className="stat-detail">
+            <h4>Recruitment Overview</h4>
+            {recruitmentLoading ? (
+              <p className="loading-text">Loading recruitment data...</p>
+            ) : recruitmentError ? (
+              <p className="error-text">Failed to load recruitment data</p>
+            ) : (
+              <div className="stat-breakdown">
+                <div className="breakdown-item">
+                  <span className="breakdown-label">Active Applicants:</span>
+                  <span className="breakdown-value recruitment-value">
+                    {totalRecruitedApplicants}
+                  </span>
+                </div>
+                {newApplicantNotifications.length > 0 && (
+                  <div className="breakdown-item">
+                    <span className="breakdown-label">Recent Activities:</span>
+                    <span className="breakdown-value notification-value">
+                      {newApplicantNotifications.length} new
+                    </span>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -1019,14 +1358,20 @@ const MainContent = ({ isCollapsed }) => {
                 currentActivities.map((activity) => (
                   <div
                     key={activity.id}
-                    className="activity-item"
+                    className={`activity-item ${
+                      activity.type === "recruitment"
+                        ? "recruitment-activity"
+                        : ""
+                    }`}
                     title={`PH Time: ${activity.timestamp}`}
                   >
                     <div className="activity-item-header">
                       <span className="activity-icon">{activity.icon}</span>
                       <div className="activity-time-container">
                         <span className="activity-time">{activity.time}</span>
-                        <span className="activity-type">{activity.type}</span>
+                        <span className={`activity-type ${activity.type}`}>
+                          {activity.type}
+                        </span>
                       </div>
                     </div>
                     <div className="activity-text">{activity.text}</div>
