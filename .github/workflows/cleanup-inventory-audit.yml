@@ -1,11 +1,7 @@
 name: Cleanup Old Inventory Audit Records
 on:
-  # Run annually on January 1st at 02:00 AM Philippine Time (UTC+8)
-  # This corresponds to 18:00 UTC on December 31st
   schedule:
-    - cron: '0 18 31 12 *'  # Runs at 18:00 UTC on December 31st (02:00 AM PH Time Jan 1st)
-  
-  # Allow manual trigger from GitHub UI
+    - cron: '0 18 31 12 *'
   workflow_dispatch:
     inputs:
       dry-run:
@@ -23,25 +19,48 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
       
-      - name: Setup Node.js
+      - name: Setup Node.js 20
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
-          cache: 'npm'
-          cache-dependency-path: 'server/package-lock.json'
+          node-version: '20'
       
-      - name: Install dependencies
-        run: npm ci
-        working-directory: ./server
+      - name: Debug - List ALL secrets (masked)
+        run: |
+          echo "=== Checking Secret Names ==="
+          echo "SUPABASE_URL exists: ${{ secrets.SUPABASE_URL != '' && 'YES' || 'NO' }}"
+          echo "SUPABASE_SERVICE_ROLE_KEY exists: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY != '' && 'YES' || 'NO' }}"
+          
+          echo ""
+          echo "=== Common Variations (check these) ==="
+          echo "supabase_url (lowercase): ${{ secrets.supabase_url != '' && 'YES' || 'NO' }}"
+          echo "supabase_service_role_key (lowercase): ${{ secrets.supabase_service_role_key != '' && 'YES' || 'NO' }}"
+          echo "SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY != '' && 'YES' || 'NO' }}"
+          echo "SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY != '' && 'YES' || 'NO' }}"
+          echo "DATABASE_URL: ${{ secrets.DATABASE_URL != '' && 'YES' || 'NO' }}"
+          
+          echo ""
+          echo "=== Action Environment ==="
+          echo "Environment name: ${{ github.event_name }}"
+          echo "Job environment: ${{ job.environment }}"
+      
+      - name: Install only required packages
+        run: |
+          cd server
+          npm install @supabase/supabase-js dotenv --no-save
       
       - name: Run cleanup script
         env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          # Try different variations of your secret names
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL || secrets.supabase_url || secrets.DATABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY || secrets.supabase_service_role_key || secrets.SUPABASE_SERVICE_KEY || secrets.SUPABASE_ANON_KEY }}
         run: |
+          cd server
+          echo "Testing environment variables..."
+          echo "SUPABASE_URL length: ${#SUPABASE_URL}"
+          echo "SUPABASE_SERVICE_ROLE_KEY length: ${#SUPABASE_SERVICE_ROLE_KEY}"
+          
           if [ "${{ inputs.dry-run }}" = "true" ]; then
             node scripts/cleanup-inventory-audit.js --dry-run
           else
             node scripts/cleanup-inventory-audit.js
           fi
-        working-directory: ./server
