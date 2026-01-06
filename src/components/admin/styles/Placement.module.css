@@ -15,6 +15,19 @@
   align-items: center;
   gap: 10px;
 }
+.animatedEmoji {
+  display: inline-block;
+  animation: bounceUpDown 2s ease-in-out infinite;
+}
+
+@keyframes bounceUpDown {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+} 
 
 /* Filter and Search Controls */
 .PMTFilterType,

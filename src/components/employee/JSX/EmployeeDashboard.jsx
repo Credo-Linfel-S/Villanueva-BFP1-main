@@ -480,9 +480,6 @@ const EmployeeDashboard = () => {
           {/* Quick Stats */}
           <div className={styles.quickStats}>
             <div className={`${styles.statCard} ${styles.equipmentStat}`}>
-              <div className={styles.statIcon}>
-                <i className="fas fa-laptop"></i>
-              </div>
               <div className={styles.statInfo}>
                 <h3>{assignedEquipment.length}</h3>
                 <p>Assigned Equipment</p>
@@ -490,9 +487,6 @@ const EmployeeDashboard = () => {
             </div>
 
             <div className={`${styles.statCard} ${styles.clearanceStat}`}>
-              <div className={styles.statIcon}>
-                <i className="fas fa-file-contract"></i>
-              </div>
               <div className={styles.statInfo}>
                 <h3>{clearanceRequests.length}</h3>
                 <p>Clearance Requests</p>
@@ -501,7 +495,22 @@ const EmployeeDashboard = () => {
 
             <div className={`${styles.statCard} ${styles.rankStat}`}>
               <div className={styles.statIcon}>
-                <i className="fas fa-user-shield"></i>
+                {employee?.rank_image ? (
+                  <img
+                    src={employee.rank_image}
+                    alt={employee?.rank || "Rank"}
+                    className={styles.rankImage}
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.style.display = "none";
+                      // Fallback to icon if image fails to load
+                      e.target.parentElement.innerHTML =
+                        '<i className="fas fa-user-shield"></i>';
+                    }}
+                  />
+                ) : (
+                  <i className="fas fa-user-shield"></i>
+                )}
               </div>
               <div className={styles.statInfo}>
                 <h3>{employee?.rank || "N/A"}</h3>
@@ -799,18 +808,6 @@ const EmployeeDashboard = () => {
                         <span className={styles.badge}>
                           {clearanceRequests.length} requests
                         </span>
-                        <button
-                          className={styles.refreshBtn}
-                          onClick={refreshClearanceData}
-                          disabled={clearanceLoading}
-                        >
-                          <i
-                            className={`fas fa-sync ${
-                              clearanceLoading ? "fa-spin" : ""
-                            }`}
-                          ></i>
-                          Refresh
-                        </button>
                       </div>
                     </div>
 

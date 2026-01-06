@@ -2403,3 +2403,748 @@
   font-size: 12px;
   font-weight: 500;
 }
+
+
+/* ================================
+    RESPONSIVE STYLES FOR 768PX AND BELOW
+  ================================ */
+
+@media (max-width: 768px) {
+  /* General adjustments */
+  .main-content {
+    padding: 10px;
+    margin-left: 0;
+  }
+
+  /* Page header with tabs */
+  .pageHeader {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 15px;
+    margin-bottom: 15px;
+  }
+
+  .pageHeader h1 {
+    font-size: 1.5rem;
+    text-align: center;
+  }
+
+  .tabNavigation {
+    flex-direction: column;
+    width: 100%;
+    gap: 8px;
+  }
+
+  .tabBtn {
+    width: 100%;
+    justify-content: center;
+    padding: 12px 16px;
+  }
+
+  /* Top controls */
+  .IIRTopControls {
+    flex-direction: column;
+    gap: 15px;
+    margin-bottom: 15px;
+  }
+
+  .IIRTableHeader {
+    flex-direction: column;
+    width: 100%;
+    gap: 10px;
+    align-items: stretch;
+  }
+
+  .IIRFilterCategory,
+  .IIRSearchBar {
+    width: 100%;
+    margin-left: 0;
+    margin-bottom: 10px;
+  }
+
+  .IIRSearchBar {
+    width: 100%;
+  }
+
+  /* Summary cards - stack vertically */
+  .IIRSummary {
+    flex-direction: column;
+    margin: 15px 0;
+    gap: 15px;
+  }
+
+  .IIRSummaryCard {
+    min-width: 100%;
+    padding: 20px;
+  }
+
+  .IIRSummaryCard h3 {
+    font-size: 14px;
+  }
+
+  .IIRSummaryCard p {
+    font-size: 20px;
+  }
+
+  /* Table header section */
+  .IIRTableHeaderSection {
+    margin: 20px 0 10px 0;
+  }
+
+  .IIRSHeaders {
+    font-size: 1.2rem;
+    text-align: center;
+  }
+
+  .combinedInfoHeader {
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    font-size: 11px;
+    text-align: center;
+    margin-top: 10px;
+  }
+
+  /* Table container */
+  .IIRTableScrollContainer {
+    width: 100%;
+    margin-left: 0;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .IIRTable {
+    min-width: 1800px; /* Allow horizontal scrolling */
+    font-size: 13px;
+  }
+
+  .IIRTable th,
+  .IIRTable td {
+    padding: 10px 8px;
+    font-size: 13px;
+  }
+
+  .IIRTable th {
+    font-size: 12px;
+    padding: 10px 8px;
+  }
+
+  /* Column width adjustments for mobile */
+  .IIRTable th:nth-child(1),
+  .IIRTable td:nth-child(1) {
+    width: 80px; /* Rank */
+    min-width: 80px;
+  }
+
+  .IIRTable th:nth-child(2),
+  .IIRTable td:nth-child(2) {
+    width: 150px; /* Personnel Name */
+    min-width: 150px;
+  }
+
+  .IIRTable th:nth-child(3),
+  .IIRTable td:nth-child(3) {
+    width: 130px; /* Clearance Type */
+    min-width: 130px;
+  }
+
+  .IIRTable th:nth-child(4),
+  .IIRTable td:nth-child(4) {
+    width: 100px; /* Request Date */
+    min-width: 100px;
+  }
+
+  .IIRTable th:nth-child(5),
+  .IIRTable td:nth-child(5) {
+    width: 100px; /* Status */
+    min-width: 100px;
+  }
+
+  .IIRTable th:nth-child(6),
+  .IIRTable td:nth-child(6) {
+    width: 120px; /* Missing Equipment */
+    min-width: 120px;
+  }
+
+  .IIRTable th:nth-child(7),
+  .IIRTable td:nth-child(7) {
+    width: 100px; /* Total Value */
+    min-width: 100px;
+  }
+
+  .IIRTable th:nth-child(8),
+  .IIRTable td:nth-child(8) {
+    width: 120px; /* Findings */
+    min-width: 120px;
+  }
+
+  .IIRTable th:nth-child(9),
+  .IIRTable td:nth-child(9) {
+    width: 150px; /* Actions */
+    min-width: 150px;
+  }
+
+  /* Cell content adjustments */
+  .rankCell {
+    flex-direction: column;
+    gap: 4px;
+    align-items: center;
+    text-align: center;
+  }
+
+  .personnelInfoCell {
+    align-items: center;
+    text-align: center;
+  }
+
+  .personnelNameRow {
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .personnelFullName {
+    font-size: 13px;
+    text-align: center;
+  }
+
+  .clearanceTypesDisplay {
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+
+  /* Status badges */
+  .IIRStatusBadge {
+    font-size: 11px;
+    padding: 4px 8px;
+  }
+
+  .settlementDate {
+    font-size: 10px;
+  }
+
+  /* Action buttons */
+  .IIRActionButtons {
+    flex-direction: column;
+    gap: 6px;
+    align-items: center;
+  }
+
+  .IIRBtn {
+    width: 100%;
+    padding: 8px 12px;
+    font-size: 12px;
+    text-align: center;
+  }
+
+  .IIRViewDetailsBtn,
+  .IIRApproveBtn {
+    width: 100%;
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+
+  /* Pagination */
+  .IIRPaginationContainer {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 5px;
+    margin: 10px 0;
+  }
+
+  .IIRPaginationBtn {
+    padding: 6px 10px;
+    font-size: 12px;
+    margin: 2px;
+  }
+
+  .IIRPaginationEllipsis {
+    padding: 6px 4px;
+  }
+
+  /* Table footer */
+  .IIRTableFooter {
+    flex-direction: column;
+    gap: 10px;
+    text-align: center;
+    padding: 15px 10px;
+  }
+
+  .IIRResultsInfo {
+    font-size: 12px;
+  }
+
+  .IIRTotalMissing {
+    font-size: 14px;
+  }
+
+  /* Modals */
+  .IIRViewModalOverlay {
+    padding: 10px;
+    align-items: flex-start;
+    padding-top: 20px;
+  }
+
+  .IIRViewModalContent {
+    max-width: 95%;
+    max-height: 85vh;
+    margin: 10px auto;
+  }
+
+  .IIRViewModalHeader {
+    padding: 15px;
+    flex-direction: column;
+    gap: 10px;
+    align-items: stretch;
+  }
+
+  .IIRViewModalTitle {
+    font-size: 1.1rem;
+    text-align: center;
+  }
+
+  .IIRViewModalCloseBtn {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 30px;
+    height: 30px;
+    font-size: 24px;
+  }
+
+  /* Modal body adjustments */
+  .IIRViewModalBody {
+    padding: 15px;
+    max-height: calc(80vh - 100px);
+  }
+
+  .IIRViewModalGrid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .IIRViewModalSection {
+    margin-bottom: 20px;
+  }
+
+  .IIRViewModalSectionTitle {
+    font-size: 1rem;
+    text-align: center;
+  }
+
+  /* Modal tables */
+  .IIRModalTable {
+    font-size: 12px;
+    min-width: 800px; /* Allow horizontal scroll within modal */
+  }
+
+  .IIRModalTable th,
+  .IIRModalTable td {
+    padding: 6px 8px;
+    font-size: 11px;
+  }
+
+  /* Modal actions */
+  .IIRViewModalActions {
+    flex-direction: column;
+    gap: 10px;
+    padding: 15px;
+  }
+
+  .IIRViewModalActions button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  /* Approve modal specific */
+  .approveModalMessage {
+    font-size: 14px;
+    text-align: center;
+  }
+
+  .approveModalBreakdown {
+    padding: 10px;
+  }
+
+  .breakdownItem {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 5px;
+    padding: 8px 0;
+  }
+
+  .breakdownTotal {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 5px;
+    padding: 10px 0;
+  }
+
+  /* Loading state */
+  .IIRLoadingContainer {
+    padding: 30px 20px;
+  }
+
+  .IIRLoadingContainer h2 {
+    font-size: 1.2rem;
+  }
+
+  /* Animated emoji */
+  .IIRAnimatedEmoji {
+    font-size: 36px;
+  }
+
+  /* Scrollbar adjustments for mobile */
+  .IIRTableScrollContainer::-webkit-scrollbar {
+    height: 6px;
+  }
+
+  /* Combined accountability indicators */
+  .combinedAccountabilityBadge {
+    font-size: 10px;
+    padding: 2px 6px;
+    text-align: center;
+  }
+
+  .sourceBreakdown {
+    justify-content: center;
+    gap: 5px;
+  }
+
+  .equipmentSourceSummary {
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .sourceCount {
+    font-size: 9px;
+  }
+
+  /* Multiple clearance indicators */
+  .multipleTypesBadge,
+  .multipleRequestsBadge {
+    font-size: 9px;
+    padding: 1px 4px;
+  }
+
+  /* Tooltips */
+  .multipleClearanceTooltip {
+    position: fixed;
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%);
+    width: 90%;
+    max-width: 300px;
+    z-index: 10000;
+  }
+
+  /* Equipment actions in modal */
+  .equipmentActions {
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .returnBtn {
+    width: 100%;
+    padding: 6px 12px;
+    font-size: 11px;
+    justify-content: center;
+  }
+
+  .settledBadge {
+    font-size: 11px;
+    padding: 4px 8px;
+    text-align: center;
+  }
+
+  /* Return all button */
+  .returnAllBtn:after {
+    display: none; /* Hide tooltip on mobile */
+  }
+}
+
+/* Additional responsive adjustments for very small screens */
+@media (max-width: 480px) {
+  /* Further reduce font sizes */
+  .IIRTable {
+    font-size: 12px;
+    min-width: 1500px;
+  }
+
+  .IIRTable th,
+  .IIRTable td {
+    padding: 8px 6px;
+    font-size: 12px;
+  }
+
+  .IIRTable th {
+    font-size: 11px;
+  }
+
+  /* Hide less important information */
+  .IIRBadgeNumber {
+    font-size: 11px;
+  }
+
+  /* Reduce modal padding */
+  .IIRViewModalContent {
+    padding: 10px;
+  }
+
+  .IIRViewModalBody {
+    padding: 10px;
+  }
+
+  /* Simplify section titles */
+  .IIRViewModalSectionTitle {
+    font-size: 0.9rem;
+  }
+
+  /* Stack amount breakdown */
+  .amountDetails {
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  /* Hide some optional elements */
+  .settlementDate {
+    display: none;
+  }
+
+  /* Adjust approve modal */
+  .approveModalMessage {
+    font-size: 13px;
+  }
+
+  /* Reduce button sizes */
+  .IIRBtn,
+  .IIRViewDetailsBtn,
+  .IIRApproveBtn,
+  .IIRCloseBtn,
+  .returnAllBtn {
+    padding: 8px 10px;
+    font-size: 11px;
+  }
+}
+
+/* Tablets (769px to 1024px) */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .IIRTableScrollContainer {
+    width: 100%;
+  }
+
+  .IIRTable {
+    min-width: 1600px;
+  }
+
+  .IIRSummary {
+    flex-wrap: wrap;
+    flex-direction: row;
+  }
+
+  .IIRSummaryCard {
+    min-width: calc(50% - 10px);
+  }
+
+  .IIRViewModalContent {
+    max-width: 90%;
+  }
+}
+
+/* Ensure touch-friendly interactions */
+@media (max-width: 768px) {
+  button,
+  select,
+  input {
+    min-height: 44px; /* Minimum touch target size */
+  }
+
+  /* Prevent zoom on input focus for iOS */
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+
+  /* Better scrolling on mobile */
+  .IIRTableScrollContainer {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Adjust modal overlays */
+  .IIRViewModalOverlay {
+    align-items: flex-start;
+    padding-top: 20px;
+    overflow-y: auto;
+  }
+
+  /* Ensure long text wraps */
+  .personnelFullName,
+  .clearanceTypeTag,
+  .multipleTypesBadge {
+    word-break: break-word;
+    white-space: normal;
+  }
+
+  /* Make filter dropdowns easier to tap */
+  .IIRFilterCategory {
+    padding: 12px;
+    background-size: 10px;
+    background-position: right 10px center;
+  }
+
+  /* Adjust tab navigation */
+  .tabBtn {
+    min-height: 48px;
+  }
+}
+
+/* Fix for iOS Safari specific issues */
+@supports (-webkit-touch-callout: none) {
+  @media (max-width: 768px) {
+    .IIRTableScrollContainer {
+      -webkit-overflow-scrolling: touch;
+    }
+    
+    .IIRViewModalOverlay {
+      -webkit-overflow-scrolling: touch;
+    }
+    
+    /* Prevent elastic scrolling in modals */
+    .IIRViewModalContent {
+      overscroll-behavior: contain;
+    }
+  }
+}
+
+/* Loading state adjustments */
+@media (max-width: 768px) {
+  .IIRLoadingContainer {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 60vh;
+    text-align: center;
+  }
+
+  .IIRLoadingContainer h2 {
+    font-size: 1.2rem;
+  }
+
+  .IIRLoadingContainer p {
+    font-size: 14px;
+  }
+}
+
+/* Empty state adjustments */
+@media (max-width: 768px) {
+  .IIRTable tbody td[colspan] {
+    padding: 30px 15px;
+  }
+
+  .IIRAnimatedEmoji {
+    display: block;
+    margin: 0 auto 15px;
+  }
+
+  .IIRTable tbody td[colspan] h3 {
+    font-size: 16px;
+  }
+
+  .IIRTable tbody td[colspan] p {
+    font-size: 14px;
+  }
+}
+
+/* Optimize tooltips for touch devices */
+@media (max-width: 768px) {
+  .clearanceTypesDisplay:hover .multipleClearanceTooltip {
+    display: none; /* Hide hover tooltips on mobile */
+  }
+
+  /* Show tooltips on long press or add a click-to-show alternative */
+  .clearanceTypesDisplay {
+    position: relative;
+  }
+
+  .clearanceTypesDisplay:active .multipleClearanceTooltip {
+    display: block;
+  }
+}
+
+/* Improve modal scrolling on mobile */
+@media (max-width: 768px) {
+  .IIRViewModalContent {
+    margin: 10px;
+    max-height: calc(100vh - 40px);
+  }
+
+  .IIRViewModalBody {
+    max-height: calc(100vh - 200px);
+    padding-right: 10px;
+  }
+
+  /* Custom scrollbar for modal body */
+  .IIRViewModalBody::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  .IIRViewModalBody::-webkit-scrollbar-thumb {
+    background: #ccc;
+    border-radius: 2px;
+  }
+}
+
+/* Responsive improvements for modal tables */
+@media (max-width: 768px) {
+  .IIRModalTable {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .IIRModalTable thead,
+  .IIRModalTable tbody,
+  .IIRModalTable th,
+  .IIRModalTable td,
+  .IIRModalTable tr {
+    display: block;
+  }
+
+  .IIRModalTable thead tr {
+    position: absolute;
+    top: -9999px;
+    left: -9999px;
+  }
+
+  .IIRModalTable tr {
+    margin-bottom: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 10px;
+  }
+
+  .IIRModalTable td {
+    border: none;
+    position: relative;
+    padding-left: 50%;
+    text-align: right;
+    margin-bottom: 5px;
+  }
+
+  .IIRModalTable td:before {
+    content: attr(data-label);
+    position: absolute;
+    left: 10px;
+    width: 45%;
+    padding-right: 10px;
+    white-space: nowrap;
+    text-align: left;
+    font-weight: bold;
+  }
+}
+
+/* Add data-labels to your modal table cells in JSX */
+/* You'll need to update your JSX to add data-label attributes to table cells */

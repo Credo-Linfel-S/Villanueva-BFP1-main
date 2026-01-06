@@ -9,6 +9,9 @@ import { supabase } from "../../../lib/supabaseClient.js";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
+// Import the BFPPreloader component
+import BFPPreloader from "../../../components/BFPPreloader"; // Adjust the path as needed
+
 const InspectorInspectionReport = () => {
   const { isSidebarCollapsed } = useSidebar();
   const [reports, setReports] = useState([]);
@@ -19,7 +22,7 @@ const InspectorInspectionReport = () => {
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [selectedReport, setSelectedReport] = useState(null);
   const [error, setError] = useState(null);
-
+  const [isMobile, setIsMobile] = useState(false);
   const [showApproveModal, setShowApproveModal] = useState(false);
   const [selectedReportToApprove, setSelectedReportToApprove] = useState(null);
   const [approveModalDetails, setApproveModalDetails] = useState({
@@ -45,6 +48,17 @@ const InspectorInspectionReport = () => {
 
   // Tab state
   const [activeTab, setActiveTab] = useState("unsettled"); // "unsettled" or "settled"
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
 
   // Load data based on active tab
   useEffect(() => {
@@ -1181,1133 +1195,1148 @@ const InspectorInspectionReport = () => {
     }
   };
 
-  if (loading) {
-    return (
+  // Handle retry for the preloader
+  const handleRetry = () => {
+    setLoading(true);
+    loadAccountabilityData();
+  };
+
+  // Render BFPPreloader at the top of the component
+  return (
+    <>
+      {/* BFP Preloader - shows while loading or on network issues */}
+      <BFPPreloader
+        loading={loading}
+        progress={0}
+        moduleTitle="INSPECTOR REPORTS • Generating Analysis..."
+        onRetry={handleRetry}
+      />
+
+      {/* Main content - only shown when preloader is not visible */}
       <div className={styles.IIRAppContainer}>
+        <Title>Personnel Equipment Accountability | BFP Villanueva</Title>
+        <Meta name="robots" content="noindex, nofollow" />
+        <ToastContainer
+          position={isMobile ? "top-center" : "top-right"}
+          autoClose={3000}
+          hideProgressBar={false}
+          newestOnTop={false}
+          closeOnClick
+          rtl={false}
+          pauseOnFocusLoss
+          draggable
+          pauseOnHover
+          theme="light"
+        />
         <InspectorSidebar />
         <Hamburger />
         <div
           className={`main-content ${isSidebarCollapsed ? "collapsed" : ""}`}
         >
-          <div className={styles.IIRLoadingContainer}>
-            <h2>Loading Accountability Reports...</h2>
-            <p>
-              Please wait while we load personnel equipment accountability data.
-            </p>
+          {/* Page Header with Tabs */}
+          <div className={styles.pageHeader}>
+            <h1>Personnel Equipment Accountability</h1>
+
+            {/* Tab Navigation */}
+            <div className={styles.tabNavigation}>
+              <button
+                className={`${styles.tabBtn} ${
+                  activeTab === "unsettled" ? styles.activeTab : ""
+                }`}
+                onClick={() => setActiveTab("unsettled")}
+              >
+                🔴 Unsettled Accountability
+              </button>
+              <button
+                className={`${styles.tabBtn} ${
+                  activeTab === "settled" ? styles.activeTab : ""
+                }`}
+                onClick={() => setActiveTab("settled")}
+              >
+                ✅ Settled Accountability
+              </button>
+            </div>
           </div>
-        </div>
-      </div>
-    );
-  }
 
-  return (
-    <div className={styles.IIRAppContainer}>
-      <Title>Personnel Equipment Accountability | BFP Villanueva</Title>
-      <Meta name="robots" content="noindex, nofollow" />
-      <ToastContainer
-        position="top-right"
-        autoClose={3000}
-        hideProgressBar={false}
-        newestOnTop={false}
-        closeOnClick
-        rtl={false}
-        pauseOnFocusLoss
-        draggable
-        pauseOnHover
-        theme="light"
-      />
-      <InspectorSidebar />
-      <Hamburger />
-      <div className={`main-content ${isSidebarCollapsed ? "collapsed" : ""}`}>
-        {/* Page Header with Tabs */}
-        <div className={styles.pageHeader}>
-          <h1>Personnel Equipment Accountability</h1>
-
-          {/* Tab Navigation */}
-          <div className={styles.tabNavigation}>
-            <button
-              className={`${styles.tabBtn} ${
-                activeTab === "unsettled" ? styles.activeTab : ""
-              }`}
-              onClick={() => setActiveTab("unsettled")}
-            >
-              🔴 Unsettled Accountability
-            </button>
-            <button
-              className={`${styles.tabBtn} ${
-                activeTab === "settled" ? styles.activeTab : ""
-              }`}
-              onClick={() => setActiveTab("settled")}
-            >
-              ✅ Settled Accountability
-            </button>
-          </div>
-        </div>
-
-        {/* Top Controls */}
-        <div className={styles.IIRTopControls}>
-          <div className={styles.IIRTableHeader}>
-            <select
-              className={styles.IIRFilterCategory}
-              value={filterClearanceType}
-              onChange={(e) => {
-                setFilterClearanceType(e.target.value);
-                setCurrentPage(1);
-              }}
-            >
-              <option value="All">All Clearance Types</option>
-              {Array.from(
-                new Set(
-                  reports.map(
-                    (item) => item.clearanceType || "Equipment Completion"
+          {/* Top Controls */}
+          <div className={styles.IIRTopControls}>
+            <div className={styles.IIRTableHeader}>
+              <select
+                className={styles.IIRFilterCategory}
+                value={filterClearanceType}
+                onChange={(e) => {
+                  setFilterClearanceType(e.target.value);
+                  setCurrentPage(1);
+                }}
+              >
+                <option value="All">All Clearance Types</option>
+                {Array.from(
+                  new Set(
+                    reports.map(
+                      (item) => item.clearanceType || "Equipment Completion"
+                    )
                   )
                 )
-              )
-                .filter(Boolean)
-                .map((type) => (
-                  <option key={type} value={type}>
-                    {type}
-                  </option>
-                ))}
-            </select>
+                  .filter(Boolean)
+                  .map((type) => (
+                    <option key={type} value={type}>
+                      {type}
+                    </option>
+                  ))}
+              </select>
 
-            <input
-              type="text"
-              className={styles.IIRSearchBar}
-              placeholder="🔍 Search personnel..."
-              value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                setCurrentPage(1);
-              }}
-            />
+              <input
+                type="text"
+                className={styles.IIRSearchBar}
+                placeholder="🔍 Search personnel..."
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setCurrentPage(1);
+                }}
+              />
+            </div>
           </div>
-        </div>
 
-        {/* Summary Cards */}
-        <div className={styles.IIRSummary}>
-          <button
-            className={`${styles.IIRSummaryCard} ${styles.IIRTotal} ${
-              currentFilterCard === "total" ? styles.IIRActive : ""
-            }`}
-            onClick={() => handleCardClick("total")}
-          >
-            <h3>Total Personnel</h3>
-            <p>{stats.total}</p>
-          </button>
-          <button
-            className={`${styles.IIRSummaryCard} ${styles.IIRUnsettled} ${
-              currentFilterCard === "unsettled" ? styles.IIRActive : ""
-            }`}
-            onClick={() => handleCardClick("unsettled")}
-          >
-            <h3>Unsettled</h3>
-            <p>{stats.unsettled}</p>
-          </button>
-          <button
-            className={`${styles.IIRSummaryCard} ${styles.IIRSettled} ${
-              currentFilterCard === "settled" ? styles.IIRActive : ""
-            }`}
-            onClick={() => handleCardClick("settled")}
-          >
-            <h3>Settled</h3>
-            <p>{stats.settled}</p>
-          </button>
-          <button className={`${styles.IIRSummaryCard} ${styles.IIRValue}`}>
-            <h3>Total Outstanding</h3>
-            <p>{formatCurrency(stats.totalMissingAmount)}</p>
-          </button>
-        </div>
-
-        {/* Table Header Section */}
-        <div className={styles.IIRTableHeaderSection}>
-          <h2 className={styles.IIRSHeaders}>
-            {activeTab === "unsettled"
-              ? "Unsettled Accountability"
-              : "Settled Accountability"}{" "}
-            Records
-          </h2>
-          <div className={styles.combinedInfoHeader}>
-            <span className={styles.routineIndicator}>
-              🔵 Routine Inspection
-            </span>
-            <span className={styles.clearanceIndicator}>
-              🟣 Clearance Request
-            </span>
-            <span className={styles.combinedIndicator}>
-              ⚡ Combined Accountability
-            </span>
+          {/* Summary Cards */}
+          <div className={styles.IIRSummary}>
+            <button
+              className={`${styles.IIRSummaryCard} ${styles.IIRTotal} ${
+                currentFilterCard === "total" ? styles.IIRActive : ""
+              }`}
+              onClick={() => handleCardClick("total")}
+            >
+              <h3>Total Personnel</h3>
+              <p>{stats.total}</p>
+            </button>
+            <button
+              className={`${styles.IIRSummaryCard} ${styles.IIRUnsettled} ${
+                currentFilterCard === "unsettled" ? styles.IIRActive : ""
+              }`}
+              onClick={() => handleCardClick("unsettled")}
+            >
+              <h3>Unsettled</h3>
+              <p>{stats.unsettled}</p>
+            </button>
+            <button
+              className={`${styles.IIRSummaryCard} ${styles.IIRSettled} ${
+                currentFilterCard === "settled" ? styles.IIRActive : ""
+              }`}
+              onClick={() => handleCardClick("settled")}
+            >
+              <h3>Settled</h3>
+              <p>{stats.settled}</p>
+            </button>
+            <button className={`${styles.IIRSummaryCard} ${styles.IIRValue}`}>
+              <h3>Total Outstanding</h3>
+              <p>{formatCurrency(stats.totalMissingAmount)}</p>
+            </button>
           </div>
-        </div>
 
-        <div
-          className={`${styles.IIRPaginationContainer} ${styles.IIRTopPagination}`}
-        >
-          {renderPaginationButtons()}
-        </div>
+          {/* Table Header Section */}
+          <div className={styles.IIRTableHeaderSection}>
+            <h2 className={styles.IIRSHeaders}>
+              {activeTab === "unsettled"
+                ? "Unsettled Accountability"
+                : "Settled Accountability"}{" "}
+              Records
+            </h2>
+            <div className={styles.combinedInfoHeader}>
+              <span className={styles.routineIndicator}>
+                🔵 Routine Inspection
+              </span>
+              <span className={styles.clearanceIndicator}>
+                🟣 Clearance Request
+              </span>
+              <span className={styles.combinedIndicator}>
+                ⚡ Combined Accountability
+              </span>
+            </div>
+          </div>
 
-        {/* Scrollable Table Container */}
-        <div className={styles.IIRTableScrollContainer}>
-          <table className={styles.IIRTable}>
-            <thead>
-              <tr>
-                <th>Rank</th>
-                <th>Personnel Name</th>
-                <th>Clearance Type</th>
-                <th>Request Date</th>
-                <th>Status</th>
-                <th>Missing Equipment</th>
-                <th>Total Value</th>
-                <th>Findings</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {paginated.length === 0 ? (
+          <div
+            className={`${styles.IIRPaginationContainer} ${styles.IIRTopPagination}`}
+          >
+            {renderPaginationButtons()}
+          </div>
+
+          {/* Scrollable Table Container */}
+          <div className={styles.IIRTableScrollContainer}>
+            <table className={styles.IIRTable}>
+              <thead>
                 <tr>
-                  <td
-                    colSpan="10"
-                    style={{ textAlign: "center", padding: "40px" }}
-                  >
-                    <div style={{ fontSize: "48px", marginBottom: "16px" }}>
-                      <span className={styles.IIRAnimatedEmoji}>
-                        {activeTab === "unsettled" ? "✅" : "📊"}
-                      </span>
-                    </div>
-                    <h3
-                      style={{
-                        fontSize: "18px",
-                        fontWeight: "600",
-                        color: "#2b2b2b",
-                        marginBottom: "8px",
-                      }}
-                    >
-                      {activeTab === "unsettled"
-                        ? "No Unsettled Accountability Found"
-                        : "No Settled Accountability Found"}
-                    </h3>
-                    <p style={{ fontSize: "14px", color: "#999" }}>
-                      {activeTab === "unsettled"
-                        ? "All personnel are settled with their equipment accountability."
-                        : "No settlement records available yet."}
-                    </p>
-                  </td>
+                  <th>Rank</th>
+                  <th>Personnel Name</th>
+                  <th>Clearance Type</th>
+                  <th>Request Date</th>
+                  <th>Status</th>
+                  <th>Missing Equipment</th>
+                  <th>Total Value</th>
+                  <th>Findings</th>
+                  <th>Actions</th>
                 </tr>
-              ) : (
-                paginated.map((report) => {
-                  const routineEquipment = report.missingEquipment.filter(
-                    (eq) => eq.source_type === "routine"
-                  );
-                  const clearanceEquipment = report.missingEquipment.filter(
-                    (eq) => eq.source_type === "clearance-linked"
-                  );
+              </thead>
+              <tbody>
+                {paginated.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan="10"
+                      style={{ textAlign: "center", padding: "40px" }}
+                    >
+                      <div style={{ fontSize: "48px", marginBottom: "16px" }}>
+                        <span className={styles.IIRAnimatedEmoji}>
+                          {activeTab === "unsettled" ? "✅" : "📊"}
+                        </span>
+                      </div>
+                      <h3
+                        style={{
+                          fontSize: "18px",
+                          fontWeight: "600",
+                          color: "#2b2b2b",
+                          marginBottom: "8px",
+                        }}
+                      >
+                        {activeTab === "unsettled"
+                          ? "No Unsettled Accountability Found"
+                          : "No Settled Accountability Found"}
+                      </h3>
+                      <p style={{ fontSize: "14px", color: "#999" }}>
+                        {activeTab === "unsettled"
+                          ? "All personnel are settled with their equipment accountability."
+                          : "No settlement records available yet."}
+                      </p>
+                    </td>
+                  </tr>
+                ) : (
+                  paginated.map((report) => {
+                    const routineEquipment = report.missingEquipment.filter(
+                      (eq) => eq.source_type === "routine"
+                    );
+                    const clearanceEquipment = report.missingEquipment.filter(
+                      (eq) => eq.source_type === "clearance-linked"
+                    );
 
-                  return (
-                    <tr key={report.id || report.personnel_id}>
-                      <td>
-                        <div className={styles.rankCell}>
-                          {report.rank || "N/A"}
-                          {report.rank_image ? (
-                            <img
-                              src={report.rank_image}
-                              alt={report.rank || "Rank"}
-                              className={styles.rankImage}
-                              onError={(e) => {
-                                e.target.style.display = "none";
-                                e.target.nextSibling.style.display =
-                                  "inline-block";
-                              }}
-                            />
-                          ) : null}
-                          <span
-                            className={
-                              report.rank_image
-                                ? styles.rankTextWithImage
-                                : styles.rankText
-                            }
-                          ></span>
-                        </div>
-                      </td>
-                      <td>
-                        <div className={styles.personnelInfoCell}>
-                          <div className={styles.personnelNameRow}>
-                            <strong className={styles.personnelFullName}>
-                              {report.formattedName}
-                            </strong>
-                            {report.badge_number && (
-                              <div className={styles.IIRBadgeNumber}>
-                                Badge: {report.badge_number}
+                    return (
+                      <tr key={report.id || report.personnel_id}>
+                        <td>
+                          <div className={styles.rankCell}>
+                            {report.rank || "N/A"}
+                            {report.rank_image ? (
+                              <img
+                                src={report.rank_image}
+                                alt={report.rank || "Rank"}
+                                className={styles.rankImage}
+                                onError={(e) => {
+                                  e.target.style.display = "none";
+                                  e.target.nextSibling.style.display =
+                                    "inline-block";
+                                }}
+                              />
+                            ) : null}
+                            <span
+                              className={
+                                report.rank_image
+                                  ? styles.rankTextWithImage
+                                  : styles.rankText
+                              }
+                            ></span>
+                          </div>
+                        </td>
+                        <td>
+                          <div className={styles.personnelInfoCell}>
+                            <div className={styles.personnelNameRow}>
+                              <strong className={styles.personnelFullName}>
+                                {report.formattedName}
+                              </strong>
+                              {report.badge_number && (
+                                <div className={styles.IIRBadgeNumber}>
+                                  Badge: {report.badge_number}
+                                </div>
+                              )}
+                            </div>
+
+                            {report.hasCombinedAccountability && (
+                              <div
+                                className={styles.combinedAccountabilityBadge}
+                              >
+                                ⚡ Combined Accountability
                               </div>
                             )}
                           </div>
-
+                        </td>
+                        <td>
+                          <div className={styles.clearanceTypesDisplay}>
+                            {report.clearanceType}
+                            {report.clearanceTypeCount > 1 && (
+                              <span className={styles.multipleTypesBadge}>
+                                ({report.clearanceTypeCount} types)
+                              </span>
+                            )}
+                            {report.clearanceRequestCount > 1 && (
+                              <span className={styles.multipleRequestsBadge}>
+                                🔢 {report.clearanceRequestCount} requests
+                              </span>
+                            )}
+                            {report.hasMultipleClearances && (
+                              <div className={styles.multipleClearanceTooltip}>
+                                <div className={styles.tooltipTitle}>
+                                  Multiple Clearance Requests:
+                                </div>
+                                {report.clearanceRequestIds.map((id, idx) => (
+                                  <div key={idx} className={styles.tooltipItem}>
+                                    Request #{idx + 1}:{" "}
+                                    {report.clearanceTypes[idx] || "Unknown"}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
                           {report.hasCombinedAccountability && (
-                            <div className={styles.combinedAccountabilityBadge}>
-                              ⚡ Combined Accountability
+                            <div className={styles.sourceBreakdown}>
+                              <span className={styles.routineBadge}>
+                                Routine: {routineEquipment.length} item(s)
+                              </span>
+                              <span className={styles.clearanceBadge}>
+                                Clearance: {clearanceEquipment.length} item(s)
+                              </span>
                             </div>
                           )}
-                        </div>
-                      </td>
-                      <td>
+                        </td>
+                        <td>{formatDate(report.requestDate)}</td>
+                        <td>
+                          <span
+                            className={`${
+                              styles.IIRStatusBadge
+                            } ${getStatusBadgeClass(report.status)}`}
+                          >
+                            {report.status}
+                            {report.settlement_date && (
+                              <div className={styles.settlementDate}>
+                                {formatDate(report.settlement_date)}
+                              </div>
+                            )}
+                          </span>
+                        </td>
+                        <td>
+                          {report.missingEquipment.length > 0 ? (
+                            <div className={styles.IIRMissingSection}>
+                              <span className={styles.IIRMissingCount}>
+                                {report.missingEquipment.length} item(s)
+                              </span>
+                              {report.hasCombinedAccountability && (
+                                <div className={styles.equipmentSourceSummary}>
+                                  <span className={styles.routineDot}>🔵</span>
+                                  <span className={styles.sourceCount}>
+                                    {routineEquipment.length} routine
+                                  </span>
+                                  <span className={styles.clearanceDot}>
+                                    🟣
+                                  </span>
+                                  <span className={styles.sourceCount}>
+                                    {clearanceEquipment.length} clearance
+                                  </span>
+                                </div>
+                              )}
+                              <button
+                                className={`${styles.IIRBtn} ${styles.IIRShowMissingBtn}`}
+                                onClick={() => showMissingEquipment(report)}
+                              >
+                                Show Details
+                              </button>
+                            </div>
+                          ) : (
+                            <span className={styles.IIRNoMissing}>
+                              No missing equipment
+                            </span>
+                          )}
+                        </td>
+                        <td>
+                          {report.totalMissingAmount > 0 ? (
+                            <div className={styles.amountBreakdown}>
+                              <span className={styles.IIRTotalPrice}>
+                                {formatCurrency(report.totalMissingAmount)}
+                              </span>
+                              {report.hasCombinedAccountability && (
+                                <div className={styles.amountDetails}>
+                                  <span className={styles.routineAmount}>
+                                    Routine:{" "}
+                                    {formatCurrency(report.routineAmount)}
+                                  </span>
+                                  <span className={styles.clearanceAmount}>
+                                    Clearance:{" "}
+                                    {formatCurrency(report.clearanceAmount)}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <span className={styles.IIRNoPrice}>₱0.00</span>
+                          )}
+                        </td>
+                        <td>
+                          <div className={styles.IIRFindingsPreview}>
+                            {report.findings && report.findings.length > 50
+                              ? `${report.findings.substring(0, 50)}...`
+                              : report.findings || "No findings"}
+                          </div>
+                        </td>
+                        <td>
+                          <div className={styles.IIRActionButtons}>
+                            <button
+                              className={styles.IIRViewDetailsBtn}
+                              onClick={() => showDetails(report)}
+                            >
+                              View Details
+                            </button>
+                            {report.status === "Unsettled" && (
+                              <button
+                                className={styles.IIRApproveBtn}
+                                onClick={() => approveSettlement(report)}
+                              >
+                                {report.hasCombinedAccountability
+                                  ? "⚡ Settle All"
+                                  : "✅ Approve"}
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <div
+            className={`${styles.IIRPaginationContainer} ${styles.IIRBottomPagination}`}
+          >
+            {renderPaginationButtons()}
+          </div>
+
+          {/* Summary Footer */}
+          <div className={styles.IIRTableFooter}>
+            <div className={styles.IIRResultsInfo}>
+              Showing {accountabilityReports.length} personnel with{" "}
+              {activeTab === "unsettled" ? "unsettled" : "settled"}{" "}
+              accountability
+              {stats.unsettled > 0 && activeTab === "unsettled" && (
+                <span className={styles.combinedCount}>
+                  ({stats.unsettled} with combined accountability)
+                </span>
+              )}
+            </div>
+            {activeTab === "unsettled" && (
+              <div className={styles.IIRTotalMissing}>
+                <strong>Total Outstanding Value:</strong>{" "}
+                {formatCurrency(
+                  accountabilityReports.reduce(
+                    (sum, report) => sum + report.totalMissingAmount,
+                    0
+                  )
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Missing Equipment Modal */}
+          {showMissingModal && selectedPersonnel && (
+            <div className={styles.IIRViewModalOverlay}>
+              <div className={styles.IIRViewModalContent}>
+                <div className={styles.IIRViewModalHeader}>
+                  <h3 className={styles.IIRViewModalTitle}>
+                    Missing/Damaged Equipment -{" "}
+                    {selectedPersonnel.personnelName}
+                    {selectedPersonnel.hasCombinedAccountability && (
+                      <span className={styles.combinedModalBadge}>
+                        ⚡ Combined Accountability
+                      </span>
+                    )}
+                  </h3>
+                  <button
+                    className={styles.IIRViewModalCloseBtn}
+                    onClick={() => setShowMissingModal(false)}
+                  >
+                    &times;
+                  </button>
+                </div>
+
+                <div className={styles.IIRViewModalBody}>
+                  <div className={styles.IIRViewModalSection}>
+                    <h4 className={styles.IIRViewModalSectionTitle}>
+                      Personnel Information
+                    </h4>
+                    <div className={styles.IIRViewModalGrid}>
+                      <div className={styles.IIRViewModalField}>
+                        <label>Rank:</label>
+                        <span>{selectedPersonnel.rank}</span>
+                      </div>
+                      <div className={styles.IIRViewModalField}>
+                        <label>Badge Number:</label>
+                        <span>{selectedPersonnel.badge_number || "N/A"}</span>
+                      </div>
+                      <div className={styles.IIRViewModalField}>
+                        <label>Clearance Type:</label>
                         <div className={styles.clearanceTypesDisplay}>
-                          {report.clearanceType}
-                          {report.clearanceTypeCount > 1 && (
+                          <span>{selectedPersonnel.clearanceType}</span>
+                          {selectedPersonnel.clearanceTypeCount > 1 && (
                             <span className={styles.multipleTypesBadge}>
-                              ({report.clearanceTypeCount} types)
+                              ({selectedPersonnel.clearanceTypeCount} types)
                             </span>
                           )}
-                          {report.clearanceRequestCount > 1 && (
+                          {selectedPersonnel.clearanceRequestCount > 1 && (
                             <span className={styles.multipleRequestsBadge}>
-                              🔢 {report.clearanceRequestCount} requests
+                              🔢 {selectedPersonnel.clearanceRequestCount}{" "}
+                              requests
                             </span>
                           )}
-                          {report.hasMultipleClearances && (
+                          {selectedPersonnel.hasMultipleClearances && (
                             <div className={styles.multipleClearanceTooltip}>
                               <div className={styles.tooltipTitle}>
                                 Multiple Clearance Requests:
                               </div>
-                              {report.clearanceRequestIds.map((id, idx) => (
-                                <div key={idx} className={styles.tooltipItem}>
-                                  Request #{idx + 1}:{" "}
-                                  {report.clearanceTypes[idx] || "Unknown"}
-                                </div>
-                              ))}
+                              {selectedPersonnel.clearanceRequestIds.map(
+                                (id, idx) => (
+                                  <div key={idx} className={styles.tooltipItem}>
+                                    Request #{idx + 1}:{" "}
+                                    {selectedPersonnel.clearanceTypes[idx] ||
+                                      "Unknown"}
+                                  </div>
+                                )
+                              )}
                             </div>
                           )}
                         </div>
-                        {report.hasCombinedAccountability && (
-                          <div className={styles.sourceBreakdown}>
-                            <span className={styles.routineBadge}>
-                              Routine: {routineEquipment.length} item(s)
-                            </span>
-                            <span className={styles.clearanceBadge}>
-                              Clearance: {clearanceEquipment.length} item(s)
-                            </span>
-                          </div>
-                        )}
-                      </td>
-                      <td>{formatDate(report.requestDate)}</td>
-                      <td>
+                        {selectedPersonnel.clearanceTypes &&
+                          selectedPersonnel.clearanceTypes.length > 0 && (
+                            <div className={styles.clearanceTypesList}>
+                              {selectedPersonnel.clearanceTypes.map(
+                                (type, index) => (
+                                  <span
+                                    key={index}
+                                    className={styles.clearanceTypeTag}
+                                  >
+                                    {type}
+                                  </span>
+                                )
+                              )}
+                            </div>
+                          )}
+                      </div>
+                      <div className={styles.IIRViewModalField}>
+                        <label>Status:</label>
                         <span
                           className={`${
                             styles.IIRStatusBadge
-                          } ${getStatusBadgeClass(report.status)}`}
+                          } ${getStatusBadgeClass(selectedPersonnel.status)}`}
                         >
-                          {report.status}
-                          {report.settlement_date && (
+                          {selectedPersonnel.status}
+                          {selectedPersonnel.settlement_date && (
                             <div className={styles.settlementDate}>
-                              {formatDate(report.settlement_date)}
+                              Settled:{" "}
+                              {formatDate(selectedPersonnel.settlement_date)}
                             </div>
                           )}
                         </span>
-                      </td>
-                      <td>
-                        {report.missingEquipment.length > 0 ? (
-                          <div className={styles.IIRMissingSection}>
-                            <span className={styles.IIRMissingCount}>
-                              {report.missingEquipment.length} item(s)
-                            </span>
-                            {report.hasCombinedAccountability && (
-                              <div className={styles.equipmentSourceSummary}>
-                                <span className={styles.routineDot}>🔵</span>
-                                <span className={styles.sourceCount}>
-                                  {routineEquipment.length} routine
-                                </span>
-                                <span className={styles.clearanceDot}>🟣</span>
-                                <span className={styles.sourceCount}>
-                                  {clearanceEquipment.length} clearance
-                                </span>
-                              </div>
-                            )}
-                            <button
-                              className={`${styles.IIRBtn} ${styles.IIRShowMissingBtn}`}
-                              onClick={() => showMissingEquipment(report)}
-                            >
-                              Show Details
-                            </button>
-                          </div>
-                        ) : (
-                          <span className={styles.IIRNoMissing}>
-                            No missing equipment
-                          </span>
-                        )}
-                      </td>
-                      <td>
-                        {report.totalMissingAmount > 0 ? (
-                          <div className={styles.amountBreakdown}>
-                            <span className={styles.IIRTotalPrice}>
-                              {formatCurrency(report.totalMissingAmount)}
-                            </span>
-                            {report.hasCombinedAccountability && (
-                              <div className={styles.amountDetails}>
-                                <span className={styles.routineAmount}>
-                                  Routine:{" "}
-                                  {formatCurrency(report.routineAmount)}
-                                </span>
-                                <span className={styles.clearanceAmount}>
-                                  Clearance:{" "}
-                                  {formatCurrency(report.clearanceAmount)}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        ) : (
-                          <span className={styles.IIRNoPrice}>₱0.00</span>
-                        )}
-                      </td>
-                      <td>
-                        <div className={styles.IIRFindingsPreview}>
-                          {report.findings && report.findings.length > 50
-                            ? `${report.findings.substring(0, 50)}...`
-                            : report.findings || "No findings"}
-                        </div>
-                      </td>
-                      <td>
-                        <div className={styles.IIRActionButtons}>
-                          <button
-                            className={styles.IIRViewDetailsBtn}
-                            onClick={() => showDetails(report)}
-                          >
-                            View Details
-                          </button>
-                          {report.status === "Unsettled" && (
-                            <button
-                              className={styles.IIRApproveBtn}
-                              onClick={() => approveSettlement(report)}
-                            >
-                              {report.hasCombinedAccountability
-                                ? "⚡ Settle All"
-                                : "✅ Approve"}
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        <div
-          className={`${styles.IIRPaginationContainer} ${styles.IIRBottomPagination}`}
-        >
-          {renderPaginationButtons()}
-        </div>
-
-        {/* Summary Footer */}
-        <div className={styles.IIRTableFooter}>
-          <div className={styles.IIRResultsInfo}>
-            Showing {accountabilityReports.length} personnel with{" "}
-            {activeTab === "unsettled" ? "unsettled" : "settled"} accountability
-            {stats.unsettled > 0 && activeTab === "unsettled" && (
-              <span className={styles.combinedCount}>
-                ({stats.unsettled} with combined accountability)
-              </span>
-            )}
-          </div>
-          {activeTab === "unsettled" && (
-            <div className={styles.IIRTotalMissing}>
-              <strong>Total Outstanding Value:</strong>{" "}
-              {formatCurrency(
-                accountabilityReports.reduce(
-                  (sum, report) => sum + report.totalMissingAmount,
-                  0
-                )
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Missing Equipment Modal */}
-        {showMissingModal && selectedPersonnel && (
-          <div className={styles.IIRViewModalOverlay}>
-            <div className={styles.IIRViewModalContent}>
-              <div className={styles.IIRViewModalHeader}>
-                <h3 className={styles.IIRViewModalTitle}>
-                  Missing/Damaged Equipment - {selectedPersonnel.personnelName}
-                  {selectedPersonnel.hasCombinedAccountability && (
-                    <span className={styles.combinedModalBadge}>
-                      ⚡ Combined Accountability
-                    </span>
-                  )}
-                </h3>
-                <button
-                  className={styles.IIRViewModalCloseBtn}
-                  onClick={() => setShowMissingModal(false)}
-                >
-                  &times;
-                </button>
-              </div>
-
-              <div className={styles.IIRViewModalBody}>
-                <div className={styles.IIRViewModalSection}>
-                  <h4 className={styles.IIRViewModalSectionTitle}>
-                    Personnel Information
-                  </h4>
-                  <div className={styles.IIRViewModalGrid}>
-                    <div className={styles.IIRViewModalField}>
-                      <label>Rank:</label>
-                      <span>{selectedPersonnel.rank}</span>
-                    </div>
-                    <div className={styles.IIRViewModalField}>
-                      <label>Badge Number:</label>
-                      <span>{selectedPersonnel.badge_number || "N/A"}</span>
-                    </div>
-                    <div className={styles.IIRViewModalField}>
-                      <label>Clearance Type:</label>
-                      <div className={styles.clearanceTypesDisplay}>
-                        <span>{selectedPersonnel.clearanceType}</span>
-                        {selectedPersonnel.clearanceTypeCount > 1 && (
-                          <span className={styles.multipleTypesBadge}>
-                            ({selectedPersonnel.clearanceTypeCount} types)
-                          </span>
-                        )}
-                        {selectedPersonnel.clearanceRequestCount > 1 && (
-                          <span className={styles.multipleRequestsBadge}>
-                            🔢 {selectedPersonnel.clearanceRequestCount}{" "}
-                            requests
-                          </span>
-                        )}
-                        {selectedPersonnel.hasMultipleClearances && (
-                          <div className={styles.multipleClearanceTooltip}>
-                            <div className={styles.tooltipTitle}>
-                              Multiple Clearance Requests:
-                            </div>
-                            {selectedPersonnel.clearanceRequestIds.map(
-                              (id, idx) => (
-                                <div key={idx} className={styles.tooltipItem}>
-                                  Request #{idx + 1}:{" "}
-                                  {selectedPersonnel.clearanceTypes[idx] ||
-                                    "Unknown"}
-                                </div>
-                              )
-                            )}
-                          </div>
-                        )}
                       </div>
-                      {selectedPersonnel.clearanceTypes &&
-                        selectedPersonnel.clearanceTypes.length > 0 && (
-                          <div className={styles.clearanceTypesList}>
-                            {selectedPersonnel.clearanceTypes.map(
-                              (type, index) => (
-                                <span
-                                  key={index}
-                                  className={styles.clearanceTypeTag}
-                                >
-                                  {type}
-                                </span>
-                              )
-                            )}
-                          </div>
-                        )}
-                    </div>
-                    <div className={styles.IIRViewModalField}>
-                      <label>Status:</label>
-                      <span
-                        className={`${
-                          styles.IIRStatusBadge
-                        } ${getStatusBadgeClass(selectedPersonnel.status)}`}
-                      >
-                        {selectedPersonnel.status}
-                        {selectedPersonnel.settlement_date && (
-                          <div className={styles.settlementDate}>
-                            Settled:{" "}
-                            {formatDate(selectedPersonnel.settlement_date)}
-                          </div>
-                        )}
-                      </span>
                     </div>
                   </div>
-                </div>
 
-                {/* Routine Equipment Section */}
-                {missingEquipmentList.routine &&
-                  missingEquipmentList.routine.length > 0 && (
-                    <div className={styles.IIRViewModalSection}>
-                      <h4 className={styles.IIRViewModalSectionTitle}>
-                        <span className={styles.routineSectionHeader}>
-                          🔵 From Routine Inspections (
-                          {missingEquipmentList.routine.length} items)
-                        </span>
-                      </h4>
-                      <div className={styles.IIRViewModalFullWidth}>
-                        <table className={styles.IIRModalTable}>
-                          <thead>
-                            <tr>
-                              <th>Item Name</th>
-                              <th>Item Code</th>
-                              <th>Category</th>
-                              <th>Status</th>
-                              <th>Value</th>
-                              <th>Inspection Date</th>
-                              <th>Actions</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {missingEquipmentList.routine.map(
-                              (equipment, index) => (
-                                <tr key={`routine-${index}`}>
-                                  <td>{equipment.name}</td>
-                                  <td>{equipment.item_code}</td>
-                                  <td>{equipment.category}</td>
-                                  <td>
-                                    <span
-                                      className={`${styles.IIRStatusBadge} ${
-                                        equipment.status === "LOST"
-                                          ? styles.IIRStatusMissing
-                                          : styles.IIRStatusDamaged
-                                      }`}
-                                    >
-                                      {equipment.status}
-                                    </span>
-                                  </td>
-                                  <td>
-                                    {formatCurrency(equipment.price || 0)}
-                                  </td>
-                                  <td>
-                                    {formatDate(equipment.last_inspection_date)}
-                                  </td>
-                                  <td>
-                                    {!equipment.is_settled && (
-                                      <div className={styles.equipmentActions}>
-                                        <button
-                                          className={styles.returnBtn}
-                                          onClick={() =>
-                                            handleEquipmentReturn(
-                                              selectedPersonnel,
-                                              equipment
-                                            )
-                                          }
-                                          title="Mark as returned/repaired"
-                                        >
-                                          ↩️ Return
-                                        </button>
-                                      </div>
-                                    )}
-                                    {equipment.is_settled && (
-                                      <span className={styles.settledBadge}>
-                                        {equipment.status === "RETURNED"
-                                          ? "✅ Returned"
-                                          : "✅ Settled"}
+                  {/* Routine Equipment Section */}
+                  {missingEquipmentList.routine &&
+                    missingEquipmentList.routine.length > 0 && (
+                      <div className={styles.IIRViewModalSection}>
+                        <h4 className={styles.IIRViewModalSectionTitle}>
+                          <span className={styles.routineSectionHeader}>
+                            🔵 From Routine Inspections (
+                            {missingEquipmentList.routine.length} items)
+                          </span>
+                        </h4>
+                        <div className={styles.IIRViewModalFullWidth}>
+                          <table className={styles.IIRModalTable}>
+                            <thead>
+                              <tr>
+                                <th>Item Name</th>
+                                <th>Item Code</th>
+                                <th>Category</th>
+                                <th>Status</th>
+                                <th>Value</th>
+                                <th>Inspection Date</th>
+                                <th>Actions</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {missingEquipmentList.routine.map(
+                                (equipment, index) => (
+                                  <tr key={`routine-${index}`}>
+                                    <td>{equipment.name}</td>
+                                    <td>{equipment.item_code}</td>
+                                    <td>{equipment.category}</td>
+                                    <td>
+                                      <span
+                                        className={`${styles.IIRStatusBadge} ${
+                                          equipment.status === "LOST"
+                                            ? styles.IIRStatusMissing
+                                            : styles.IIRStatusDamaged
+                                        }`}
+                                      >
+                                        {equipment.status}
                                       </span>
+                                    </td>
+                                    <td>
+                                      {formatCurrency(equipment.price || 0)}
+                                    </td>
+                                    <td>
+                                      {formatDate(
+                                        equipment.last_inspection_date
+                                      )}
+                                    </td>
+                                    <td>
+                                      {!equipment.is_settled && (
+                                        <div
+                                          className={styles.equipmentActions}
+                                        >
+                                          <button
+                                            className={styles.returnBtn}
+                                            onClick={() =>
+                                              handleEquipmentReturn(
+                                                selectedPersonnel,
+                                                equipment
+                                              )
+                                            }
+                                            title="Mark as returned/repaired"
+                                          >
+                                            ↩️ Return
+                                          </button>
+                                        </div>
+                                      )}
+                                      {equipment.is_settled && (
+                                        <span className={styles.settledBadge}>
+                                          {equipment.status === "RETURNED"
+                                            ? "✅ Returned"
+                                            : "✅ Settled"}
+                                        </span>
+                                      )}
+                                    </td>
+                                  </tr>
+                                )
+                              )}
+                            </tbody>
+                            <tfoot>
+                              <tr>
+                                <td colSpan="4" className={styles.sourceTotal}>
+                                  <strong>Routine Subtotal:</strong>
+                                </td>
+                                <td className={styles.sourceTotalAmount}>
+                                  <strong>
+                                    {formatCurrency(
+                                      missingEquipmentList.routine.reduce(
+                                        (sum, eq) => sum + (eq.price || 0),
+                                        0
+                                      )
                                     )}
-                                  </td>
-                                </tr>
-                              )
-                            )}
-                          </tbody>
-                          <tfoot>
-                            <tr>
-                              <td colSpan="4" className={styles.sourceTotal}>
-                                <strong>Routine Subtotal:</strong>
-                              </td>
-                              <td className={styles.sourceTotalAmount}>
-                                <strong>
-                                  {formatCurrency(
-                                    missingEquipmentList.routine.reduce(
-                                      (sum, eq) => sum + (eq.price || 0),
-                                      0
-                                    )
-                                  )}
-                                </strong>
-                              </td>
-                              <td colSpan="2"></td>
-                            </tr>
-                          </tfoot>
-                        </table>
-                      </div>
-                    </div>
-                  )}
-
-                {/* Clearance Equipment Section */}
-                {missingEquipmentList.clearance &&
-                  missingEquipmentList.clearance.length > 0 && (
-                    <div className={styles.IIRViewModalSection}>
-                      <h4 className={styles.IIRViewModalSectionTitle}>
-                        <span className={styles.clearanceSectionHeader}>
-                          🟣 From Clearance Request (
-                          {missingEquipmentList.clearance.length} items)
-                        </span>
-                      </h4>
-                      <div className={styles.IIRViewModalFullWidth}>
-                        <table className={styles.IIRModalTable}>
-                          <thead>
-                            <tr>
-                              <th>Item Name</th>
-                              <th>Item Code</th>
-                              <th>Category</th>
-                              <th>Status</th>
-                              <th>Value</th>
-                              <th>Inspection Date</th>
-                              <th>Clearance Type</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {missingEquipmentList.clearance.map(
-                              (equipment, index) => (
-                                <tr key={`clearance-${index}`}>
-                                  <td>{equipment.name}</td>
-                                  <td>{equipment.item_code}</td>
-                                  <td>{equipment.category}</td>
-                                  <td>
-                                    <span
-                                      className={`${styles.IIRStatusBadge} ${
-                                        equipment.status === "LOST"
-                                          ? styles.IIRStatusMissing
-                                          : styles.IIRStatusDamaged
-                                      }`}
-                                    >
-                                      {equipment.status}
-                                    </span>
-                                  </td>
-                                  <td>
-                                    {formatCurrency(equipment.price || 0)}
-                                  </td>
-                                  <td>
-                                    {formatDate(equipment.last_inspection_date)}
-                                  </td>
-                                  <td>{equipment.clearance_type || "N/A"}</td>
-                                </tr>
-                              )
-                            )}
-                          </tbody>
-                          <tfoot>
-                            <tr>
-                              <td colSpan="4" className={styles.sourceTotal}>
-                                <strong>Clearance Subtotal:</strong>
-                              </td>
-                              <td className={styles.sourceTotalAmount}>
-                                <strong>
-                                  {formatCurrency(
-                                    missingEquipmentList.clearance.reduce(
-                                      (sum, eq) => sum + (eq.price || 0),
-                                      0
-                                    )
-                                  )}
-                                </strong>
-                              </td>
-                              <td colSpan="2"></td>
-                            </tr>
-                          </tfoot>
-                        </table>
-                      </div>
-                    </div>
-                  )}
-
-                <div className={styles.IIRViewModalSection}>
-                  <h4 className={styles.IIRViewModalSectionTitle}>
-                    Financial Summary
-                  </h4>
-                  <div className={styles.IIRViewModalGrid}>
-                    <div className={styles.IIRViewModalField}>
-                      <label>Total Items:</label>
-                      <span>{missingEquipmentList.all?.length || 0}</span>
-                    </div>
-                    {missingEquipmentList.routine &&
-                      missingEquipmentList.routine.length > 0 && (
-                        <div className={styles.IIRViewModalField}>
-                          <label>Routine Items:</label>
-                          <span className={styles.routineValue}>
-                            {missingEquipmentList.routine.length} item(s)
-                          </span>
+                                  </strong>
+                                </td>
+                                <td colSpan="2"></td>
+                              </tr>
+                            </tfoot>
+                          </table>
                         </div>
-                      )}
-                    {missingEquipmentList.clearance &&
-                      missingEquipmentList.clearance.length > 0 && (
-                        <div className={styles.IIRViewModalField}>
-                          <label>Clearance Items:</label>
-                          <span className={styles.clearanceValue}>
-                            {missingEquipmentList.clearance.length} item(s)
+                      </div>
+                    )}
+
+                  {/* Clearance Equipment Section */}
+                  {missingEquipmentList.clearance &&
+                    missingEquipmentList.clearance.length > 0 && (
+                      <div className={styles.IIRViewModalSection}>
+                        <h4 className={styles.IIRViewModalSectionTitle}>
+                          <span className={styles.clearanceSectionHeader}>
+                            🟣 From Clearance Request (
+                            {missingEquipmentList.clearance.length} items)
                           </span>
+                        </h4>
+                        <div className={styles.IIRViewModalFullWidth}>
+                          <table className={styles.IIRModalTable}>
+                            <thead>
+                              <tr>
+                                <th>Item Name</th>
+                                <th>Item Code</th>
+                                <th>Category</th>
+                                <th>Status</th>
+                                <th>Value</th>
+                                <th>Inspection Date</th>
+                                <th>Clearance Type</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {missingEquipmentList.clearance.map(
+                                (equipment, index) => (
+                                  <tr key={`clearance-${index}`}>
+                                    <td>{equipment.name}</td>
+                                    <td>{equipment.item_code}</td>
+                                    <td>{equipment.category}</td>
+                                    <td>
+                                      <span
+                                        className={`${styles.IIRStatusBadge} ${
+                                          equipment.status === "LOST"
+                                            ? styles.IIRStatusMissing
+                                            : styles.IIRStatusDamaged
+                                        }`}
+                                      >
+                                        {equipment.status}
+                                      </span>
+                                    </td>
+                                    <td>
+                                      {formatCurrency(equipment.price || 0)}
+                                    </td>
+                                    <td>
+                                      {formatDate(
+                                        equipment.last_inspection_date
+                                      )}
+                                    </td>
+                                    <td>{equipment.clearance_type || "N/A"}</td>
+                                  </tr>
+                                )
+                              )}
+                            </tbody>
+                            <tfoot>
+                              <tr>
+                                <td colSpan="4" className={styles.sourceTotal}>
+                                  <strong>Clearance Subtotal:</strong>
+                                </td>
+                                <td className={styles.sourceTotalAmount}>
+                                  <strong>
+                                    {formatCurrency(
+                                      missingEquipmentList.clearance.reduce(
+                                        (sum, eq) => sum + (eq.price || 0),
+                                        0
+                                      )
+                                    )}
+                                  </strong>
+                                </td>
+                                <td colSpan="2"></td>
+                              </tr>
+                            </tfoot>
+                          </table>
                         </div>
-                      )}
-                    <div className={styles.IIRViewModalField}>
-                      <label>Total Value:</label>
-                      <span style={{ color: "#dc3545", fontWeight: "bold" }}>
-                        {formatCurrency(selectedPersonnel.totalMissingAmount)}
-                      </span>
-                    </div>
-                    {selectedPersonnel.is_settled && (
-                      <div className={styles.IIRViewModalField}>
-                        <label>Settlement Method:</label>
-                        <span>
-                          {selectedPersonnel.settlement_method ||
-                            "Cash Payment"}
-                        </span>
                       </div>
                     )}
-                  </div>
-                </div>
-              </div>
 
-              <div className={styles.IIRViewModalActions}>
-                <button
-                  className={styles.IIRCloseBtn}
-                  onClick={() => setShowMissingModal(false)}
-                >
-                  Close
-                </button>
-
-                {selectedPersonnel.status === "Unsettled" && (
-                  <>
-                    <button
-                      className={styles.returnAllBtn}
-                      onClick={() => {
-                        if (
-                          window.confirm(
-                            `Return ALL equipment for ${selectedPersonnel.personnelName}?`
-                          )
-                        ) {
-                          handleReturnAllEquipment(selectedPersonnel);
-                          setShowMissingModal(false);
-                        }
-                      }}
-                    >
-                      ↩️ Return All
-                    </button>
-                    <button
-                      className={styles.IIRApproveBtn}
-                      onClick={() => {
-                        setShowMissingModal(false);
-                        approveSettlement(selectedPersonnel);
-                      }}
-                    >
-                      {selectedPersonnel.hasCombinedAccountability
-                        ? "⚡ Settle All Accountability"
-                        : "✅ Approve"}
-                    </button>
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Approve Settlement Modal */}
-        {showApproveModal && (
-          <div className={styles.IIRViewModalOverlay}>
-            <div
-              className={styles.IIRViewModalContent}
-              style={{ maxWidth: "500px" }}
-            >
-              <div className={styles.IIRViewModalHeader}>
-                <h3 className={styles.IIRViewModalTitle}>
-                  {approveModalDetails.title}
-                </h3>
-                <button
-                  className={styles.IIRViewModalCloseBtn}
-                  onClick={() => {
-                    setShowApproveModal(false);
-                    setSelectedReportToApprove(null);
-                  }}
-                >
-                  &times;
-                </button>
-              </div>
-
-              <div className={styles.IIRViewModalBody}>
-                <div className={styles.approveModalIcon}>
-                  {approveModalDetails.hasCombinedAccountability ? (
-                    <div className={styles.combinedModalIcon}>⚡</div>
-                  ) : (
-                    <div className={styles.approveModalIcon}>✅</div>
-                  )}
-                </div>
-
-                <div
-                  className={styles.approveModalMessage}
-                  dangerouslySetInnerHTML={{
-                    __html: approveModalDetails.message,
-                  }}
-                />
-
-                {approveModalDetails.hasCombinedAccountability && (
-                  <div className={styles.approveModalBreakdown}>
-                    <div className={styles.breakdownItem}>
-                      <span className={styles.routineDot}>🔵</span>
-                      <span>Routine Inspection:</span>
-                      <strong>
-                        {formatCurrency(approveModalDetails.routineAmount)}
-                      </strong>
-                    </div>
-                    <div className={styles.breakdownItem}>
-                      <span className={styles.clearanceDot}>🟣</span>
-                      <span>Clearance Request:</span>
-                      <strong>
-                        {formatCurrency(approveModalDetails.clearanceAmount)}
-                      </strong>
-                    </div>
-                    <div className={styles.breakdownTotal}>
-                      <span className={styles.combinedDot}>⚡</span>
-                      <span>Total Amount:</span>
-                      <strong style={{ color: "#dc3545" }}>
-                        {formatCurrency(approveModalDetails.totalAmount)}
-                      </strong>
-                    </div>
-                  </div>
-                )}
-
-                <div className={styles.approveModalWarning}>
-                  ⚠️ <strong>This action cannot be undone.</strong> Please
-                  verify the details before proceeding.
-                </div>
-              </div>
-
-              <div className={styles.IIRViewModalActions}>
-                <button
-                  className={styles.IIRCancelBtn}
-                  onClick={() => {
-                    setShowApproveModal(false);
-                    setSelectedReportToApprove(null);
-                  }}
-                >
-                  ❌ Cancel
-                </button>
-                <button
-                  className={styles.IIRConfirmBtn}
-                  onClick={handleConfirmApproval}
-                >
-                  ✅ Confirm Approval
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Details Modal */}
-        {showDetailsModal && selectedReport && (
-          <div className={styles.IIRViewModalOverlay}>
-            <div
-              className={styles.IIRViewModalContent}
-              style={{ maxWidth: "800px" }}
-            >
-              <div className={styles.IIRViewModalHeader}>
-                <h3 className={styles.IIRViewModalTitle}>
-                  Complete Details - {selectedReport.personnelName}
-                  {selectedReport.hasCombinedAccountability && (
-                    <span className={styles.combinedModalBadge}>
-                      ⚡ Combined Accountability
-                    </span>
-                  )}
-                </h3>
-                <button
-                  className={styles.IIRViewModalCloseBtn}
-                  onClick={() => setShowDetailsModal(false)}
-                >
-                  &times;
-                </button>
-              </div>
-
-              <div className={styles.IIRViewModalBody}>
-                <div className={styles.IIRViewModalSection}>
-                  <h4 className={styles.IIRViewModalSectionTitle}>
-                    Personnel Information
-                  </h4>
-                  <div className={styles.IIRViewModalGrid}>
-                    <div className={styles.IIRViewModalField}>
-                      <label>Name:</label>
-                      <span>{selectedReport.personnelName}</span>
-                    </div>
-                    <div className={styles.IIRViewModalField}>
-                      <label>Rank:</label>
-                      <span>{selectedReport.rank}</span>
-                    </div>
-                    <div className={styles.IIRViewModalField}>
-                      <label>Badge Number:</label>
-                      <span>{selectedReport.badge_number || "N/A"}</span>
-                    </div>
-                    <div className={styles.IIRViewModalField}>
-                      <label>Clearance Type:</label>
-                      <div className={styles.clearanceTypesDisplay}>
-                        <span>{selectedReport.clearanceType}</span>
-                        {selectedReport.clearanceTypeCount > 1 && (
-                          <span className={styles.multipleTypesBadge}>
-                            ({selectedReport.clearanceTypeCount} types)
-                          </span>
-                        )}
-                        {selectedReport.clearanceRequestCount > 1 && (
-                          <span className={styles.multipleRequestsBadge}>
-                            🔢 {selectedReport.clearanceRequestCount} requests
-                          </span>
-                        )}
-                        {selectedReport.hasMultipleClearances && (
-                          <div className={styles.multipleClearanceTooltip}>
-                            <div className={styles.tooltipTitle}>
-                              Multiple Clearance Requests:
-                            </div>
-                            {selectedReport.clearanceRequestIds.map(
-                              (id, idx) => (
-                                <div key={idx} className={styles.tooltipItem}>
-                                  Request #{idx + 1}:{" "}
-                                  {selectedReport.clearanceTypes[idx] ||
-                                    "Unknown"}
-                                </div>
-                              )
-                            )}
-                          </div>
-                        )}
-                      </div>
-                      {selectedReport.clearanceTypes &&
-                        selectedReport.clearanceTypes.length > 0 && (
-                          <div className={styles.clearanceTypesList}>
-                            {selectedReport.clearanceTypes.map(
-                              (type, index) => (
-                                <span
-                                  key={index}
-                                  className={styles.clearanceTypeTag}
-                                >
-                                  {type}
-                                </span>
-                              )
-                            )}
-                          </div>
-                        )}
-                    </div>
-                  </div>
-                </div>
-
-                <div className={styles.IIRViewModalSection}>
-                  <h4 className={styles.IIRViewModalSectionTitle}>
-                    Account Information
-                  </h4>
-                  <div className={styles.IIRViewModalGrid}>
-                    <div className={styles.IIRViewModalField}>
-                      <label>Request Date:</label>
-                      <span>{formatDate(selectedReport.requestDate)}</span>
-                    </div>
-                    <div className={styles.IIRViewModalField}>
-                      <label>Status:</label>
-                      <span
-                        className={`${
-                          styles.IIRStatusBadge
-                        } ${getStatusBadgeClass(selectedReport.status)}`}
-                      >
-                        {selectedReport.status}
-                      </span>
-                    </div>
-                    <div className={styles.IIRViewModalField}>
-                      <label>Clearance Status:</label>
-                      <span>{selectedReport.clearance_status || "N/A"}</span>
-                    </div>
-                    {selectedReport.settlement_date && (
-                      <div className={styles.IIRViewModalField}>
-                        <label>Settlement Date:</label>
-                        <span>
-                          {formatDate(selectedReport.settlement_date)}
-                        </span>
-                      </div>
-                    )}
-                    {selectedReport.settlement_method && (
-                      <div className={styles.IIRViewModalField}>
-                        <label>Settlement Method:</label>
-                        <span>{selectedReport.settlement_method}</span>
-                      </div>
-                    )}
-                    {selectedReport.hasCombinedAccountability && (
-                      <div className={styles.IIRViewModalField}>
-                        <label>Accountability Type:</label>
-                        <span className={styles.combinedType}>
-                          ⚡ Combined (Routine + Clearance)
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className={styles.IIRViewModalSection}>
-                  <h4 className={styles.IIRViewModalSectionTitle}>
-                    Findings Report
-                  </h4>
-                  <div className={styles.IIRViewModalFullWidth}>
-                    <div className={styles.IIRViewModalField}>
-                      <div className={styles.IIRViewModalTextContent}>
-                        {selectedReport.findings || "No findings recorded."}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {selectedReport.missingEquipment.length > 0 && (
                   <div className={styles.IIRViewModalSection}>
                     <h4 className={styles.IIRViewModalSectionTitle}>
-                      Missing/Damaged Equipment Summary
+                      Financial Summary
                     </h4>
                     <div className={styles.IIRViewModalGrid}>
                       <div className={styles.IIRViewModalField}>
                         <label>Total Items:</label>
-                        <span>{selectedReport.missingEquipment.length}</span>
+                        <span>{missingEquipmentList.all?.length || 0}</span>
                       </div>
-                      {selectedReport.routineEquipmentCount > 0 && (
-                        <div className={styles.IIRViewModalField}>
-                          <label>Routine Items:</label>
-                          <span className={styles.routineValue}>
-                            {selectedReport.routineEquipmentCount} item(s)
-                          </span>
-                        </div>
-                      )}
-                      {selectedReport.clearanceEquipmentCount > 0 && (
-                        <div className={styles.IIRViewModalField}>
-                          <label>Clearance Items:</label>
-                          <span className={styles.clearanceValue}>
-                            {selectedReport.clearanceEquipmentCount} item(s)
-                          </span>
-                        </div>
-                      )}
+                      {missingEquipmentList.routine &&
+                        missingEquipmentList.routine.length > 0 && (
+                          <div className={styles.IIRViewModalField}>
+                            <label>Routine Items:</label>
+                            <span className={styles.routineValue}>
+                              {missingEquipmentList.routine.length} item(s)
+                            </span>
+                          </div>
+                        )}
+                      {missingEquipmentList.clearance &&
+                        missingEquipmentList.clearance.length > 0 && (
+                          <div className={styles.IIRViewModalField}>
+                            <label>Clearance Items:</label>
+                            <span className={styles.clearanceValue}>
+                              {missingEquipmentList.clearance.length} item(s)
+                            </span>
+                          </div>
+                        )}
                       <div className={styles.IIRViewModalField}>
                         <label>Total Value:</label>
                         <span style={{ color: "#dc3545", fontWeight: "bold" }}>
-                          {formatCurrency(selectedReport.totalMissingAmount)}
+                          {formatCurrency(selectedPersonnel.totalMissingAmount)}
                         </span>
                       </div>
-                      {selectedReport.hasCombinedAccountability && (
-                        <>
-                          <div className={styles.IIRViewModalField}>
-                            <label>Routine Value:</label>
-                            <span className={styles.routineAmount}>
-                              {formatCurrency(selectedReport.routineAmount)}
-                            </span>
-                          </div>
-                          <div className={styles.IIRViewModalField}>
-                            <label>Clearance Value:</label>
-                            <span className={styles.clearanceAmount}>
-                              {formatCurrency(selectedReport.clearanceAmount)}
-                            </span>
-                          </div>
-                        </>
+                      {selectedPersonnel.is_settled && (
+                        <div className={styles.IIRViewModalField}>
+                          <label>Settlement Method:</label>
+                          <span>
+                            {selectedPersonnel.settlement_method ||
+                              "Cash Payment"}
+                          </span>
+                        </div>
                       )}
                     </div>
                   </div>
-                )}
-              </div>
+                </div>
 
-              <div className={styles.IIRViewModalActions}>
-                <button
-                  className={styles.IIRCloseBtn}
-                  onClick={() => setShowDetailsModal(false)}
-                >
-                  Close
-                </button>
-                {selectedReport.status === "Unsettled" && (
+                <div className={styles.IIRViewModalActions}>
                   <button
-                    className={styles.IIRApproveBtn}
-                    onClick={() => {
-                      setShowDetailsModal(false);
-                      approveSettlement(selectedReport);
-                    }}
+                    className={styles.IIRCloseBtn}
+                    onClick={() => setShowMissingModal(false)}
                   >
-                    {selectedReport.hasCombinedAccountability
-                      ? "Settle All Accountability"
-                      : "Approve Settlement"}
+                    Close
                   </button>
-                )}
+
+                  {selectedPersonnel.status === "Unsettled" && (
+                    <>
+                      <button
+                        className={styles.returnAllBtn}
+                        onClick={() => {
+                          if (
+                            window.confirm(
+                              `Return ALL equipment for ${selectedPersonnel.personnelName}?`
+                            )
+                          ) {
+                            handleReturnAllEquipment(selectedPersonnel);
+                            setShowMissingModal(false);
+                          }
+                        }}
+                      >
+                        ↩️ Return All
+                      </button>
+                      <button
+                        className={styles.IIRApproveBtn}
+                        onClick={() => {
+                          setShowMissingModal(false);
+                          approveSettlement(selectedPersonnel);
+                        }}
+                      >
+                        {selectedPersonnel.hasCombinedAccountability
+                          ? "⚡ Settle All Accountability"
+                          : "✅ Approve"}
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
+
+          {/* Approve Settlement Modal */}
+          {showApproveModal && (
+            <div className={styles.IIRViewModalOverlay}>
+              <div
+                className={styles.IIRViewModalContent}
+                style={{ maxWidth: "500px" }}
+              >
+                <div className={styles.IIRViewModalHeader}>
+                  <h3 className={styles.IIRViewModalTitle}>
+                    {approveModalDetails.title}
+                  </h3>
+                  <button
+                    className={styles.IIRViewModalCloseBtn}
+                    onClick={() => {
+                      setShowApproveModal(false);
+                      setSelectedReportToApprove(null);
+                    }}
+                  >
+                    &times;
+                  </button>
+                </div>
+
+                <div className={styles.IIRViewModalBody}>
+                  <div className={styles.approveModalIcon}>
+                    {approveModalDetails.hasCombinedAccountability ? (
+                      <div className={styles.combinedModalIcon}>⚡</div>
+                    ) : (
+                      <div className={styles.approveModalIcon}>✅</div>
+                    )}
+                  </div>
+
+                  <div
+                    className={styles.approveModalMessage}
+                    dangerouslySetInnerHTML={{
+                      __html: approveModalDetails.message,
+                    }}
+                  />
+
+                  {approveModalDetails.hasCombinedAccountability && (
+                    <div className={styles.approveModalBreakdown}>
+                      <div className={styles.breakdownItem}>
+                        <span className={styles.routineDot}>🔵</span>
+                        <span>Routine Inspection:</span>
+                        <strong>
+                          {formatCurrency(approveModalDetails.routineAmount)}
+                        </strong>
+                      </div>
+                      <div className={styles.breakdownItem}>
+                        <span className={styles.clearanceDot}>🟣</span>
+                        <span>Clearance Request:</span>
+                        <strong>
+                          {formatCurrency(approveModalDetails.clearanceAmount)}
+                        </strong>
+                      </div>
+                      <div className={styles.breakdownTotal}>
+                        <span className={styles.combinedDot}>⚡</span>
+                        <span>Total Amount:</span>
+                        <strong style={{ color: "#dc3545" }}>
+                          {formatCurrency(approveModalDetails.totalAmount)}
+                        </strong>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className={styles.approveModalWarning}>
+                    ⚠️ <strong>This action cannot be undone.</strong> Please
+                    verify the details before proceeding.
+                  </div>
+                </div>
+
+                <div className={styles.IIRViewModalActions}>
+                  <button
+                    className={styles.IIRCancelBtn}
+                    onClick={() => {
+                      setShowApproveModal(false);
+                      setSelectedReportToApprove(null);
+                    }}
+                  >
+                    ❌ Cancel
+                  </button>
+                  <button
+                    className={styles.IIRConfirmBtn}
+                    onClick={handleConfirmApproval}
+                  >
+                    ✅ Confirm Approval
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Details Modal */}
+          {showDetailsModal && selectedReport && (
+            <div className={styles.IIRViewModalOverlay}>
+              <div
+                className={styles.IIRViewModalContent}
+                style={{ maxWidth: "800px" }}
+              >
+                <div className={styles.IIRViewModalHeader}>
+                  <h3 className={styles.IIRViewModalTitle}>
+                    Complete Details - {selectedReport.personnelName}
+                    {selectedReport.hasCombinedAccountability && (
+                      <span className={styles.combinedModalBadge}>
+                        ⚡ Combined Accountability
+                      </span>
+                    )}
+                  </h3>
+                  <button
+                    className={styles.IIRViewModalCloseBtn}
+                    onClick={() => setShowDetailsModal(false)}
+                  >
+                    &times;
+                  </button>
+                </div>
+
+                <div className={styles.IIRViewModalBody}>
+                  <div className={styles.IIRViewModalSection}>
+                    <h4 className={styles.IIRViewModalSectionTitle}>
+                      Personnel Information
+                    </h4>
+                    <div className={styles.IIRViewModalGrid}>
+                      <div className={styles.IIRViewModalField}>
+                        <label>Name:</label>
+                        <span>{selectedReport.personnelName}</span>
+                      </div>
+                      <div className={styles.IIRViewModalField}>
+                        <label>Rank:</label>
+                        <span>{selectedReport.rank}</span>
+                      </div>
+                      <div className={styles.IIRViewModalField}>
+                        <label>Badge Number:</label>
+                        <span>{selectedReport.badge_number || "N/A"}</span>
+                      </div>
+                      <div className={styles.IIRViewModalField}>
+                        <label>Clearance Type:</label>
+                        <div className={styles.clearanceTypesDisplay}>
+                          <span>{selectedReport.clearanceType}</span>
+                          {selectedReport.clearanceTypeCount > 1 && (
+                            <span className={styles.multipleTypesBadge}>
+                              ({selectedReport.clearanceTypeCount} types)
+                            </span>
+                          )}
+                          {selectedReport.clearanceRequestCount > 1 && (
+                            <span className={styles.multipleRequestsBadge}>
+                              🔢 {selectedReport.clearanceRequestCount} requests
+                            </span>
+                          )}
+                          {selectedReport.hasMultipleClearances && (
+                            <div className={styles.multipleClearanceTooltip}>
+                              <div className={styles.tooltipTitle}>
+                                Multiple Clearance Requests:
+                              </div>
+                              {selectedReport.clearanceRequestIds.map(
+                                (id, idx) => (
+                                  <div key={idx} className={styles.tooltipItem}>
+                                    Request #{idx + 1}:{" "}
+                                    {selectedReport.clearanceTypes[idx] ||
+                                      "Unknown"}
+                                  </div>
+                                )
+                              )}
+                            </div>
+                          )}
+                        </div>
+                        {selectedReport.clearanceTypes &&
+                          selectedReport.clearanceTypes.length > 0 && (
+                            <div className={styles.clearanceTypesList}>
+                              {selectedReport.clearanceTypes.map(
+                                (type, index) => (
+                                  <span
+                                    key={index}
+                                    className={styles.clearanceTypeTag}
+                                  >
+                                    {type}
+                                  </span>
+                                )
+                              )}
+                            </div>
+                          )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className={styles.IIRViewModalSection}>
+                    <h4 className={styles.IIRViewModalSectionTitle}>
+                      Account Information
+                    </h4>
+                    <div className={styles.IIRViewModalGrid}>
+                      <div className={styles.IIRViewModalField}>
+                        <label>Request Date:</label>
+                        <span>{formatDate(selectedReport.requestDate)}</span>
+                      </div>
+                      <div className={styles.IIRViewModalField}>
+                        <label>Status:</label>
+                        <span
+                          className={`${
+                            styles.IIRStatusBadge
+                          } ${getStatusBadgeClass(selectedReport.status)}`}
+                        >
+                          {selectedReport.status}
+                        </span>
+                      </div>
+                      <div className={styles.IIRViewModalField}>
+                        <label>Clearance Status:</label>
+                        <span>{selectedReport.clearance_status || "N/A"}</span>
+                      </div>
+                      {selectedReport.settlement_date && (
+                        <div className={styles.IIRViewModalField}>
+                          <label>Settlement Date:</label>
+                          <span>
+                            {formatDate(selectedReport.settlement_date)}
+                          </span>
+                        </div>
+                      )}
+                      {selectedReport.settlement_method && (
+                        <div className={styles.IIRViewModalField}>
+                          <label>Settlement Method:</label>
+                          <span>{selectedReport.settlement_method}</span>
+                        </div>
+                      )}
+                      {selectedReport.hasCombinedAccountability && (
+                        <div className={styles.IIRViewModalField}>
+                          <label>Accountability Type:</label>
+                          <span className={styles.combinedType}>
+                            ⚡ Combined (Routine + Clearance)
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className={styles.IIRViewModalSection}>
+                    <h4 className={styles.IIRViewModalSectionTitle}>
+                      Findings Report
+                    </h4>
+                    <div className={styles.IIRViewModalFullWidth}>
+                      <div className={styles.IIRViewModalField}>
+                        <div className={styles.IIRViewModalTextContent}>
+                          {selectedReport.findings || "No findings recorded."}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {selectedReport.missingEquipment.length > 0 && (
+                    <div className={styles.IIRViewModalSection}>
+                      <h4 className={styles.IIRViewModalSectionTitle}>
+                        Missing/Damaged Equipment Summary
+                      </h4>
+                      <div className={styles.IIRViewModalGrid}>
+                        <div className={styles.IIRViewModalField}>
+                          <label>Total Items:</label>
+                          <span>{selectedReport.missingEquipment.length}</span>
+                        </div>
+                        {selectedReport.routineEquipmentCount > 0 && (
+                          <div className={styles.IIRViewModalField}>
+                            <label>Routine Items:</label>
+                            <span className={styles.routineValue}>
+                              {selectedReport.routineEquipmentCount} item(s)
+                            </span>
+                          </div>
+                        )}
+                        {selectedReport.clearanceEquipmentCount > 0 && (
+                          <div className={styles.IIRViewModalField}>
+                            <label>Clearance Items:</label>
+                            <span className={styles.clearanceValue}>
+                              {selectedReport.clearanceEquipmentCount} item(s)
+                            </span>
+                          </div>
+                        )}
+                        <div className={styles.IIRViewModalField}>
+                          <label>Total Value:</label>
+                          <span
+                            style={{ color: "#dc3545", fontWeight: "bold" }}
+                          >
+                            {formatCurrency(selectedReport.totalMissingAmount)}
+                          </span>
+                        </div>
+                        {selectedReport.hasCombinedAccountability && (
+                          <>
+                            <div className={styles.IIRViewModalField}>
+                              <label>Routine Value:</label>
+                              <span className={styles.routineAmount}>
+                                {formatCurrency(selectedReport.routineAmount)}
+                              </span>
+                            </div>
+                            <div className={styles.IIRViewModalField}>
+                              <label>Clearance Value:</label>
+                              <span className={styles.clearanceAmount}>
+                                {formatCurrency(selectedReport.clearanceAmount)}
+                              </span>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className={styles.IIRViewModalActions}>
+                  <button
+                    className={styles.IIRCloseBtn}
+                    onClick={() => setShowDetailsModal(false)}
+                  >
+                    Close
+                  </button>
+                  {selectedReport.status === "Unsettled" && (
+                    <button
+                      className={styles.IIRApproveBtn}
+                      onClick={() => {
+                        setShowDetailsModal(false);
+                        approveSettlement(selectedReport);
+                      }}
+                    >
+                      {selectedReport.hasCombinedAccountability
+                        ? "Settle All Accountability"
+                        : "Approve Settlement"}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+    </>
   );
 };
 

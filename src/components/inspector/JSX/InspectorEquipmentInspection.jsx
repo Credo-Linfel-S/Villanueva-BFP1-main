@@ -10,6 +10,7 @@ import { supabase } from "../../../lib/supabaseClient.js";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { Html5QrcodeScanner } from "html5-qrcode";
+import BFPPreloader from "../../BFPPreloader"; // Add this import
 
 const InspectorEquipmentInspection = () => {
   const { isSidebarCollapsed } = useSidebar();
@@ -81,6 +82,14 @@ const InspectorEquipmentInspection = () => {
     documentFile: null,
     equipmentStatus: "Good",
   });
+
+  // BFP Preloader states
+  const [isPageLoading, setIsPageLoading] = useState(true);
+  const [loadingProgress, setLoadingProgress] = useState(0);
+  const [moduleTitle, setModuleTitle] = useState(
+    "EQUIPMENT INSPECTION • Running Diagnostics..."
+  );
+
   // Open View Details Modal for Recent Inspections
   const openRecentViewModal = (inspection) => {
     setSelectedRecentInspection(inspection);
@@ -103,6 +112,7 @@ const InspectorEquipmentInspection = () => {
     });
     return Array.from(categories).sort();
   };
+
   // Real-time subscription for pending clearances
   useEffect(() => {
     let subscription;
@@ -178,6 +188,7 @@ const InspectorEquipmentInspection = () => {
 
   // Polling fallback state and functions
   const [pollingInterval, setPollingInterval] = useState(null);
+  const [isMobile, setIsMobile] = useState(false);
 
   const startPollingFallback = () => {
     console.log("Starting polling fallback for pending clearances");
@@ -204,6 +215,18 @@ const InspectorEquipmentInspection = () => {
       setPollingInterval(null);
     }
   };
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
   // Add this function to get unique equipment statuses from recent inspections
   const getRecentEquipmentStatuses = () => {
     const statuses = new Set();
@@ -268,17 +291,7 @@ const InspectorEquipmentInspection = () => {
     recentFilterStatus,
     recentFilterResult,
   ]);
-  /*
-  const recentTotalPages = Math.max(
-    1,
-    Math.ceil(filteredRecentInspections.length / rowsPerPage)
-  );
-  const recentStart = (recentCurrentPage - 1) * rowsPerPage;
-  const paginatedRecent = filteredRecentInspections.slice(
-    recentStart,
-    recentStart + rowsPerPage
-  );
-*/
+
   // Add a function to reset recent filters
   const resetRecentFilters = () => {
     setRecentSearch("");
@@ -370,7 +383,6 @@ const InspectorEquipmentInspection = () => {
   }, [scheduledInspections]);
 
   // Philippine Time functions
-  // Replace your existing date comparison functions with these simpler versions
   const getTodayDate = () => {
     const today = new Date();
     const year = today.getFullYear();
@@ -394,8 +406,8 @@ const InspectorEquipmentInspection = () => {
     const scheduleDateOnly = scheduleDate.split("T")[0];
     return scheduleDateOnly > today;
   };
+
   // Function to check if equipment is in pending clearance
-  // Replace the existing checkEquipmentClearanceStatus function with this:
   const checkEquipmentClearanceStatus = async (inventoryIds) => {
     try {
       const cachedResults = {};
@@ -535,8 +547,13 @@ const InspectorEquipmentInspection = () => {
 
   const loadAllData = async () => {
     setIsLoading(true);
+    setIsPageLoading(true);
+    setLoadingProgress(10);
+
     try {
       console.log("Loading inventory items...");
+      setLoadingProgress(20);
+
       const { data: inventoryData, error: inventoryError } = await supabase
         .from("inventory")
         .select(
@@ -567,8 +584,9 @@ const InspectorEquipmentInspection = () => {
 
       setInventoryItems(inventoryData || []);
       console.log("Inventory loaded:", inventoryData?.length || 0, "items");
+      setLoadingProgress(40);
 
-      // Load scheduled inspections (status = 'PENDING') - REMOVED personnel_id
+      // Load scheduled inspections (status = 'PENDING')
       const { data: scheduledData, error: scheduledError } = await supabase
         .from("inspections")
         .select(
@@ -652,8 +670,9 @@ const InspectorEquipmentInspection = () => {
 
       setScheduledInspections(scheduledInspectionsWithEquipment);
       console.log("Scheduled inspections loaded:", scheduledData?.length || 0);
+      setLoadingProgress(60);
 
-      // Load recent completed inspections - REMOVED personnel_id
+      // Load recent completed inspections
       const { data: recentData, error: recentError } = await supabase
         .from("inspections")
         .select(
@@ -724,13 +743,17 @@ const InspectorEquipmentInspection = () => {
         setRecentInspections(recent);
         console.log("Recent inspections loaded:", recent.length);
       }
+      setLoadingProgress(80);
     } catch (error) {
       console.error("Error loading data:", error);
       toast.error(`Failed to load data: ${error.message}`);
     } finally {
       setIsLoading(false);
+      setIsPageLoading(false);
+      setLoadingProgress(100);
     }
   };
+
   // Add loading state for clearances
   const [isLoadingClearances, setIsLoadingClearances] = useState(false);
 
@@ -1303,6 +1326,7 @@ const InspectorEquipmentInspection = () => {
       setIsScheduling(false); // Stop loading
     }
   };
+
   const checkEquipmentHasPendingInspection = async (equipmentIds) => {
     try {
       if (!equipmentIds || equipmentIds.length === 0) {
@@ -1440,6 +1464,7 @@ const InspectorEquipmentInspection = () => {
       console.error("Error updating clearance status:", error);
     }
   };
+
   const submitInspection = async () => {
     if (!inspectionData.findings) {
       toast.error("Please enter findings");
@@ -1499,8 +1524,6 @@ const InspectorEquipmentInspection = () => {
       console.log("🔍 Determined clearance status:", clearanceStatus);
 
       // 2. Update the inspection record
-      // The database trigger will automatically set schedule_status = 'DONE'
-      // when status is set to 'COMPLETED' or 'FAILED'
       const inspectionStatus =
         inspectionData.status === "PASS" ? "COMPLETED" : "FAILED";
 
@@ -1516,8 +1539,6 @@ const InspectorEquipmentInspection = () => {
             inspectionData.status === "PASS"
               ? "Equipment cleared"
               : "Equipment requires attention",
-          // Don't set schedule_status here - the trigger will handle it
-          // Don't set inspection_date here - the trigger will handle it if needed
           updated_at: new Date().toISOString(),
         })
         .eq("id", selectedSchedule.id);
@@ -1639,6 +1660,7 @@ const InspectorEquipmentInspection = () => {
       setIsInspecting(false); // Stop loading
     }
   };
+
   // Add this test function temporarily
   const testClearanceUpdate = async () => {
     try {
@@ -1732,11 +1754,6 @@ const InspectorEquipmentInspection = () => {
           continue;
         }
 
-        // ====== IMPORTANT CHANGE ======
-        // DO NOT automatically mark as "Completed"
-        // Only update status to "In Progress" if there are no pending items
-        // But keep it as "In Progress" - NOT "Completed"
-
         if (pendingCount === 0) {
           console.log(
             `✅ All equipment inspected for clearance request ${requestId}`
@@ -1768,7 +1785,6 @@ const InspectorEquipmentInspection = () => {
               `ℹ️ Clearance request ${requestId} already In Progress - waiting for manual completion`
             );
 
-            // ====== NEW: Check if there are any damaged/lost equipment ======
             if (damagedCount > 0 || lostCount > 0) {
               console.log(
                 `⚠️ Clearance request ${requestId} has damaged/lost equipment - may require accountability`
@@ -1808,6 +1824,7 @@ const InspectorEquipmentInspection = () => {
       console.error("Error in checkAndCompletePersonnelClearance:", error);
     }
   };
+
   // Function to update schedule status based on dates
   const updateScheduleStatus = async (inspectionId, scheduledDate) => {
     const todayPST = getTodayInPST();
@@ -1836,7 +1853,6 @@ const InspectorEquipmentInspection = () => {
     }
   };
 
-  // You can call this function when loading data or when dates change
   // QR Scanner functions
   const startScanner = async () => {
     setIsRequestingPermission(true);
@@ -1930,143 +1946,6 @@ const InspectorEquipmentInspection = () => {
     setShowScanner(false);
   };
 
-  if (isLoading) {
-    return (
-      <div className="AppInspectorInventoryControl">
-        <InspectorSidebar />
-        <Hamburger />
-        <div
-          className={`main-content ${isSidebarCollapsed ? "collapsed" : ""}`}
-        >
-          <div className={styles.loadingContainer}>
-            <h2>Loading inspection data...</h2>
-            <p>Initializing system...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Render pagination buttons function (similar to InspectionControl)
-  const renderPaginationButtons = (
-    currentPage,
-    totalPages,
-    setPage,
-    hasNoData
-  ) => {
-    const buttons = [];
-
-    // Previous button
-    buttons.push(
-      <button
-        key="prev"
-        className={`${styles.IEIPaginationBtn} ${
-          hasNoData ? styles.IEIDisabled : ""
-        }`}
-        disabled={currentPage === 1 || hasNoData}
-        onClick={() => setPage(Math.max(1, currentPage - 1))}
-      >
-        Previous
-      </button>
-    );
-
-    // Always show first page
-    buttons.push(
-      <button
-        key={1}
-        className={`${styles.IEIPaginationBtn} ${
-          1 === currentPage ? styles.IEIActive : ""
-        } ${hasNoData ? styles.IEIDisabled : ""}`}
-        onClick={() => setPage(1)}
-        disabled={hasNoData}
-      >
-        1
-      </button>
-    );
-
-    // Show ellipsis after first page if needed
-    if (currentPage > 3) {
-      buttons.push(
-        <span key="ellipsis1" className={styles.IEIPaginationEllipsis}>
-          ...
-        </span>
-      );
-    }
-
-    // Show pages around current page (max 5 pages total including first and last)
-    let startPage = Math.max(2, currentPage - 1);
-    let endPage = Math.min(totalPages - 1, currentPage + 1);
-
-    // Adjust if we're near the beginning
-    if (currentPage <= 3) {
-      endPage = Math.min(totalPages - 1, 4);
-    }
-
-    // Adjust if we're near the end
-    if (currentPage >= totalPages - 2) {
-      startPage = Math.max(2, totalPages - 3);
-    }
-
-    // Generate middle page buttons
-    for (let i = startPage; i <= endPage; i++) {
-      if (i > 1 && i < totalPages) {
-        buttons.push(
-          <button
-            key={i}
-            className={`${styles.IEIPaginationBtn} ${
-              i === currentPage ? styles.IEIActive : ""
-            } ${hasNoData ? styles.IEIDisabled : ""}`}
-            onClick={() => setPage(i)}
-            disabled={hasNoData}
-          >
-            {i}
-          </button>
-        );
-      }
-    }
-
-    // Show ellipsis before last page if needed
-    if (currentPage < totalPages - 2) {
-      buttons.push(
-        <span key="ellipsis2" className={styles.IEIPaginationEllipsis}>
-          ...
-        </span>
-      );
-    }
-
-    // Always show last page if there is more than 1 page
-    if (totalPages > 1) {
-      buttons.push(
-        <button
-          key={totalPages}
-          className={`${styles.IEIPaginationBtn} ${
-            totalPages === currentPage ? styles.IEIActive : ""
-          } ${hasNoData ? styles.IEIDisabled : ""}`}
-          onClick={() => setPage(totalPages)}
-          disabled={hasNoData}
-        >
-          {totalPages}
-        </button>
-      );
-    }
-
-    // Next button
-    buttons.push(
-      <button
-        key="next"
-        className={`${styles.IEIPaginationBtn} ${
-          hasNoData ? styles.IEIDisabled : ""
-        }`}
-        disabled={currentPage === totalPages || hasNoData}
-        onClick={() => setPage(Math.min(totalPages, currentPage + 1))}
-      >
-        Next
-      </button>
-    );
-
-    return buttons;
-  };
-
   // Pagination calculations
   const scheduledTotalPages = Math.max(
     1,
@@ -2087,14 +1966,14 @@ const InspectorEquipmentInspection = () => {
     recentStart,
     recentStart + rowsPerPage
   );
-  // Add this helper function near your other functions
+
   const createAccountabilityRecord = async (
     inspectionId,
     equipmentId,
     personnelId,
     status,
     findings,
-    clearanceRequestIds = [] // Change to accept array
+    clearanceRequestIds = []
   ) => {
     try {
       // 1. Get equipment details
@@ -2210,7 +2089,6 @@ const InspectorEquipmentInspection = () => {
     }
   };
 
-  // Helper function to update the summary table
   // Helper function to update the summary table
   const updatePersonnelAccountabilitySummary = async (
     personnelId,
@@ -2358,13 +2236,147 @@ const InspectorEquipmentInspection = () => {
       throw error;
     }
   };
+
+  // Render pagination buttons function
+  const renderPaginationButtons = (
+    currentPage,
+    totalPages,
+    setPage,
+    hasNoData
+  ) => {
+    const buttons = [];
+
+    // Previous button
+    buttons.push(
+      <button
+        key="prev"
+        className={`${styles.IEIPaginationBtn} ${
+          hasNoData ? styles.IEIDisabled : ""
+        }`}
+        disabled={currentPage === 1 || hasNoData}
+        onClick={() => setPage(Math.max(1, currentPage - 1))}
+      >
+        Previous
+      </button>
+    );
+
+    // Always show first page
+    buttons.push(
+      <button
+        key={1}
+        className={`${styles.IEIPaginationBtn} ${
+          1 === currentPage ? styles.IEIActive : ""
+        } ${hasNoData ? styles.IEIDisabled : ""}`}
+        onClick={() => setPage(1)}
+        disabled={hasNoData}
+      >
+        1
+      </button>
+    );
+
+    // Show ellipsis after first page if needed
+    if (currentPage > 3) {
+      buttons.push(
+        <span key="ellipsis1" className={styles.IEIPaginationEllipsis}>
+          ...
+        </span>
+      );
+    }
+
+    // Show pages around current page (max 5 pages total including first and last)
+    let startPage = Math.max(2, currentPage - 1);
+    let endPage = Math.min(totalPages - 1, currentPage + 1);
+
+    // Adjust if we're near the beginning
+    if (currentPage <= 3) {
+      endPage = Math.min(totalPages - 1, 4);
+    }
+
+    // Adjust if we're near the end
+    if (currentPage >= totalPages - 2) {
+      startPage = Math.max(2, totalPages - 3);
+    }
+
+    // Generate middle page buttons
+    for (let i = startPage; i <= endPage; i++) {
+      if (i > 1 && i < totalPages) {
+        buttons.push(
+          <button
+            key={i}
+            className={`${styles.IEIPaginationBtn} ${
+              i === currentPage ? styles.IEIActive : ""
+            } ${hasNoData ? styles.IEIDisabled : ""}`}
+            onClick={() => setPage(i)}
+            disabled={hasNoData}
+          >
+            {i}
+          </button>
+        );
+      }
+    }
+
+    // Show ellipsis before last page if needed
+    if (currentPage < totalPages - 2) {
+      buttons.push(
+        <span key="ellipsis2" className={styles.IEIPaginationEllipsis}>
+          ...
+        </span>
+      );
+    }
+
+    // Always show last page if there is more than 1 page
+    if (totalPages > 1) {
+      buttons.push(
+        <button
+          key={totalPages}
+          className={`${styles.IEIPaginationBtn} ${
+            totalPages === currentPage ? styles.IEIActive : ""
+          } ${hasNoData ? styles.IEIDisabled : ""}`}
+          onClick={() => setPage(totalPages)}
+          disabled={hasNoData}
+        >
+          {totalPages}
+        </button>
+      );
+    }
+
+    // Next button
+    buttons.push(
+      <button
+        key="next"
+        className={`${styles.IEIPaginationBtn} ${
+          hasNoData ? styles.IEIDisabled : ""
+        }`}
+        disabled={currentPage === totalPages || hasNoData}
+        onClick={() => setPage(Math.min(totalPages, currentPage + 1))}
+      >
+        Next
+      </button>
+    );
+
+    return buttons;
+  };
+
+  // Display BFP Preloader while page is loading
   return (
     <div className="AppInspectorInventoryControl">
       <Title>Inspector Equipment Inspection | BFP Villanueva</Title>
       <Meta name="robots" content="noindex, nofollow" />
 
+      {/* BFP Preloader */}
+      <BFPPreloader
+        loading={isPageLoading}
+        progress={loadingProgress}
+        moduleTitle={moduleTitle}
+        onRetry={() => {
+          setIsPageLoading(true);
+          setLoadingProgress(0);
+          loadAllData();
+        }}
+      />
+
       <ToastContainer
-        position="top-right"
+        position={isMobile ? "top-center" : "top-right"}
         autoClose={3000}
         hideProgressBar={false}
         newestOnTop={false}
@@ -2380,14 +2392,17 @@ const InspectorEquipmentInspection = () => {
       <Hamburger />
 
       <div className={`main-content ${isSidebarCollapsed ? "collapsed" : ""}`}>
-        {/* Pending Clearances Section */}
-        <h1>Equipment Inspection</h1>
+        {/* Add mobile header with title and hamburger if needed */}
+        {isMobile && (
+          <div className={styles.mobileHeader}>
+            <h1>Equipment Inspection</h1>
+          </div>
+        )}
 
         {/* Updated Pending Clearances Section with Carousel */}
         <section className={styles.IEISection}>
           <div className={styles.IEISectionHeader}>
             <h2>Pending Clearance Inspections</h2>
-           
           </div>
 
           <div className={styles.clearanceCarousel}>
@@ -2543,9 +2558,6 @@ const InspectorEquipmentInspection = () => {
                             const day = String(date.getDate()).padStart(2, "0");
                             const dateStr = `${year}-${month}-${day}`;
 
-                            // Option B: Use Date.toLocaleDateString
-                            // const dateStr = date.toLocaleDateString('en-CA'); // YYYY-MM-DD format
-
                             setFormData({
                               ...formData,
                               scheduled_date: dateStr,
@@ -2560,9 +2572,8 @@ const InspectorEquipmentInspection = () => {
                         options={{
                           dateFormat: "Y-m-d",
                           minDate: "today",
-                          // Add timezone handling
                           time_24hr: false,
-                          disableMobile: true, // Disable mobile native picker for consistency
+                          disableMobile: true,
                         }}
                         className={styles.floatingInput}
                         placeholder=" "
@@ -2634,7 +2645,7 @@ const InspectorEquipmentInspection = () => {
                           <option
                             key={index}
                             value={personName}
-                            title={personName} /* Add tooltip for full name */
+                            title={personName}
                           >
                             {personName.length > 30
                               ? `${personName.substring(0, 30)}...`
@@ -3701,7 +3712,7 @@ const InspectorEquipmentInspection = () => {
                     type="button"
                     className={`${styles.IEIBtn} ${styles.IEISubmitBtn}`}
                     onClick={submitInspection}
-                    disabled={isInspecting} // Disable while loading
+                    disabled={isInspecting}
                   >
                     {isInspecting ? (
                       <>
@@ -3885,6 +3896,7 @@ const InspectorEquipmentInspection = () => {
             </div>
           </div>
         )}
+
         {/* Recent Inspection View Details Modal */}
         {isRecentViewModalOpen && selectedRecentInspection && (
           <div
@@ -4039,4 +4051,5 @@ const InspectorEquipmentInspection = () => {
     </div>
   );
 };
+
 export default InspectorEquipmentInspection;

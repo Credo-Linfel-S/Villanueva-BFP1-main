@@ -489,12 +489,6 @@ bottom: 100px;
   }
 }
 
-/* Responsive */
-@media (max-width: 768px) {
-  .inspectionRightSidebar {
-    width: 100%;
-  }
-}
 
 /* ================================
     TABLE STYLES
@@ -1106,32 +1100,6 @@ bottom: 100px;
   transform: scale(1.1);
 }
 
-/* Responsive adjustments */
-@media (max-width: 768px) {
-  .inspectionModalCloseBtn {
-    width: 36px;
-    height: 36px;
-    font-size: 18px;
-    top: 15px;
-    right: 15px;
-  }
-  
-  .inspectionCloseBtn {
-    width: 32px;
-    height: 32px;
-    font-size: 20px;
-  }
-}
-
-@media (max-width: 480px) {
-  .inspectionModalCloseBtn {
-    width: 32px;
-    height: 32px;
-    font-size: 16px;
-    top: 10px;
-    right: 10px;
-  }
-}
 
 .inspectionModalInputLabelBarCode {
   position: absolute;
@@ -1266,47 +1234,6 @@ bottom: 100px;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
 }
 
-/* Responsive Design */
-@media (max-width: 768px) {
-  #inspectionEditModal .inspectionModalContent {
-    width: 95vw;
-    margin: 20px;
-  }
-  
-  .inspectionModalInputRow {
-    grid-template-columns: 1fr;
-    gap: 12px;
-  }
-  
-  .inspectionModalSection {
-    padding: 20px 15px;
-  }
-  
-  .inspectionModalActions {
-    padding: 20px 15px;
-    flex-direction: column;
-  }
-  
-  .inspectionModalSubmitBtn,
-  .inspectionModalCancelBtn {
-    min-width: auto;
-    width: 100%;
-  }
-  
-  .inspectionModalBarcodeContainer {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 480px) {
-  .inspectionModalHeader {
-    padding: 15px 20px;
-  }
-  
-  .inspectionModalTitle {
-    font-size: 20px;
-  }
-}
 
 #inspectionSearchBar {
   padding: 8px 12px;
@@ -2023,28 +1950,7 @@ bottom: 100px;
   border: 1px solid #ffeaa7;
 }
 
-/* Responsive Design */
-@media (max-width: 768px) {
-  .inspectionModalContainer {
-    width: 95vw !important;
-    margin: 20px;
-  }
-  
-  .inspectionModalSection {
-    padding: 20px 15px;
-  }
-  
-  .inspectionModalActions {
-    padding: 20px 15px;
-    flex-direction: column;
-  }
-  
-  .inspectionModalSubmitBtn,
-  .inspectionModalCancelBtn {
-    min-width: auto;
-    width: 100%;
-  }
-}/* Add these status styles to your InspectorInventoryControl.module.css file */
+
 
 /* Inspection Status Styles (matching InspectorEquipmentInspection) */
 .inspectionStatusBadge {
@@ -2352,21 +2258,6 @@ bottom: 100px;
   margin: 0;
 }
 
-/* Responsive styles */
-@media (max-width: 768px) {
-  .inspectionViewModalContent {
-    max-width: 95%;
-    margin: 10px;
-  }
-  
-  .viewModalGrid {
-    grid-template-columns: 1fr;
-  }
-  
-  .inspectionViewModalTitle {
-    font-size: 1.2rem;
-  }
-}
 
 /* ================================
     SCROLLABLE TABLE STYLES (Matching InspectorEquipmentInspection)
@@ -2491,3 +2382,415 @@ bottom: 100px;
   min-width: 150px;
 }
 
+
+
+
+/* ================================
+    RESPONSIVE STYLES FOR 768PX AND BELOW
+  ================================ */
+
+@media (max-width: 768px) {
+  /* General adjustments for mobile */
+  .inspectionAppContainer {
+    padding: 10px;
+  }
+
+  .main-content {
+    padding: 10px;
+    margin-left: 0;
+  }
+
+  /* Top controls - stack vertically */
+  .inspectionTopControls {
+    flex-direction: column;
+    gap: 15px;
+    margin-top: 15px;
+    margin-bottom: 20px;
+    padding: 0;
+  }
+
+  .inspectionTableHeader {
+    flex-direction: column;
+    width: 100%;
+    gap: 10px;
+    align-items: stretch;
+  }
+
+  .inspectionTableHeader select,
+  .inspectionTableHeader input {
+    width: 100%;
+    margin-left: 0;
+    margin-bottom: 5px;
+  }
+
+  .inspectionFilterCategory,
+  .inspectionFilterStatus,
+  .inspectionSearchBar {
+    width: 100%;
+    margin-left: 0;
+    margin-bottom: 10px;
+  }
+
+  label[for="inspectionFilterStatus"],
+  label[for="inspectionFilterCategory"] {
+    display: block;
+    margin-left: 0;
+    margin-bottom: 5px;
+  }
+
+  /* Summary cards - stack vertically on mobile */
+  #inspectionSummary {
+    flex-direction: column;
+    margin: 15px 0;
+    gap: 15px;
+  }
+
+  .inspectionSummaryCard {
+    min-width: 100%;
+    padding: 20px;
+  }
+
+  /* Table container adjustments */
+  .inspectionTableScrollContainer {
+    width: 100%;
+    margin-left: 0;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .inspectionTable {
+    min-width: 1200px; /* Allow horizontal scrolling on mobile */
+    font-size: 13px;
+  }
+
+  .inspectionTable th,
+  .inspectionTable td {
+    padding: 10px 8px;
+    font-size: 13px;
+  }
+
+  .inspectionTable th {
+    font-size: 12px;
+    padding: 10px 8px;
+  }
+
+  /* Adjust action buttons for mobile */
+  .inspectionDeleteBtn,
+  .inspectionEditBtn {
+    width: 50px;
+    font-size: 12px;
+    padding: 6px 2px;
+  }
+
+  .viewDetailsBtn {
+    padding: 4px 8px;
+    font-size: 12px;
+  }
+
+  /* Status badges adjustment */
+  .inspectionStatusBadge,
+  .equipmentStatusBadge {
+    font-size: 11px;
+    padding: 4px 8px;
+  }
+
+  /* Pagination adjustments */
+  .inspectionPaginationContainer {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 5px;
+    padding-right: 0;
+    margin: 10px 0;
+  }
+
+  .inspectionPaginationBtn {
+    padding: 6px 10px;
+    font-size: 13px;
+    margin: 2px;
+  }
+
+  .inspectionPaginationEllipsis {
+    padding: 6px 4px;
+  }
+
+  /* Modal adjustments for mobile */
+  .inspectionRightSidebar {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .inspectionModalDeleteContent {
+    width: 95%;
+    margin: 0 10px;
+  }
+
+  .inspectionModalDeleteHeader {
+    padding: 15px;
+  }
+
+  .inspectionModalDeleteCloseBtn {
+    right: 10px;
+    bottom: 10px;
+  }
+
+  /* Edit modal adjustments */
+  #inspectionEditModal {
+    left: 0;
+    padding: 10px;
+  }
+
+  #inspectionEditModal .inspectionModalContent {
+    width: 100%;
+    max-height: 90vh;
+  }
+
+  .inspectionModalHeader {
+    padding: 15px 20px;
+  }
+
+  .inspectionModalTitle {
+    margin-left: 0;
+    text-align: center;
+    font-size: 18px;
+  }
+
+  .inspectionModalCloseBtn {
+    right: 0;
+    top: 0;
+  }
+
+  .inspectionModalSection {
+    padding: 15px;
+  }
+
+  .inspectionModalInputRow {
+    grid-template-columns: 1fr;
+    gap: 15px;
+    margin-bottom: 15px;
+  }
+
+  .inspectionModalInput,
+  .inspectionModalSelect {
+    width: 100%;
+  }
+
+  .inspectionModalActions {
+    flex-direction: column;
+    gap: 10px;
+    padding: 15px;
+    left: 0;
+  }
+
+  .inspectionModalActions button {
+    width: 100%;
+    left: 0;
+    margin-top: 5px;
+  }
+
+  /* View Details Modal adjustments */
+  .inspectionViewModalOverlay {
+    padding: 10px;
+    align-items: flex-start;
+    padding-top: 20px;
+  }
+
+  .inspectionViewModalContent {
+    max-height: 85vh;
+    margin-top: 20px;
+  }
+
+  .inspectionViewModalGrid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .viewModalField {
+    margin-bottom: 10px;
+  }
+
+  /* Barcode scanner adjustments */
+  .inspectionQrScannerModal {
+    width: 98%;
+    height: auto;
+    max-height: 90vh;
+  }
+
+  .inspectionQrScannerHeader {
+    padding: 15px;
+  }
+
+  .inspectionQrScannerContent {
+    padding: 10px;
+  }
+
+  .inspectionQrReader {
+    height: 300px;
+  }
+
+  /* Table column adjustments for mobile */
+  .inspectionTable th:nth-child(1),
+  .inspectionTable td:nth-child(1) {
+    width: 120px; /* Item Code */
+    min-width: 120px;
+  }
+
+  .inspectionTable th:nth-child(2),
+  .inspectionTable td:nth-child(2) {
+    width: 150px; /* Equipment Name */
+    min-width: 150px;
+  }
+
+  .inspectionTable th:nth-child(3),
+  .inspectionTable td:nth-child(3) {
+    width: 120px; /* Category */
+    min-width: 120px;
+  }
+
+  .inspectionTable th:nth-child(4),
+  .inspectionTable td:nth-child(4) {
+    width: 130px; /* Equipment Status */
+    min-width: 130px;
+  }
+
+  .inspectionTable th:nth-child(5),
+  .inspectionTable td:nth-child(5) {
+    width: 120px; /* Assigned To */
+    min-width: 120px;
+  }
+
+  .inspectionTable th:nth-child(6),
+  .inspectionTable td:nth-child(6) {
+    width: 100px; /* Assigned Date */
+    min-width: 100px;
+  }
+
+  .inspectionTable th:nth-child(7),
+  .inspectionTable td:nth-child(7) {
+    width: 150px; /* Inspector Name */
+    min-width: 150px;
+  }
+
+  .inspectionTable th:nth-child(8),
+  .inspectionTable td:nth-child(8) {
+    width: 100px; /* Scheduled Date */
+    min-width: 100px;
+  }
+
+  .inspectionTable th:nth-child(9),
+  .inspectionTable td:nth-child(9) {
+    width: 120px; /* Inspection Result */
+    min-width: 120px;
+  }
+
+  .inspectionTable th:nth-child(10),
+  .inspectionTable td:nth-child(10) {
+    width: 100px; /* Findings */
+    min-width: 100px;
+  }
+
+  .inspectionTable th:nth-child(11),
+  .inspectionTable td:nth-child(11) {
+    width: 110px; /* Actions */
+    min-width: 110px;
+  }
+
+  /* Sidebar form adjustments */
+  .inspectionSidebarForm {
+    padding: 15px;
+    gap: 15px;
+  }
+
+  .inspectionFormSection h4 {
+    margin-top: 20px;
+    font-size: 14px;
+  }
+
+  .inspectionInputGroup input,
+  .inspectionInputGroup select,
+  .inspectionInputGroup textarea {
+    padding: 10px;
+    font-size: 14px;
+  }
+
+  .inspectionBarcodeGrid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .inspectionQrScannerBtn {
+    position: relative;
+    left: 0;
+    margin-left: 0;
+    width: 100%;
+    margin-top: 5px;
+  }
+
+  /* Sidebar actions */
+  .inspectionSidebarActions {
+    flex-direction: column;
+    gap: 10px;
+    padding: 15px 0;
+  }
+
+  .inspectionSidebarActions button {
+    width: 100%;
+  }
+
+  /* Scrollbar adjustments for mobile */
+  .inspectionTableScrollContainer::-webkit-scrollbar {
+    height: 6px;
+  }
+
+  /* Hide some columns or reduce text on very small screens */
+  @media (max-width: 480px) {
+    .inspectionTable {
+      font-size: 12px;
+    }
+
+    .inspectionTable th,
+    .inspectionTable td {
+      padding: 8px 6px;
+    }
+
+    .inspectionSummaryCard h3 {
+      font-size: 14px;
+    }
+
+    .inspectionSummaryCard p {
+      font-size: 20px;
+    }
+
+    h1 {
+      font-size: 1.5rem;
+    }
+
+    .sheaders {
+      font-size: 1.2rem;
+    }
+  }
+
+  /* Empty state adjustments */
+  .inspectionTable tbody td[colspan] {
+    padding: 20px;
+  }
+}
+
+/* Additional responsive adjustments for tablets (769px to 1024px) */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .inspectionTableScrollContainer {
+    width: 100%;
+  }
+
+  .inspectionTable {
+    min-width: 1800px;
+  }
+
+  .inspectionSummaryCard {
+    min-width: calc(50% - 10px);
+  }
+
+  #inspectionSummary {
+    flex-wrap: wrap;
+    flex-direction: row;
+  }
+}

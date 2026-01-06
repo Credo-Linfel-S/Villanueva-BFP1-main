@@ -282,6 +282,7 @@ const MainContent = ({ isCollapsed }) => {
   const [newApplicantNotifications, setNewApplicantNotifications] = useState(
     []
   );
+  const [lastNotificationCheck, setLastNotificationCheck] = useState(null);
 
   // Overall loading state
   const [overallLoading, setOverallLoading] = useState(true);
@@ -298,6 +299,13 @@ const MainContent = ({ isCollapsed }) => {
   const currentActivities = useMemo(() => {
     return paginate(recentActivities, activityCurrentPage, activityRowsPerPage);
   }, [recentActivities, activityCurrentPage, activityRowsPerPage]);
+
+  // NEW: Calculate unread notifications
+  const unreadNotifications = useMemo(() => {
+    return newApplicantNotifications.filter(
+      (notification) => !notification.read
+    );
+  }, [newApplicantNotifications]);
 
   // Function to fetch total personnel count
   const fetchTotalPersonnel = async () => {
@@ -779,12 +787,11 @@ const MainContent = ({ isCollapsed }) => {
   // NEW: Function to check for new applicant notifications
   const checkNewApplicantNotifications = async () => {
     try {
-      // Get the last 24 hours
-      const twentyFourHoursAgo = new Date();
-      twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 24);
-      const twentyFourHoursAgoString = twentyFourHoursAgo.toISOString();
+      // Get the last checked timestamp
+      const lastChecked = lastNotificationCheck || new Date(0);
+      const now = new Date();
 
-      // Fetch new applicants from the last 24 hours
+      // Fetch new applicants since last check
       const { data, error } = await supabase
         .from("recruitment_personnel")
         .select(
@@ -798,16 +805,17 @@ const MainContent = ({ isCollapsed }) => {
           application_date,
           interview_date,
           resume_url,
-          created_at
+          created_at,
+          updated_at
         `
         )
-        .gte("created_at", twentyFourHoursAgoString) // Last 24 hours
+        .gte("created_at", lastChecked.toISOString()) // Only new since last check
         .order("created_at", { ascending: false }); // Most recent first
 
       if (error) throw error;
 
       if (data && data.length > 0) {
-        const notifications = data.map((applicant) => {
+        const newNotifications = data.map((applicant) => {
           const phTime = convertToPHTime(applicant.created_at);
           const applicantName =
             applicant.full_name || applicant.candidate || "New applicant";
@@ -821,10 +829,13 @@ const MainContent = ({ isCollapsed }) => {
           } else if (applicant.application_date) {
             notificationText = `${applicantName} submitted application`;
             notificationType = "application_submitted";
+          } else if (applicant.interview_date) {
+            notificationText = `${applicantName} scheduled interview`;
+            notificationType = "interview_scheduled";
           }
 
           return {
-            id: applicant.id,
+            id: `notification-${applicant.id}-${Date.now()}`,
             text: notificationText,
             type: notificationType,
             timestamp: formatPHTimestamp(applicant.created_at),
@@ -832,18 +843,29 @@ const MainContent = ({ isCollapsed }) => {
             applicantName: applicantName,
             stage: applicant.stage,
             status: applicant.status,
+            read: false,
+            createdAt: new Date(),
+            rawTime: phTime.getTime(),
           };
         });
 
-        setNewApplicantNotifications(notifications);
+        // Sort new notifications by time (most recent first)
+        newNotifications.sort((a, b) => b.rawTime - a.rawTime);
 
-        // Show browser notification if there are new applicants
+        // Add new notifications to the beginning of the array (top position)
+        setNewApplicantNotifications((prev) => {
+          const combined = [...newNotifications, ...prev];
+          // Keep only the last 50 notifications to prevent memory issues
+          return combined.slice(0, 50);
+        });
+
+        // Show browser notification if there are new notifications
         if (
-          notifications.length > 0 &&
+          newNotifications.length > 0 &&
           "Notification" in window &&
           Notification.permission === "granted"
         ) {
-          notifications.forEach((notification) => {
+          newNotifications.forEach((notification) => {
             new Notification("New Recruitment Activity", {
               body: notification.text,
               icon: "/firefighter-icon.png", // Add your icon path here
@@ -851,9 +873,35 @@ const MainContent = ({ isCollapsed }) => {
           });
         }
       }
+
+      // Update last check timestamp
+      setLastNotificationCheck(now);
     } catch (error) {
       console.error("Error checking new applicant notifications:", error);
     }
+  };
+
+  // NEW: Function to mark notification as read
+  const markNotificationAsRead = (notificationId) => {
+    setNewApplicantNotifications((prev) =>
+      prev.map((notification) =>
+        notification.id === notificationId
+          ? { ...notification, read: true }
+          : notification
+      )
+    );
+  };
+
+  // NEW: Function to mark all notifications as read
+  const markAllNotificationsAsRead = () => {
+    setNewApplicantNotifications((prev) =>
+      prev.map((notification) => ({ ...notification, read: true }))
+    );
+  };
+
+  // NEW: Function to clear all notifications
+  const clearAllNotifications = () => {
+    setNewApplicantNotifications([]);
   };
 
   // Function to fetch all dashboard data
@@ -910,6 +958,8 @@ const MainContent = ({ isCollapsed }) => {
       }
     }
   };
+
+  // NEW: Function to add a notification manually (for testing)
 
   useEffect(() => {
     // Request notification permission on component mount
@@ -1028,6 +1078,17 @@ const MainContent = ({ isCollapsed }) => {
             ) {
               checkNewApplicantNotifications();
             }
+            // Check if stage changed
+            if (payload.new.stage && payload.old.stage !== payload.new.stage) {
+              checkNewApplicantNotifications();
+            }
+            // Check if status changed
+            if (
+              payload.new.status &&
+              payload.old.status !== payload.new.status
+            ) {
+              checkNewApplicantNotifications();
+            }
           }
         )
         .subscribe();
@@ -1045,10 +1106,10 @@ const MainContent = ({ isCollapsed }) => {
     // Enable real-time updates
     const cleanup = setupRealtimeSubscriptions();
 
-    // Set interval to check for new applicants every 5 minutes
+    // Set interval to check for new applicants every 2 minutes
     const notificationInterval = setInterval(() => {
       checkNewApplicantNotifications();
-    }, 5 * 60 * 1000); // 5 minutes
+    }, 2 * 60 * 1000); // 2 minutes
 
     return () => {
       cleanup();
@@ -1073,19 +1134,108 @@ const MainContent = ({ isCollapsed }) => {
     <div className={`main-content ${isCollapsed ? "collapsed" : ""}`}>
       <div className="header">
         <h1>Admin Dashboard</h1>
-        <p className="pp">Welcome, Admin User</p>
+        <div className="header-right">
+          <p className="pp">Welcome, Admin User</p>
 
-        {/* NEW: Notification badge */}
-        {newApplicantNotifications.length > 0 && (
-          <div className="notification-badge">
-            <span className="notification-count">
-              {newApplicantNotifications.length}
-            </span>
-            <span className="notification-text">
-              New Recruitment Activities
-            </span>
-          </div>
-        )}
+          {/* NEW: Notification badge with dropdown */}
+          {newApplicantNotifications.length > 0 && (
+            <div className="notification-container">
+              <div
+                className="notification-badge"
+                onClick={() =>
+                  document
+                    .querySelector(".notification-dropdown")
+                    .classList.toggle("show")
+                }
+              >
+                <span className="notification-icon">🔔</span>
+                <span className="notification-count">
+                  {unreadNotifications.length > 99
+                    ? "99+"
+                    : unreadNotifications.length}
+                </span>
+              </div>
+
+              {/* Notification Dropdown */}
+              <div className="notification-dropdown">
+                <div className="notification-header">
+                  <h3>Recent Recruitment Activities</h3>
+                  <div className="notification-actions">
+                    <button
+                      className="notification-action-btn"
+                      onClick={markAllNotificationsAsRead}
+                      title="Mark all as read"
+                    >
+                      ✓
+                    </button>
+                    <button
+                      className="notification-action-btn"
+                      onClick={clearAllNotifications}
+                      title="Clear all"
+                    >
+                      ✕
+                    </button>
+                    {/* Test button - remove in production */}
+             
+                  </div>
+                </div>
+
+                <div className="notification-list">
+                  {newApplicantNotifications.length > 0 ? (
+                    newApplicantNotifications.map((notification) => (
+                      <div
+                        key={notification.id}
+                        className={`notification-item ${
+                          notification.read ? "read" : "unread"
+                        }`}
+                        onClick={() => markNotificationAsRead(notification.id)}
+                      >
+                        <div className="notification-content">
+                          <span className="notification-icon-small">
+                            {notification.type === "resume_uploaded"
+                              ? "📄"
+                              : notification.type === "application_submitted"
+                              ? "📅"
+                              : notification.type === "interview_scheduled"
+                              ? "🎯"
+                              : "👤"}
+                          </span>
+                          <div className="notification-text">
+                            <p className="notification-message">
+                              {notification.text}
+                            </p>
+                            <p className="notification-timestamp">
+                              {notification.timestamp}
+                            </p>
+                            {notification.stage && (
+                              <p className="notification-stage">
+                                Stage: {notification.stage}
+                              </p>
+                            )}
+                          </div>
+                          {!notification.read && (
+                            <div className="notification-unread-dot"></div>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="notification-empty">
+                      <p>No recent notifications</p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="notification-footer">
+                  <span className="notification-count-text">
+                    {unreadNotifications.length} unread •{" "}
+                    {newApplicantNotifications.length} total
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="dashboard-content">
@@ -1241,10 +1391,6 @@ const MainContent = ({ isCollapsed }) => {
                     : totalRecruitedApplicants}
                 </div>
               )}
-            {/* NEW: Show notification dot if there are recent applicant activities */}
-            {newApplicantNotifications.length > 0 && (
-              <div className="notification-dot"></div>
-            )}
           </div>
         </div>
 

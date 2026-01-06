@@ -1,0 +1,698 @@
+/* styles/LeaveMeter.module.css */
+
+.leaveMeterContainer {
+  background: white;
+  border-radius: 12px;
+  padding: 25px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  margin-bottom: 25px;
+}
+
+.meterHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 25px;
+  padding-bottom: 15px;
+  border-bottom: 2px solid #f3f4f6;
+}
+
+.meterHeader h2 {
+  margin: 0;
+  color: #1f2937;
+  font-size: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.meterHeader h2 i {
+  color: #3b82f6;
+}
+
+.employeeName {
+  margin: 0;
+  color: #6b7280;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.meterGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+  gap: 20px;
+  margin-bottom: 25px;
+}
+
+.meterCard {
+  background: #f9fafb;
+  border-radius: 10px;
+  padding: 20px;
+  border: 1px solid #e5e7eb;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.meterCard:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+}
+
+.meterCardHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.meterIcon {
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 1.5rem;
+}
+
+.meterCardHeader h3 {
+  margin: 0;
+  color: #1f2937;
+  font-size: 1.2rem;
+}
+
+/* Meter Styles */
+.meterWrapper {
+  margin-bottom: 20px;
+}
+
+.meterLabels {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 0.85rem;
+  color: #6b7280;
+}
+
+.meterValue {
+  font-weight: 600;
+  color: #374151;
+}
+
+.meterContainer {
+  position: relative;
+  height: 24px;
+  margin-bottom: 8px;
+}
+
+.meterTrack {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 8px;
+  background: #e5e7eb;
+  border-radius: 4px;
+  transform: translateY(-50%);
+  overflow: hidden;
+}
+
+.meterFill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.meterPercentage {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  background: white;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: #1f2937;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border: 2px solid #e5e7eb;
+}
+
+/* Meter Stats */
+.meterStats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+  background: white;
+  padding: 15px;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+}
+
+.statItem {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.statLabel {
+  font-size: 0.8rem;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.statValue {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+/* Meter Footer */
+.meterFooter {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 15px;
+  padding-top: 20px;
+  border-top: 2px solid #f3f4f6;
+}
+
+.summaryCard {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 15px;
+  background: #f8fafc;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.summaryCard i {
+  font-size: 1.8rem;
+  color: #3b82f6;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: white;
+  border-radius: 10px;
+  border: 2px solid #e2e8f0;
+}
+
+.summaryCard h4 {
+  margin: 0 0 4px 0;
+  font-size: 0.9rem;
+  color: #6b7280;
+  font-weight: 600;
+}
+
+.summaryCard p {
+  margin: 0;
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.totalDays {
+  color: #10b981 !important;
+}
+
+.usedDays {
+  color: #ef4444 !important;
+}
+
+.updateTime {
+  color: #6b7280 !important;
+}
+
+.summaryCard small {
+  display: block;
+  font-size: 0.75rem;
+  color: #9ca3af;
+  margin-top: 2px;
+}
+
+/* Loading State */
+.meterLoading {
+  text-align: center;
+  padding: 40px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.loadingSpinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #e5e7eb;
+  border-top-color: #3b82f6;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 15px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.meterLoading p {
+  margin: 0;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+/* Error State */
+.meterError {
+  text-align: center;
+  padding: 40px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  color: #ef4444;
+}
+
+.meterError i {
+  font-size: 3rem;
+  margin-bottom: 15px;
+  opacity: 0.7;
+}
+
+.meterError p {
+  margin: 0;
+  font-weight: 500;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .meterGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .meterHeader {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .meterCard {
+    padding: 15px;
+  }
+
+  .meterFooter {
+    grid-template-columns: 1fr;
+  }
+
+  .meterContainer {
+    height: 20px;
+  }
+
+  .meterTrack {
+    height: 6px;
+  }
+
+  .meterPercentage {
+    font-size: 0.8rem;
+    padding: 3px 10px;
+  }
+}
+
+@media (max-width: 480px) {
+  .leaveMeterContainer {
+    padding: 15px;
+  }
+
+  .meterStats {
+    grid-template-columns: 1fr;
+  }
+
+  .meterCardHeader {
+    flex-direction: column;
+    text-align: center;
+    gap: 8px;
+  }
+
+  .meterIcon {
+    width: 40px;
+    height: 40px;
+    font-size: 1.2rem;
+  }
+}
+
+/* Add these styles to your LeaveMeter.module.css */
+
+/* Emoji Styles */
+.emojiIcon {
+  font-size: 1.8rem;
+  line-height: 1;
+}
+
+.emojiSmall {
+  font-size: 0.9rem;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+
+.emojiLarge {
+  font-size: 2.2rem;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: white;
+  border-radius: 10px;
+  border: 2px solid #e2e8f0;
+}
+
+/* Update meter icon container to handle emojis */
+.meterIcon {
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 1.8rem; /* Larger for emojis */
+}
+
+/* Adjust header for emojis */
+.meterCardHeader h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Update summary card icons */
+.summaryCard i {
+  font-size: 1.8rem;
+  color: #3b82f6;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: white;
+  border-radius: 10px;
+  border: 2px solid #e2e8f0;
+}
+
+/* Remove the old icon styles and replace with emoji container */
+.meterIcon i {
+  display: none; /* Hide font awesome icons if using emojis */
+}
+
+/* Responsive adjustments for emojis */
+@media (max-width: 768px) {
+  .emojiIcon {
+    font-size: 1.5rem;
+  }
+  
+  .emojiLarge {
+    font-size: 1.8rem;
+    width: 40px;
+    height: 40px;
+  }
+  
+  .meterIcon {
+    width: 40px;
+    height: 40px;
+    font-size: 1.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .meterCardHeader h3 {
+    font-size: 1rem;
+  }
+  
+  .emojiIcon {
+    font-size: 1.2rem;
+  }
+  
+  .emojiSmall {
+    font-size: 0.8rem;
+  }
+  
+  .emojiLarge {
+    font-size: 1.5rem;
+    width: 36px;
+    height: 36px;
+  }
+}
+/* Add to LeaveMeter.module.css */
+.retryButton {
+  background: #3b82f6;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  margin-top: 15px;
+  transition: background 0.3s ease;
+}
+
+.retryButton:hover {
+  background: #2563eb;
+}
+
+/* styles/LeaveMeter.module.css */
+.leaveMeterContainer {
+  padding: 20px;
+  background: #f8fafc;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.meterHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.meterHeader h2 {
+  color: #1e293b;
+  font-size: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.refreshButton {
+  padding: 8px 16px;
+  background: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.refreshButton:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.infoBanner {
+  background-color: #e0f2fe;
+  border: 1px solid #38bdf8;
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 24px;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: flex-start;
+}
+
+.meterGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+.meterCard {
+  background: white;
+  border-radius: 10px;
+  padding: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.meterCardHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.meterIcon {
+  font-size: 1.8rem;
+}
+
+.meterCardHeader h3 {
+  margin: 0;
+  color: #334155;
+}
+
+.meterWrapper {
+  margin-bottom: 20px;
+}
+
+.meterLabels {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 0.85rem;
+}
+
+.meterLabel {
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.meterValue {
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.meterContainer {
+  position: relative;
+  height: 24px;
+}
+
+.meterTrack {
+  width: 100%;
+  height: 100%;
+  background: #e2e8f0;
+  border-radius: 12px;
+  overflow: hidden;
+  position: relative;
+}
+
+.meterFill {
+  height: 100%;
+  border-radius: 12px;
+  transition: width 0.5s ease;
+}
+
+.meterPercentage {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-weight: bold;
+  font-size: 0.9rem;
+  color: #1e293b;
+}
+
+.meterStats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.statItem {
+  background: #f8fafc;
+  padding: 10px;
+  border-radius: 6px;
+}
+
+.statLabel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #64748b;
+  font-size: 0.85rem;
+}
+
+.statValue {
+  font-weight: 600;
+  color: #1e293b;
+  margin-top: 4px;
+  display: block;
+}
+
+.meterFooter {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.summaryCard {
+  background: white;
+  border-radius: 10px;
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.emojiLarge {
+  font-size: 2rem;
+}
+
+.summaryCard h4 {
+  margin: 0 0 4px 0;
+  color: #64748b;
+  font-size: 0.9rem;
+}
+
+.totalDays, .usedDays {
+  font-size: 1.4rem;
+  font-weight: bold;
+  margin: 0;
+  color: #1e293b;
+}
+
+.totalDays {
+  color: #10b981;
+}
+
+.usedDays {
+  color: #ef4444;
+}
+
+.summaryCard small {
+  color: #94a3b8;
+  font-size: 0.8rem;
+}
+
+.emojiSmall {
+  font-size: 0.9rem;
+}
+
+.meterLoading {
+  text-align: center;
+  padding: 40px;
+}
+
+.loadingSpinner {
+  border: 3px solid #f3f3f3;
+  border-top: 3px solid #3b82f6;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 16px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}

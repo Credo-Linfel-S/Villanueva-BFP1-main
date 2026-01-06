@@ -1259,6 +1259,7 @@ const RecruitmentPersonnel = () => {
                 </div>
 
                 {/* Row 2: Username and Password */}
+                {/* Row 2: Username and Password - FIXED VERSION */}
                 <div className={styles.formRow}>
                   <div className={styles.formGroup}>
                     <div className={styles.floatingGroup}>
@@ -1282,7 +1283,7 @@ const RecruitmentPersonnel = () => {
                   </div>
                   <div className={styles.formGroup}>
                     <div className={styles.floatingGroup}>
-                      <div className={styles.passwordInputGroup}>
+                      <div className={styles.passwordInputContainer}>
                         <input
                           type={showPassword ? "text" : "password"}
                           id="password"
@@ -1293,20 +1294,21 @@ const RecruitmentPersonnel = () => {
                           required
                           disabled={submitting || initialLoading}
                         />
+                        <label
+                          htmlFor="password"
+                          className={styles.floatingLabel}
+                        >
+                          Password *
+                        </label>
                         <button
                           type="button"
-                          className={styles.showPasswordBtn}
+                          className={styles.eyeToggleBtn}
                           onClick={() => setShowPassword(!showPassword)}
+                          disabled={submitting || initialLoading}
                         >
-                          {showPassword ? "🙈" : "👁"}
+                          {showPassword ? <FaEyeSlash /> : <FaEye />}
                         </button>
                       </div>
-                      <label
-                        htmlFor="password"
-                        className={styles.floatingLabel}
-                      >
-                        Password *
-                      </label>
                     </div>
                     <button
                       type="button"
@@ -1318,7 +1320,6 @@ const RecruitmentPersonnel = () => {
                     </button>
                   </div>
                 </div>
-
                 {/* Row 3: Application Date and Stage */}
                 <div className={styles.formRow}>
                   <div className={styles.formGroup}>
@@ -1494,7 +1495,7 @@ const RecruitmentPersonnel = () => {
                       style={{ textAlign: "center", padding: "40px" }}
                     >
                       <div style={{ fontSize: "48px", marginBottom: "16px" }}>
-                        ⏳
+                        <span className={styles.animatedEmoji}>⏳</span>
                       </div>
                       <h3
                         style={{
@@ -1514,7 +1515,7 @@ const RecruitmentPersonnel = () => {
                       style={{ textAlign: "center", padding: "40px" }}
                     >
                       <div style={{ fontSize: "48px", marginBottom: "16px" }}>
-                        📇
+                        <span className={styles.animatedEmoji}>📇</span>
                       </div>
                       <h3
                         style={{
@@ -1638,37 +1639,67 @@ const RecruitmentPersonnel = () => {
           </div>
 
           {/* Delete Confirmation Modal */}
+          {/* Delete Confirmation Modal - Updated to match Personnel Register */}
           {showDeleteModal && (
-            <div className={`${styles.modal} ${styles.show}`}>
-              <div className={styles.modalContent}>
-                <div className={styles.modalHeader}>
-                  <h2>Confirm Deletion</h2>
-                  <button onClick={cancelDelete} className={styles.closeBtn}>
+            <div className={`${styles.preModalDelete} ${styles.show}`}>
+              <div
+                className={styles.preModalContentDelete}
+                style={{ maxWidth: "450px" }}
+              >
+                <div className={styles.preModalHeaderDelete}>
+                  <h2 style={{ marginLeft: "30px" }}>Confirm Deletion</h2>
+                  <span className={styles.preCloseBtn} onClick={cancelDelete}>
                     &times;
-                  </button>
+                  </span>
                 </div>
-                <div className={styles.modalBody}>
-                  <p>
-                    Are you sure you want to delete this candidate record? This
-                    will also delete associated files.
-                  </p>
-                  <div className={styles.modalActions}>
-                    <button onClick={cancelDelete} className={styles.cancelBtn}>
-                      Cancel
-                    </button>
-                    <button
-                      onClick={confirmDelete}
-                      className={styles.deleteConfirmBtn}
-                      disabled={submitting}
-                    >
-                      {submitting ? "Deleting..." : "Delete"}
-                    </button>
+
+                <div className={styles.preModalBody}>
+                  <div className={styles.deleteConfirmationContent}>
+                    <div className={styles.deleteWarningIcon}>⚠️</div>
+                    <p className={styles.deleteConfirmationText}>
+                      Are you sure you want to delete the candidate record for
+                    </p>
+                    <p className={styles.documentNameHighlight}>
+                      "
+                      {records.find((record) => record.id === deleteId)
+                        ?.candidate || "this candidate"}
+                      "?
+                    </p>
+                    <p className={styles.deleteWarning}>
+                      This action cannot be undone. All associated files (photo
+                      and resume) will also be deleted.
+                    </p>
                   </div>
+                </div>
+
+                <div className={styles.preModalActions}>
+                  <button
+                    className={`${styles.preBtn} ${styles.preCancelBtn}`}
+                    onClick={cancelDelete}
+                    disabled={submitting}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    className={`${styles.preBtn} ${styles.deleteConfirmBtn} ${
+                      submitting ? styles.deleteConfirmBtnLoading : ""
+                    }`}
+                    onClick={confirmDelete}
+                    disabled={submitting}
+                  >
+                    {submitting ? (
+                      <>
+                        <span className={styles.deleteSpinner}></span>
+                        Deleting...
+                      </>
+                    ) : (
+                      "Delete"
+                    )}
+                  </button>
                 </div>
               </div>
             </div>
           )}
-
           {/* EDIT MODAL */}
           {showEditModal && (
             <div className={`${styles.modal} ${styles.show}`}>
@@ -1843,49 +1874,10 @@ const RecruitmentPersonnel = () => {
                         </div>
                       </div>
 
-                      {/* In your add form */}
+                      {/* FIXED EDIT MODAL PASSWORD INPUT WITH FLOATING LABEL */}
                       <div className={styles.formGroup}>
                         <div className={styles.floatingGroup}>
-                          <div className={styles.passwordInputGroup}>
-                            <input
-                              type={showPassword ? "text" : "password"}
-                              id="password"
-                              className={styles.floatingInput}
-                              placeholder=" "
-                              value={addPassword}
-                              onChange={(e) => setAddPassword(e.target.value)}
-                              required
-                              disabled={submitting || initialLoading}
-                            />
-                            <button
-                              type="button"
-                              className={styles.showPasswordBtn}
-                              onClick={() => setShowPassword(!showPassword)}
-                            >
-                              {showPassword ? <FaEyeSlash /> : <FaEye />}
-                            </button>
-                          </div>
-                          <label
-                            htmlFor="password"
-                            className={styles.floatingLabel}
-                          >
-                            Password *
-                          </label>
-                        </div>
-                        <button
-                          type="button"
-                          className={styles.generatePasswordBtn}
-                          onClick={handleGeneratePassword}
-                          disabled={submitting || initialLoading}
-                        >
-                          Generate
-                        </button>
-                      </div>
-
-                      {/* In your edit form (inside edit modal) */}
-                      <div className={styles.formGroup}>
-                        <div className={styles.floatingGroup}>
-                          <div className={styles.passwordInputGroup}>
+                          <div className={styles.passwordInputContainer}>
                             <input
                               type={showPassword ? "text" : "password"}
                               id="edit-password"
@@ -1896,21 +1888,21 @@ const RecruitmentPersonnel = () => {
                               required
                               disabled={isSavingEdit}
                             />
+                            <label
+                              htmlFor="edit-password"
+                              className={styles.floatingLabel}
+                            >
+                              Password *
+                            </label>
                             <button
                               type="button"
-                              className={styles.showPasswordBtn}
+                              className={styles.eyeToggleBtn}
                               onClick={() => setShowPassword(!showPassword)}
                               disabled={isSavingEdit}
                             >
                               {showPassword ? <FaEyeSlash /> : <FaEye />}
                             </button>
                           </div>
-                          <label
-                            htmlFor="edit-password"
-                            className={styles.floatingLabel}
-                          >
-                            Password *
-                          </label>
                         </div>
                         <button
                           type="button"
@@ -1957,7 +1949,7 @@ const RecruitmentPersonnel = () => {
                       <div className={styles.formGroup}>
                         <div className={styles.floatingGroup}>
                           <select
-                            id="edit-stage"
+                            id="stage"
                             className={styles.floatingSelect}
                             value={editFormData.stage}
                             onChange={handleEditInputChange}
@@ -1979,7 +1971,7 @@ const RecruitmentPersonnel = () => {
                             <option value="Final Review">Final Review</option>
                           </select>
                           <label
-                            htmlFor="edit-stage"
+                            htmlFor="stage"
                             className={styles.floatingLabel}
                           >
                             Select Stage *
@@ -2020,7 +2012,7 @@ const RecruitmentPersonnel = () => {
                       <div className={styles.formGroup}>
                         <div className={styles.floatingGroup}>
                           <select
-                            id="edit-status"
+                            id="status"
                             className={styles.floatingSelect}
                             value={editFormData.status}
                             onChange={handleEditInputChange}
@@ -2044,7 +2036,7 @@ const RecruitmentPersonnel = () => {
                             <option value="Rejected">Rejected</option>
                           </select>
                           <label
-                            htmlFor="edit-status"
+                            htmlFor="status"
                             className={styles.floatingLabel}
                           >
                             Select Status *

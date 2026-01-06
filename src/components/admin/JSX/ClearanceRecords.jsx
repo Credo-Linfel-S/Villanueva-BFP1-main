@@ -42,9 +42,7 @@ const ClearanceRecords = () => {
   const [selectedRecordDetails, setSelectedRecordDetails] = useState(null);
 
   const [deleteReason, setDeleteReason] = useState("");
-  const [generatingPdf, setGeneratingPdf] = useState(false);
-  const [pdfDownloadProgress, setPdfDownloadProgress] = useState(0);
-  const [pdfDownloadForRequest, setPdfDownloadForRequest] = useState(null);
+ 
   const [existingPdfs, setExistingPdfs] = useState({});
 
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
@@ -1522,68 +1520,61 @@ const handleCheckSchema = async () => {
     }
   };
 
-  const getPdfButton = (record) => {
-    const recordKey = record.recordType === "yearly" ? record.id : record.dbId;
-    const existingPdfsForRecord = existingPdfs[recordKey] || [];
+const getPdfButton = (record) => {
+  const recordKey = record.recordType === "yearly" ? record.id : record.dbId;
+  const existingPdfsForRecord = existingPdfs[recordKey] || [];
 
-    const hasExistingPdf = existingPdfsForRecord.length > 0;
-    const isGenerating = pdfDownloadForRequest === recordKey && generatingPdf;
+  // Check if PDF is available (completed status)
+  const isPdfAvailable =
+    record.recordType === "yearly"
+      ? record.status?.toUpperCase() === "CLEARED" ||
+        record.status?.toUpperCase() === "COMPLETED"
+      : record.status?.toLowerCase() === "completed";
 
-    const isPdfAvailable =
-      record.recordType === "yearly"
-        ? record.status?.toUpperCase() === "CLEARED" ||
-          record.status?.toUpperCase() === "COMPLETED"
-        : record.status?.toLowerCase() === "completed";
+  if (!isPdfAvailable) {
+    return (
+      <button
+        className={styles.CRSpdfBtn}
+        disabled
+        title={
+          record.recordType === "yearly"
+            ? "PDF only available for CLEARED yearly records"
+            : "PDF only available for completed clearances"
+        }
+      >
+        📄 PDF
+      </button>
+    );
+  }
 
-    if (!isPdfAvailable) {
-      return (
-        <button
-          className={styles.CRSpdfBtn}
-          disabled
-          title={
-            record.recordType === "yearly"
-              ? "PDF only available for CLEARED yearly records"
-              : "PDF only available for completed clearances"
-          }
-        >
-          📄 PDF
-        </button>
-      );
-    }
-
-    if (hasExistingPdf) {
-      return (
-        <button
-          className={styles.CRSpdfBtn}
-          onClick={() =>
-            downloadExistingPdf(existingPdfsForRecord[0].file_url, record)
-          }
-          title={`Download existing PDF (Generated: ${new Date(
-            existingPdfsForRecord[0].uploaded_at
-          ).toLocaleDateString()})`}
-        >
-          📥 PDF
-        </button>
-      );
-    } else {
-      return (
-        <button
-          className={styles.CRSpdfBtn}
-          onClick={() => generateAndUploadClearanceForm(record)}
-          disabled={isGenerating}
-          title="Generate new PDF"
-        >
-          {isGenerating ? (
-            <>
-              <span className={styles.spinner}></span> Generating...
-            </>
-          ) : (
-            "📄 Generate"
-          )}
-        </button>
-      );
-    }
-  };
+  // If PDF exists, show download button
+  if (existingPdfsForRecord.length > 0) {
+    return (
+      <button
+        className={styles.CRSpdfBtn}
+        onClick={() =>
+          downloadExistingPdf(existingPdfsForRecord[0].file_url, record)
+        }
+        title={`Download existing PDF (Generated: ${new Date(
+          existingPdfsForRecord[0].uploaded_at
+        ).toLocaleDateString()})`}
+      >
+        📥 Download PDF
+      </button>
+    );
+  } else {
+    // No PDF exists - show disabled button
+    return (
+      <button
+        className={styles.CRSpdfBtn}
+        disabled
+        title="PDF not yet generated. Generate PDF in Clearance System."
+      >
+        📄 No PDF
+      </button>
+    );
+  }
+};
 
   const generateYearlyClearanceRecord = async () => {
     const year = prompt(
@@ -2783,7 +2774,7 @@ const renderBulkDeleteControls = () => {
     );
   };
 
-  const renderPdfProgressOverlay = () => {
+{/*  const renderPdfProgressOverlay = () => {
     if (!generatingPdf) return null;
 
     return (
@@ -2803,7 +2794,7 @@ const renderBulkDeleteControls = () => {
         </div>
       </div>
     );
-  };
+  };*/}
 
   const renderDetailsModal = () => {
     if (!showDetailsModal || !selectedRecordDetails) return null;
@@ -3630,13 +3621,12 @@ const renderBulkDeleteControls = () => {
 
   return (
     <>
-      {/* ADD BFP PRELOADER AT THE TOP OF THE COMPONENT */}
-      <BFPPreloader 
-        loading={loading || generatingPdf || generatingYearlyRecord}
+      <BFPPreloader
+        loading={loading || generatingYearlyRecord}
         moduleTitle="CLEARANCE RECORDS • Validating Documents..."
         onRetry={loadClearanceData}
       />
-    
+
       <div className={styles.CRSappContainer}>
         <Title>Clearance Records | BFP Villanueva</Title>
         <Meta name="robots" content="noindex, nofollow" />
@@ -3645,7 +3635,9 @@ const renderBulkDeleteControls = () => {
         <Sidebar />
         <ToastContainer />
 
-        <div className={`main-content ${isSidebarCollapsed ? "collapsed" : ""}`}>
+        <div
+          className={`main-content ${isSidebarCollapsed ? "collapsed" : ""}`}
+        >
           <div className={styles.CRSheaderContainer}>
             <h1>Clearance Records</h1>
 
@@ -3866,7 +3858,6 @@ const renderBulkDeleteControls = () => {
           {renderManualArchiveModal()}
 
           {/* PDF Progress Overlay */}
-          {renderPdfProgressOverlay()}
         </div>
 
         {/* Delete Confirmation Modal */}
@@ -3985,8 +3976,8 @@ const renderBulkDeleteControls = () => {
                     )}
 
                     <p className={styles.inventoryDeleteWarning}>
-                      This action cannot be undone. All associated data including
-                      PDF files will be permanently deleted.
+                      This action cannot be undone. All associated data
+                      including PDF files will be permanently deleted.
                     </p>
                   </div>
                 )}

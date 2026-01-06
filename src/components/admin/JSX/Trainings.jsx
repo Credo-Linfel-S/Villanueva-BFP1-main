@@ -994,7 +994,7 @@ const Trainings = () => {
                 <tr>
                   <td colSpan="7" className={styles.TSNoRequestsTable}>
                     <div style={{ fontSize: "48px", marginBottom: "16px" }}>
-                      📚
+                      <span className={styles.animatedEmoji}>📚</span>
                     </div>
                     <h3>No Training Records Found</h3>
                     <p>

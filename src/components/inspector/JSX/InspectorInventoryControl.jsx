@@ -10,6 +10,9 @@ import "flatpickr/dist/flatpickr.css";
 import { Title, Meta } from "react-head";
 import { supabase } from "../../../lib/supabaseClient.js";
 
+// Import the BFPPreloader component
+import BFPPreloader from "../../../components/BFPPreloader"; // Adjust the path as needed
+
 export default function InspectionControl() {
   // Status constants
   const STATUS_OPTIONS = [
@@ -101,6 +104,16 @@ export default function InspectionControl() {
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
 
+  // Loading states for different data loads
+  const [loadingInspections, setLoadingInspections] = useState(true);
+  const [loadingInventory, setLoadingInventory] = useState(true);
+  const [loadingPersonnel, setLoadingPersonnel] = useState(true);
+  const [deleting, setDeleting] = useState(false);
+
+  // Calculate overall loading state
+  const loading =
+    loadingInspections || loadingInventory || loadingPersonnel || deleting;
+
   // Summary numbers (computed)
   const totalInspections = inspections.length;
   const passedInspections = inspections.filter(
@@ -115,6 +128,7 @@ export default function InspectionControl() {
 
   // Load inspections with joined data from inventory and personnel
   async function loadInspections() {
+    setLoadingInspections(true);
     try {
       const { data: inspectionsData, error: inspectionsError } = await supabase
         .from("inspections")
@@ -188,10 +202,13 @@ export default function InspectionControl() {
       if (currentPage > totalPages) setCurrentPage(totalPages);
     } catch (err) {
       console.error("loadInspections error", err);
+    } finally {
+      setLoadingInspections(false);
     }
   }
 
   async function loadInventory() {
+    setLoadingInventory(true);
     try {
       const { data, error } = await supabase
         .from("inventory")
@@ -204,10 +221,13 @@ export default function InspectionControl() {
       setInventory(data || []);
     } catch (err) {
       console.error("loadInventory error", err);
+    } finally {
+      setLoadingInventory(false);
     }
   }
 
   async function loadPersonnel() {
+    setLoadingPersonnel(true);
     try {
       const { data, error } = await supabase
         .from("personnel")
@@ -218,6 +238,8 @@ export default function InspectionControl() {
       setPersonnel(data || []);
     } catch (err) {
       console.error("loadPersonnel error", err);
+    } finally {
+      setLoadingPersonnel(false);
     }
   }
 
@@ -422,6 +444,7 @@ export default function InspectionControl() {
 
   async function performDelete() {
     if (!deleteId) return;
+    setDeleting(true);
     try {
       const { error } = await supabase
         .from("inspections")
@@ -435,6 +458,8 @@ export default function InspectionControl() {
     } catch (err) {
       console.error("delete error", err);
       alert(`Failed to delete inspection: ${err.message}`);
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -513,494 +538,533 @@ export default function InspectionControl() {
     };
   }, []);
 
+  // Handle retry for the preloader
+  const handleRetry = () => {
+    setLoadingInspections(true);
+    setLoadingInventory(true);
+    setLoadingPersonnel(true);
+    loadInspections();
+    loadInventory();
+    loadPersonnel();
+  };
+
+  // Render BFPPreloader at the top of the component
   return (
-    <div className={styles.inspectionAppContainer}>
-      <Title>Inspection Control | BFP Villanueva</Title>
-      <Meta name="robots" content="noindex, nofollow" />
-      <InspectorSidebar />
-      <Hamburger />
+    <>
+      {/* BFP Preloader - shows while loading or on network issues */}
+      <BFPPreloader
+        loading={loading}
+        progress={0}
+        moduleTitle="INSPECTOR INVENTORY CONTROL • Verifying Equipment..."
+        onRetry={handleRetry}
+      />
 
-      <div className={`main-content ${isSidebarCollapsed ? "collapsed" : ""}`}>
-        <h1>Inspection Control</h1>
+      {/* Main content - only shown when preloader is not visible */}
+      <div className={styles.inspectionAppContainer}>
+        <Title>Inspection Control | BFP Villanueva</Title>
+        <Meta name="robots" content="noindex, nofollow" />
+        <InspectorSidebar />
+        <Hamburger />
 
-        {/* Removed Add Inspection Button */}
+        <div
+          className={`main-content ${isSidebarCollapsed ? "collapsed" : ""}`}
+        >
+          <h1>Inspection Control</h1>
 
-        <div className={styles.inspectionTopControls}>
-          <div className={styles.inspectionTableHeader}>
-            <select
-              className={styles.inspectionFilterCategory}
-              value={filterCategory}
-              onChange={(e) => {
-                setFilterCategory(e.target.value);
-                setCurrentPage(1);
-              }}
-            >
-              <option value="">All Categories</option>
-              {Array.from(new Set(inventory.map((item) => item.category))).map(
-                (category) => (
+          {/* Removed Add Inspection Button */}
+
+          <div className={styles.inspectionTopControls}>
+            <div className={styles.inspectionTableHeader}>
+              <select
+                className={styles.inspectionFilterCategory}
+                value={filterCategory}
+                onChange={(e) => {
+                  setFilterCategory(e.target.value);
+                  setCurrentPage(1);
+                }}
+              >
+                <option value="">All Categories</option>
+                {Array.from(
+                  new Set(inventory.map((item) => item.category))
+                ).map((category) => (
                   <option key={category} value={category}>
                     {category}
                   </option>
-                )
-              )}
-            </select>
+                ))}
+              </select>
 
-            <select
-              className={styles.inspectionFilterStatus}
-              value={filterStatus}
-              onChange={(e) => {
-                setFilterStatus(e.target.value);
-                setCurrentPage(1);
-              }}
-            >
-              <option value="">All Status</option>
-              {STATUS_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+              <select
+                className={styles.inspectionFilterStatus}
+                value={filterStatus}
+                onChange={(e) => {
+                  setFilterStatus(e.target.value);
+                  setCurrentPage(1);
+                }}
+              >
+                <option value="">All Status</option>
+                {STATUS_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
 
-            <input
-              type="text"
-              className={styles.inspectionSearchBar}
-              placeholder="🔍 Search inspections..."
-              value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                setCurrentPage(1);
-              }}
-            />
+              <input
+                type="text"
+                className={styles.inspectionSearchBar}
+                placeholder="🔍 Search inspections..."
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setCurrentPage(1);
+                }}
+              />
+            </div>
           </div>
-        </div>
 
-        <div
-          id={styles.inspectionSummary}
-          style={{ display: "flex", gap: 20, margin: 20 }}
-        >
-          <button
-            className={`${styles.inspectionSummaryCard} ${
-              styles.inspectionTotal
-            } ${currentFilterCard === "total" ? styles.inspectionActive : ""}`}
-            onClick={() => handleCardClick("total")}
+          <div
+            id={styles.inspectionSummary}
+            style={{ display: "flex", gap: 20, margin: 20 }}
           >
-            <h3>Total Inspections</h3>
-            <p id={styles.inspectionTotalItems}>{totalInspections}</p>
-          </button>
-          <button
-            className={`${styles.inspectionSummaryCard} ${
-              styles.inspectionPassed
-            } ${currentFilterCard === "passed" ? styles.inspectionActive : ""}`}
-            onClick={() => handleCardClick("passed")}
-          >
-            <h3>Passed (Completed)</h3>
-            <p id={styles.inspectionPassedItems}>{passedInspections}</p>
-          </button>
-          <button
-            className={`${styles.inspectionSummaryCard} ${
-              styles.inspectionFailed
-            } ${currentFilterCard === "failed" ? styles.inspectionActive : ""}`}
-            onClick={() => handleCardClick("failed")}
-          >
-            <h3>Failed</h3>
-            <p id={styles.inspectionFailedItems}>{failedInspections}</p>
-          </button>
-          <button
-            className={`${styles.inspectionSummaryCard} ${
-              styles.inspectionNeedsAttention
-            } ${
-              currentFilterCard === "needsAttention"
-                ? styles.inspectionActive
-                : ""
-            }`}
-            onClick={() => handleCardClick("needsAttention")}
-          >
-            <h3>Needs Attention</h3>
-            <p id={styles.inspectionNeedsAttentionItems}>
-              {needsAttentionInspections}
-            </p>
-          </button>
-        </div>
+            <button
+              className={`${styles.inspectionSummaryCard} ${
+                styles.inspectionTotal
+              } ${
+                currentFilterCard === "total" ? styles.inspectionActive : ""
+              }`}
+              onClick={() => handleCardClick("total")}
+            >
+              <h3>Total Inspections</h3>
+              <p id={styles.inspectionTotalItems}>{totalInspections}</p>
+            </button>
+            <button
+              className={`${styles.inspectionSummaryCard} ${
+                styles.inspectionPassed
+              } ${
+                currentFilterCard === "passed" ? styles.inspectionActive : ""
+              }`}
+              onClick={() => handleCardClick("passed")}
+            >
+              <h3>Passed (Completed)</h3>
+              <p id={styles.inspectionPassedItems}>{passedInspections}</p>
+            </button>
+            <button
+              className={`${styles.inspectionSummaryCard} ${
+                styles.inspectionFailed
+              } ${
+                currentFilterCard === "failed" ? styles.inspectionActive : ""
+              }`}
+              onClick={() => handleCardClick("failed")}
+            >
+              <h3>Failed</h3>
+              <p id={styles.inspectionFailedItems}>{failedInspections}</p>
+            </button>
+            <button
+              className={`${styles.inspectionSummaryCard} ${
+                styles.inspectionNeedsAttention
+              } ${
+                currentFilterCard === "needsAttention"
+                  ? styles.inspectionActive
+                  : ""
+              }`}
+              onClick={() => handleCardClick("needsAttention")}
+            >
+              <h3>Needs Attention</h3>
+              <p id={styles.inspectionNeedsAttentionItems}>
+                {needsAttentionInspections}
+              </p>
+            </button>
+          </div>
 
-        {/* Table Header Section - Matching InspectorEquipmentInspection */}
-        <div className={styles.inspectionTableHeaderSection}>
-          <h2 className={styles.sheaders}>Inspection Records</h2>
-        </div>
-        <div
-          className={`${styles.inspectionPaginationContainer} ${styles.inspectionTopPagination}`}
-        >
-          {renderPaginationButtons()}
-        </div>
+          {/* Table Header Section - Matching InspectorEquipmentInspection */}
+          <div className={styles.inspectionTableHeaderSection}>
+            <h2 className={styles.sheaders}>Inspection Records</h2>
+          </div>
+          <div
+            className={`${styles.inspectionPaginationContainer} ${styles.inspectionTopPagination}`}
+          >
+            {renderPaginationButtons()}
+          </div>
 
-        {/* Scrollable Table Container - Matching InspectorEquipmentInspection */}
-        <div className={styles.inspectionTableScrollContainer}>
-          {/* Top Pagination */}
+          {/* Scrollable Table Container - Matching InspectorEquipmentInspection */}
+          <div className={styles.inspectionTableScrollContainer}>
+            {/* Top Pagination */}
 
-          {/* Table */}
-          <table className={styles.inspectionTable}>
-            <thead>
-              <tr>
-                <th>Item Code</th>
-                <th>Equipment Name</th>
-                <th>Category</th>
-                <th>Equipment Status</th>
-                <th>Assigned To</th>
-                <th>Assigned Date</th>
-                <th>Inspector Name</th>
-                <th>Scheduled Date</th>
-                <th>Inspection Result</th>
-                <th>Findings</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody id={styles.inspectionTableBody}>
-              {paginated.length === 0 ? (
+            {/* Table */}
+            <table className={styles.inspectionTable}>
+              <thead>
                 <tr>
-                  <td
-                    colSpan="11"
-                    style={{ textAlign: "center", padding: "40px" }}
-                  >
-                    <div style={{ fontSize: "48px", marginBottom: "16px" }}>
-                      <span className={styles.animatedEmoji}>🔍</span>
-                    </div>
-                    <h3
-                      style={{
-                        fontSize: "18px",
-                        fontWeight: "600",
-                        color: "#2b2b2b",
-                        marginBottom: "8px",
-                      }}
-                    >
-                      No Inspections Found
-                    </h3>
-                    <p style={{ fontSize: "14px", color: "#999" }}>
-                      No inspection records available
-                    </p>
-                  </td>
+                  <th>Item Code</th>
+                  <th>Equipment Name</th>
+                  <th>Category</th>
+                  <th>Equipment Status</th>
+                  <th>Assigned To</th>
+                  <th>Assigned Date</th>
+                  <th>Inspector Name</th>
+                  <th>Scheduled Date</th>
+                  <th>Inspection Result</th>
+                  <th>Findings</th>
+                  <th>Actions</th>
                 </tr>
-              ) : (
-                paginated.map((inspection) => (
-                  <tr key={inspection.id}>
-                    <td>{inspection.item_code}</td>
-                    <td>{inspection.equipment_name}</td>
-                    <td>{inspection.category}</td>
-                    <td>
-                      <span
-                        className={`${styles.equipmentStatusBadge} ${
-                          styles[
-                            getEquipmentStatusClass(inspection.equipment_status)
-                          ]
-                        }`}
+              </thead>
+              <tbody id={styles.inspectionTableBody}>
+                {paginated.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan="11"
+                      style={{ textAlign: "center", padding: "40px" }}
+                    >
+                      <div style={{ fontSize: "48px", marginBottom: "16px" }}>
+                        <span className={styles.animatedEmoji}>🔍</span>
+                      </div>
+                      <h3
+                        style={{
+                          fontSize: "18px",
+                          fontWeight: "600",
+                          color: "#2b2b2b",
+                          marginBottom: "8px",
+                        }}
                       >
-                        {inspection.equipment_status}
-                      </span>
-                    </td>
-                    <td>{inspection.assigned_to}</td>
-                    <td>{formatDate(inspection.assigned_date)}</td>
-                    <td>{inspection.inspector_name}</td>
-                    <td>{formatDate(inspection.schedule_inspection_date)}</td>
-                    <td>
-                      <span
-                        className={`${styles.inspectionStatusBadge} ${
-                          styles[getStatusClass(inspection.status)]
-                        }`}
-                      >
-                        {getStatusDisplay(inspection.status)}
-                      </span>
-                    </td>
-                    <td>
-                      {inspection.findings ? (
-                        <button
-                          className={styles.viewDetailsBtn}
-                          onClick={() => openViewModal(inspection)}
-                        >
-                          View Details
-                        </button>
-                      ) : (
-                        "No findings"
-                      )}
-                    </td>
-                    <td>
-                      <button
-                        className={styles.inspectionDeleteBtn}
-                        onClick={() => confirmDelete(inspection.id)}
-                      >
-                        Delete
-                      </button>
+                        No Inspections Found
+                      </h3>
+                      <p style={{ fontSize: "14px", color: "#999" }}>
+                        No inspection records available
+                      </p>
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : (
+                  paginated.map((inspection) => (
+                    <tr key={inspection.id}>
+                      <td>{inspection.item_code}</td>
+                      <td>{inspection.equipment_name}</td>
+                      <td>{inspection.category}</td>
+                      <td>
+                        <span
+                          className={`${styles.equipmentStatusBadge} ${
+                            styles[
+                              getEquipmentStatusClass(
+                                inspection.equipment_status
+                              )
+                            ]
+                          }`}
+                        >
+                          {inspection.equipment_status}
+                        </span>
+                      </td>
+                      <td>{inspection.assigned_to}</td>
+                      <td>{formatDate(inspection.assigned_date)}</td>
+                      <td>{inspection.inspector_name}</td>
+                      <td>{formatDate(inspection.schedule_inspection_date)}</td>
+                      <td>
+                        <span
+                          className={`${styles.inspectionStatusBadge} ${
+                            styles[getStatusClass(inspection.status)]
+                          }`}
+                        >
+                          {getStatusDisplay(inspection.status)}
+                        </span>
+                      </td>
+                      <td>
+                        {inspection.findings ? (
+                          <button
+                            className={styles.viewDetailsBtn}
+                            onClick={() => openViewModal(inspection)}
+                          >
+                            View Details
+                          </button>
+                        ) : (
+                          "No findings"
+                        )}
+                      </td>
+                      <td>
+                        <button
+                          className={styles.inspectionDeleteBtn}
+                          onClick={() => confirmDelete(inspection.id)}
+                          disabled={deleting}
+                        >
+                          {deleting && deleteId === inspection.id
+                            ? "Deleting..."
+                            : "Delete"}
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
 
-          {/* Bottom Pagination */}
-        </div>
-        <div
-          className={`${styles.inspectionPaginationContainer} ${styles.inspectionBottomPagination}`}
-        >
-          {renderPaginationButtons()}
-        </div>
-        {/* View Details Modal */}
-        {isViewModalOpen && selectedInspection && (
+            {/* Bottom Pagination */}
+          </div>
           <div
-            className={styles.inspectionViewModalOverlay}
-            style={{ display: "flex" }}
-            onClick={closeViewModal}
+            className={`${styles.inspectionPaginationContainer} ${styles.inspectionBottomPagination}`}
           >
+            {renderPaginationButtons()}
+          </div>
+          {/* View Details Modal */}
+          {isViewModalOpen && selectedInspection && (
             <div
-              className={styles.inspectionViewModalContent}
-              onClick={(e) => e.stopPropagation()}
+              className={styles.inspectionViewModalOverlay}
+              style={{ display: "flex" }}
+              onClick={closeViewModal}
             >
-              <div className={styles.inspectionViewModalHeader}>
-                <h3 className={styles.inspectionViewModalTitle}>
-                  Inspection Details
-                </h3>
-                <button
-                  className={styles.inspectionViewModalCloseBtn}
-                  onClick={closeViewModal}
-                >
-                  &times;
-                </button>
-              </div>
-
-              <div className={styles.inspectionViewModalBody}>
-                {/* Equipment Information Section */}
-                <div className={styles.viewModalSection}>
-                  <h4 className={styles.viewModalSectionTitle}>
-                    Equipment Information
-                  </h4>
-                  <div className={styles.viewModalGrid}>
-                    <div className={styles.viewModalField}>
-                      <label>Item Code:</label>
-                      <span>{selectedInspection.item_code}</span>
-                    </div>
-                    <div className={styles.viewModalField}>
-                      <label>Equipment Name:</label>
-                      <span>{selectedInspection.equipment_name}</span>
-                    </div>
-                    <div className={styles.viewModalField}>
-                      <label>Category:</label>
-                      <span>{selectedInspection.category}</span>
-                    </div>
-                    <div className={styles.viewModalField}>
-                      <label>Equipment Status:</label>
-                      <span
-                        className={`${styles.equipmentStatusBadge} ${
-                          styles[
-                            getEquipmentStatusClass(
-                              selectedInspection.equipment_status
-                            )
-                          ]
-                        }`}
-                      >
-                        {selectedInspection.equipment_status}
-                      </span>
-                    </div>
-                    <div className={styles.viewModalField}>
-                      <label>Purchase Date:</label>
-                      <span>
-                        {formatDate(selectedInspection.purchase_date)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Assignment Information Section */}
-                <div className={styles.viewModalSection}>
-                  <h4 className={styles.viewModalSectionTitle}>
-                    Assignment Information
-                  </h4>
-                  <div className={styles.viewModalGrid}>
-                    <div className={styles.viewModalField}>
-                      <label>Assigned To:</label>
-                      <span>{selectedInspection.assigned_to}</span>
-                    </div>
-                    <div className={styles.viewModalField}>
-                      <label>Assigned Date:</label>
-                      <span>
-                        {formatDate(selectedInspection.assigned_date)}
-                      </span>
-                    </div>
-                    <div className={styles.viewModalField}>
-                      <label>Last Checked:</label>
-                      <span>{formatDate(selectedInspection.last_checked)}</span>
-                    </div>
-                    <div className={styles.viewModalField}>
-                      <label>Next Maintenance:</label>
-                      <span>
-                        {formatDate(selectedInspection.next_maintenance_date)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Inspection Details Section */}
-                <div className={styles.viewModalSection}>
-                  <h4 className={styles.viewModalSectionTitle}>
+              <div
+                className={styles.inspectionViewModalContent}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className={styles.inspectionViewModalHeader}>
+                  <h3 className={styles.inspectionViewModalTitle}>
                     Inspection Details
-                  </h4>
-                  <div className={styles.viewModalGrid}>
-                    <div className={styles.viewModalField}>
-                      <label>Inspector:</label>
-                      <span>{selectedInspection.inspector_name}</span>
-                    </div>
-                    <div className={styles.viewModalField}>
-                      <label>Inspector Badge:</label>
-                      <span>{selectedInspection.inspector_badge}</span>
-                    </div>
-                    <div className={styles.viewModalField}>
-                      <label>Inspector Rank:</label>
-                      <span>{selectedInspection.inspector_rank}</span>
-                    </div>
-                    <div className={styles.viewModalField}>
-                      <label>Scheduled Date:</label>
-                      <span>
-                        {formatDate(
-                          selectedInspection.schedule_inspection_date
-                        )}
-                      </span>
-                    </div>
-                    <div className={styles.viewModalField}>
-                      <label>Reschedule Date:</label>
-                      <span>
-                        {formatDate(
-                          selectedInspection.reschedule_inspection_date
-                        )}
-                      </span>
-                    </div>
-                    <div className={styles.viewModalField}>
-                      <label>Inspection Status:</label>
-                      <span
-                        className={`${styles.inspectionStatusBadge} ${
-                          styles[getStatusClass(selectedInspection.status)]
-                        }`}
-                      >
-                        {getStatusDisplay(selectedInspection.status)}
-                      </span>
-                    </div>
-                    <div className={styles.viewModalField}>
-                      <label>Schedule Status:</label>
-                      <span>{selectedInspection.schedule_status}</span>
-                    </div>
-                  </div>
+                  </h3>
+                  <button
+                    className={styles.inspectionViewModalCloseBtn}
+                    onClick={closeViewModal}
+                  >
+                    &times;
+                  </button>
                 </div>
 
-                {/* Findings & Notes Section */}
-                <div className={styles.viewModalSection}>
-                  <h4 className={styles.viewModalSectionTitle}>
-                    Findings & Notes
-                  </h4>
-                  <div className={styles.viewModalFullWidth}>
-                    <div className={styles.viewModalField}>
-                      <label>Findings:</label>
-                      <div className={styles.viewModalTextContent}>
-                        {formatFindings(selectedInspection.findings)}
+                <div className={styles.inspectionViewModalBody}>
+                  {/* Equipment Information Section */}
+                  <div className={styles.viewModalSection}>
+                    <h4 className={styles.viewModalSectionTitle}>
+                      Equipment Information
+                    </h4>
+                    <div className={styles.viewModalGrid}>
+                      <div className={styles.viewModalField}>
+                        <label>Item Code:</label>
+                        <span>{selectedInspection.item_code}</span>
                       </div>
-                    </div>
-                    <div className={styles.viewModalField}>
-                      <label>Recommendations:</label>
-                      <div className={styles.viewModalTextContent}>
-                        {selectedInspection.recommendations ||
-                          "No recommendations"}
+                      <div className={styles.viewModalField}>
+                        <label>Equipment Name:</label>
+                        <span>{selectedInspection.equipment_name}</span>
                       </div>
-                    </div>
-                    <div className={styles.viewModalField}>
-                      <label>Additional Notes:</label>
-                      <div className={styles.viewModalTextContent}>
-                        {selectedInspection.notes || "No additional notes"}
+                      <div className={styles.viewModalField}>
+                        <label>Category:</label>
+                        <span>{selectedInspection.category}</span>
+                      </div>
+                      <div className={styles.viewModalField}>
+                        <label>Equipment Status:</label>
+                        <span
+                          className={`${styles.equipmentStatusBadge} ${
+                            styles[
+                              getEquipmentStatusClass(
+                                selectedInspection.equipment_status
+                              )
+                            ]
+                          }`}
+                        >
+                          {selectedInspection.equipment_status}
+                        </span>
+                      </div>
+                      <div className={styles.viewModalField}>
+                        <label>Purchase Date:</label>
+                        <span>
+                          {formatDate(selectedInspection.purchase_date)}
+                        </span>
                       </div>
                     </div>
                   </div>
-                </div>
 
-                {/* System Information Section */}
-                <div className={styles.viewModalSection}>
-                  <h4 className={styles.viewModalSectionTitle}>
-                    System Information
-                  </h4>
-                  <div className={styles.viewModalGrid}>
-                    <div className={styles.viewModalField}>
-                      <label>Record Created:</label>
-                      <span>
-                        {formatDateTime(selectedInspection.created_at)}
-                      </span>
+                  {/* Assignment Information Section */}
+                  <div className={styles.viewModalSection}>
+                    <h4 className={styles.viewModalSectionTitle}>
+                      Assignment Information
+                    </h4>
+                    <div className={styles.viewModalGrid}>
+                      <div className={styles.viewModalField}>
+                        <label>Assigned To:</label>
+                        <span>{selectedInspection.assigned_to}</span>
+                      </div>
+                      <div className={styles.viewModalField}>
+                        <label>Assigned Date:</label>
+                        <span>
+                          {formatDate(selectedInspection.assigned_date)}
+                        </span>
+                      </div>
+                      <div className={styles.viewModalField}>
+                        <label>Last Checked:</label>
+                        <span>
+                          {formatDate(selectedInspection.last_checked)}
+                        </span>
+                      </div>
+                      <div className={styles.viewModalField}>
+                        <label>Next Maintenance:</label>
+                        <span>
+                          {formatDate(selectedInspection.next_maintenance_date)}
+                        </span>
+                      </div>
                     </div>
-                    <div className={styles.viewModalField}>
-                      <label>Last Updated:</label>
-                      <span>
-                        {formatDateTime(selectedInspection.updated_at)}
-                      </span>
+                  </div>
+
+                  {/* Inspection Details Section */}
+                  <div className={styles.viewModalSection}>
+                    <h4 className={styles.viewModalSectionTitle}>
+                      Inspection Details
+                    </h4>
+                    <div className={styles.viewModalGrid}>
+                      <div className={styles.viewModalField}>
+                        <label>Inspector:</label>
+                        <span>{selectedInspection.inspector_name}</span>
+                      </div>
+                      <div className={styles.viewModalField}>
+                        <label>Inspector Badge:</label>
+                        <span>{selectedInspection.inspector_badge}</span>
+                      </div>
+                      <div className={styles.viewModalField}>
+                        <label>Inspector Rank:</label>
+                        <span>{selectedInspection.inspector_rank}</span>
+                      </div>
+                      <div className={styles.viewModalField}>
+                        <label>Scheduled Date:</label>
+                        <span>
+                          {formatDate(
+                            selectedInspection.schedule_inspection_date
+                          )}
+                        </span>
+                      </div>
+                      <div className={styles.viewModalField}>
+                        <label>Reschedule Date:</label>
+                        <span>
+                          {formatDate(
+                            selectedInspection.reschedule_inspection_date
+                          )}
+                        </span>
+                      </div>
+                      <div className={styles.viewModalField}>
+                        <label>Inspection Status:</label>
+                        <span
+                          className={`${styles.inspectionStatusBadge} ${
+                            styles[getStatusClass(selectedInspection.status)]
+                          }`}
+                        >
+                          {getStatusDisplay(selectedInspection.status)}
+                        </span>
+                      </div>
+                      <div className={styles.viewModalField}>
+                        <label>Schedule Status:</label>
+                        <span>{selectedInspection.schedule_status}</span>
+                      </div>
                     </div>
-                    <div className={styles.viewModalField}>
-                      <label>Clearance Request ID:</label>
-                      <span>
-                        {selectedInspection.clearance_request_id || "N/A"}
-                      </span>
+                  </div>
+
+                  {/* Findings & Notes Section */}
+                  <div className={styles.viewModalSection}>
+                    <h4 className={styles.viewModalSectionTitle}>
+                      Findings & Notes
+                    </h4>
+                    <div className={styles.viewModalFullWidth}>
+                      <div className={styles.viewModalField}>
+                        <label>Findings:</label>
+                        <div className={styles.viewModalTextContent}>
+                          {formatFindings(selectedInspection.findings)}
+                        </div>
+                      </div>
+                      <div className={styles.viewModalField}>
+                        <label>Recommendations:</label>
+                        <div className={styles.viewModalTextContent}>
+                          {selectedInspection.recommendations ||
+                            "No recommendations"}
+                        </div>
+                      </div>
+                      <div className={styles.viewModalField}>
+                        <label>Additional Notes:</label>
+                        <div className={styles.viewModalTextContent}>
+                          {selectedInspection.notes || "No additional notes"}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* System Information Section */}
+                  <div className={styles.viewModalSection}>
+                    <h4 className={styles.viewModalSectionTitle}>
+                      System Information
+                    </h4>
+                    <div className={styles.viewModalGrid}>
+                      <div className={styles.viewModalField}>
+                        <label>Record Created:</label>
+                        <span>
+                          {formatDateTime(selectedInspection.created_at)}
+                        </span>
+                      </div>
+                      <div className={styles.viewModalField}>
+                        <label>Last Updated:</label>
+                        <span>
+                          {formatDateTime(selectedInspection.updated_at)}
+                        </span>
+                      </div>
+                      <div className={styles.viewModalField}>
+                        <label>Clearance Request ID:</label>
+                        <span>
+                          {selectedInspection.clearance_request_id || "N/A"}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Delete Modal */}
-        {isDeleteOpen && (
-          <div
-            className={styles.inspectionModalDeleteOverlay}
-            style={{ display: "flex" }}
-          >
+          {/* Delete Modal */}
+          {isDeleteOpen && (
             <div
-              className={styles.inspectionModalDeleteContent}
-              style={{ maxWidth: "450px" }}
+              className={styles.inspectionModalDeleteOverlay}
+              style={{ display: "flex" }}
             >
-              <div className={styles.inspectionModalDeleteHeader}>
-                <h2 style={{ marginLeft: "30px" }}>Confirm Deletion</h2>
-                <span
-                  className={styles.inspectionModalDeleteCloseBtn}
-                  onClick={cancelDelete}
-                >
-                  &times;
-                </span>
-              </div>
+              <div
+                className={styles.inspectionModalDeleteContent}
+                style={{ maxWidth: "450px" }}
+              >
+                <div className={styles.inspectionModalDeleteHeader}>
+                  <h2 style={{ marginLeft: "30px" }}>Confirm Deletion</h2>
+                  <span
+                    className={styles.inspectionModalDeleteCloseBtn}
+                    onClick={cancelDelete}
+                  >
+                    &times;
+                  </span>
+                </div>
 
-              <div className={styles.inspectionModalDeleteBody}>
-                <div className={styles.inspectionDeleteConfirmationContent}>
-                  <div className={styles.inspectionDeleteWarningIcon}>⚠️</div>
-                  <p className={styles.inspectionDeleteConfirmationText}>
-                    Are you sure you want to delete the inspection record for
-                  </p>
-                  <p className={styles.inspectionDocumentNameHighlight}>
-                    "
-                    {inspections.find((item) => item.id === deleteId)
-                      ?.equipment_name || "this equipment"}
-                    "?
-                  </p>
-                  <p className={styles.inspectionDeleteWarning}>
-                    This action cannot be undone.
-                  </p>
+                <div className={styles.inspectionModalDeleteBody}>
+                  <div className={styles.inspectionDeleteConfirmationContent}>
+                    <div className={styles.inspectionDeleteWarningIcon}>⚠️</div>
+                    <p className={styles.inspectionDeleteConfirmationText}>
+                      Are you sure you want to delete the inspection record for
+                    </p>
+                    <p className={styles.inspectionDocumentNameHighlight}>
+                      "
+                      {inspections.find((item) => item.id === deleteId)
+                        ?.equipment_name || "this equipment"}
+                      "?
+                    </p>
+                    <p className={styles.inspectionDeleteWarning}>
+                      This action cannot be undone.
+                    </p>
+                  </div>
+                </div>
+
+                <div className={styles.inspectionModalDeleteActions}>
+                  <button
+                    className={`${styles.inspectionModalDeleteBtn} ${styles.inspectionModalCancelBtn}`}
+                    onClick={cancelDelete}
+                    disabled={deleting}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    className={`${styles.inspectionModalDeleteBtn} ${styles.inspectionDeleteConfirmBtn}`}
+                    onClick={performDelete}
+                    disabled={deleting}
+                  >
+                    {deleting ? "Deleting..." : "Delete"}
+                  </button>
                 </div>
               </div>
-
-              <div className={styles.inspectionModalDeleteActions}>
-                <button
-                  className={`${styles.inspectionModalDeleteBtn} ${styles.inspectionModalCancelBtn}`}
-                  onClick={cancelDelete}
-                >
-                  Cancel
-                </button>
-                <button
-                  className={`${styles.inspectionModalDeleteBtn} ${styles.inspectionDeleteConfirmBtn}`}
-                  onClick={performDelete}
-                >
-                  Delete
-                </button>
-              </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
-    </div>
+    </>
   );
 }

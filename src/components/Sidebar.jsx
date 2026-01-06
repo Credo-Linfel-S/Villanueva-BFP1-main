@@ -67,8 +67,8 @@ const Sidebar = () => {
           icon: "📁",
           text: "Personnel Profile (201 Files)",
         },
-        { href: "/leaveRecords", icon: "🗄️", text: "Leave Records" },
-        { href: "/clearanceRecords", icon: "💾", text: "Clearance Records" },
+        { href: "/leaveRecords", icon: "🗄️", text: "Leave Request Records" },
+        { href: "/clearanceRecords", icon: "💾", text: "Clearance Request Records" },
       ],
     },
     {
@@ -79,7 +79,7 @@ const Sidebar = () => {
         {
           href: "/medicalRecords",
           icon: "🩺",
-          text: "Medical Records of Employees",
+          text: "Medical Records of Personnel",
         },
         {
           href: "/awardsCommendations",
@@ -99,9 +99,9 @@ const Sidebar = () => {
           icon: "👥",
           text: "Recruited Applicants",
         },
-        { href: "/trainings", icon: "🎓", text: "Trainings" },
+        { href: "/trainings", icon: "🎓", text: "Personnel Trainings" },
         { href: "/placement", icon: "📍", text: "Personnel Designation" },
-        { href: "/history", icon: "⏳", text: "History" },
+        { href: "/history", icon: "⏳", text: "Archived Personnel Accounts" },
       ],
     },
   ];

@@ -18,8 +18,8 @@ export const checkPersonnelStatus = (personnel) => {
 
   if (!personnel) return defaultStatus;
 
-  // Check status field - ONLY Retirement and Resignation should be considered inactive
-  if (personnel.status === 'Retired' || personnel.status === 'Resigned') {
+  // ONLY Retirement and Resignation should mark as inactive
+  if (personnel.status === "Retired" || personnel.status === "Resigned") {
     return {
       isActive: false,
       status: personnel.status,
@@ -28,24 +28,25 @@ export const checkPersonnelStatus = (personnel) => {
     };
   }
 
-  // Equipment Completion should NOT affect active status
-  if (personnel.status === 'Equipment Completed') {
+  // Equipment Completion should NOT affect active status - it's for promotions/clearances
+  if (personnel.status === "Equipment Completed") {
     return {
       isActive: true, // STAYS ACTIVE
-      status: 'Active',
-      reason: 'Equipment clearance completed',
+      status: "Active", // Display as Active
+      reason: "Equipment clearance completed",
       shouldDisplay: true,
     };
   }
 
-  // Check is_active field
-  if (personnel.is_active === false && 
-      personnel.status !== 'Active' &&
-      (personnel.status === 'Retired' || personnel.status === 'Resigned')) {
+  // Check is_active field - but only if status is retired/resigned
+  if (
+    personnel.is_active === false &&
+    (personnel.status === "Retired" || personnel.status === "Resigned")
+  ) {
     return {
       isActive: false,
-      status: personnel.status || 'Inactive',
-      reason: personnel.separation_reason || 'Account deactivated',
+      status: personnel.status || "Inactive",
+      reason: personnel.separation_reason || "Account deactivated",
       shouldDisplay: false,
     };
   }
@@ -57,15 +58,22 @@ export const checkPersonnelStatus = (personnel) => {
  * @param {Array} personnelList - Array of personnel records
  * @returns {Array} - Filtered array with only active personnel
  */
+// In personnelStatusUtils.js
 export const filterActivePersonnel = (personnelList) => {
   if (!Array.isArray(personnelList)) return [];
 
   return personnelList.filter((person) => {
-    const status = checkPersonnelStatus(person);
-    return status.shouldDisplay;
+    // Simplified: Only show personnel with status 'Active' or null/empty status
+    // and is_active should be true
+    const hasActiveStatus = !person.status || 
+                           person.status === 'Active' || 
+                           person.status === 'Equipment Completed';
+    
+    const isActiveFlag = person.is_active !== false;
+    
+    return hasActiveStatus && isActiveFlag;
   });
 };
-
 /**
  * Filter inactive personnel from array
  * @param {Array} personnelList - Array of personnel records

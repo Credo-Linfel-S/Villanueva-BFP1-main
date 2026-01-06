@@ -26,6 +26,9 @@ import {
   AlertTriangle,
 } from "lucide-react";
 
+// Import the BFPPreloader component
+import BFPPreloader from "../../BFPPreloader.jsx"; // Adjust the path as needed
+
 const InspectionHistory = () => {
   const { isSidebarCollapsed } = useSidebar();
   const [inspections, setInspections] = useState([]);
@@ -901,469 +904,475 @@ const InspectionHistory = () => {
     return { total, routine, clearance, unassigned, completed };
   }, [inspections]);
 
-  if (loading) {
-    return (
+  // Render BFPPreloader at the top of the component
+  return (
+    <>
+      {/* BFP Preloader - shows while loading or on network issues */}
+      <BFPPreloader
+        loading={loading}
+        progress={0}
+        moduleTitle="INSPECTION HISTORY • Retrieving Records..."
+        onRetry={() => {
+          loadData();
+          fetchPersonnel();
+        }}
+      />
+
+      {/* Main content - only shown when preloader is not visible */}
       <div className="AppInspectorInventoryControl">
+        <Title>Inspection History | BFP Villanueva</Title>
+        <Meta name="robots" content="noindex, nofollow" />
         <InspectorSidebar />
         <Hamburger />
         <div
           className={`main-content ${isSidebarCollapsed ? "collapsed" : ""}`}
         >
-          <div className={styles.loadingContainer}>
-            <RefreshCw size={48} className={styles.spinningIcon} />
-            <h2>Loading Inspection History...</h2>
-            <p>Please wait while we load the historical data.</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="AppInspectorInventoryControl">
-      <Title>Inspection History | BFP Villanueva</Title>
-      <Meta name="robots" content="noindex, nofollow" />
-      <InspectorSidebar />
-      <Hamburger />
-      <div className={`main-content ${isSidebarCollapsed ? "collapsed" : ""}`}>
-        <section className={styles.IHSection}>
-          <div className={styles.IHSectionHeader}>
-            <h2>
-              <FileText size={28} className={styles.headerIcon} />
-              Inspection History & Audit Logs
-            </h2>
-            <div className={styles.headerActions}>
-              <button
-                className={`${styles.IHBtn} ${styles.IHRefresh}`}
-                onClick={loadData}
-                disabled={loading || deleteLoading}
-              >
-                <RefreshCw
-                  size={16}
-                  className={loading ? styles.spinningIcon : ""}
-                />
-                Refresh Data
-              </button>
-              {selectedRows.size > 0 && (
+          <section className={styles.IHSection}>
+            <div className={styles.IHSectionHeader}>
+              <h2>
+                <FileText size={28} className={styles.headerIcon} />
+                Inspection History & Audit Logs
+              </h2>
+              <div className={styles.headerActions}>
                 <button
-                  className={`${styles.IHBtn} ${styles.IHDelete}`}
-                  onClick={deleteSelectedRecords}
-                  disabled={deleteLoading}
+                  className={`${styles.IHBtn} ${styles.IHRefresh}`}
+                  onClick={loadData}
+                  disabled={loading || deleteLoading}
                 >
-                  <Trash2 size={16} />
-                  {deleteLoading
-                    ? "Deleting..."
-                    : `Delete (${selectedRows.size})`}
+                  <RefreshCw
+                    size={16}
+                    className={loading ? styles.spinningIcon : ""}
+                  />
+                  Refresh Data
                 </button>
-              )}
-              <button
-                className={`${styles.IHBtn} ${styles.IHExport}`}
-                onClick={exportToCSV}
-                disabled={exportLoading || filteredInspections.length === 0}
-              >
-                <Download size={16} />
-                {exportLoading ? "Exporting..." : "Export CSV"}
-              </button>
-            </div>
-          </div>
-
-          {error && (
-            <div className={styles.errorAlert}>
-              <AlertCircle size={20} />
-              <span>{error}</span>
-              <button onClick={() => setError(null)}>×</button>
-            </div>
-          )}
-
-          {successMessage && (
-            <div className={styles.successAlert}>
-              <CheckCircle size={20} />
-              <span>{successMessage}</span>
-              <button onClick={() => setSuccessMessage(null)}>×</button>
-            </div>
-          )}
-
-          <div className={styles.statsSummary}>
-            <div className={styles.statCard}>
-              <div className={styles.statIcon}>
-                <FileText size={24} />
+                {selectedRows.size > 0 && (
+                  <button
+                    className={`${styles.IHBtn} ${styles.IHDelete}`}
+                    onClick={deleteSelectedRecords}
+                    disabled={deleteLoading}
+                  >
+                    <Trash2 size={16} />
+                    {deleteLoading
+                      ? "Deleting..."
+                      : `Delete (${selectedRows.size})`}
+                  </button>
+                )}
+                <button
+                  className={`${styles.IHBtn} ${styles.IHExport}`}
+                  onClick={exportToCSV}
+                  disabled={exportLoading || filteredInspections.length === 0}
+                >
+                  <Download size={16} />
+                  {exportLoading ? "Exporting..." : "Export CSV"}
+                </button>
               </div>
-              <span className={styles.statNumber}>{stats.total}</span>
-              <span className={styles.statLabel}>Total Inspections</span>
             </div>
-            <div className={styles.statCard}>
-              <div className={styles.statIcon}>
-                <CheckCircle size={24} />
+
+            {error && (
+              <div className={styles.errorAlert}>
+                <AlertCircle size={20} />
+                <span>{error}</span>
+                <button onClick={() => setError(null)}>×</button>
               </div>
-              <span className={styles.statNumber}>{stats.completed}</span>
-              <span className={styles.statLabel}>Completed</span>
-            </div>
-            <div className={styles.statCard}>
-              <div className={styles.statIcon}>
-                <Package size={24} />
+            )}
+
+            {successMessage && (
+              <div className={styles.successAlert}>
+                <CheckCircle size={20} />
+                <span>{successMessage}</span>
+                <button onClick={() => setSuccessMessage(null)}>×</button>
               </div>
-              <span className={styles.statNumber}>{stats.routine}</span>
-              <span className={styles.statLabel}>Routine Inspections</span>
-            </div>
-            <div className={styles.statCard}>
-              <div className={styles.statIcon}>
-                <User size={24} />
+            )}
+
+            <div className={styles.statsSummary}>
+              <div className={styles.statCard}>
+                <div className={styles.statIcon}>
+                  <FileText size={24} />
+                </div>
+                <span className={styles.statNumber}>{stats.total}</span>
+                <span className={styles.statLabel}>Total Inspections</span>
               </div>
-              <span className={styles.statNumber}>{stats.clearance}</span>
-              <span className={styles.statLabel}>Clearance Inspections</span>
-            </div>
-            <div className={styles.statCard}>
-              <div className={styles.statIcon}>
-                <UserX size={24} />
+              <div className={styles.statCard}>
+                <div className={styles.statIcon}>
+                  <CheckCircle size={24} />
+                </div>
+                <span className={styles.statNumber}>{stats.completed}</span>
+                <span className={styles.statLabel}>Completed</span>
               </div>
-              <span className={styles.statNumber}>{stats.unassigned}</span>
-              <span className={styles.statLabel}>Unassigned</span>
-            </div>
-          </div>
-
-          <div className={styles.filtersContainer}>
-            {/* Search */}
-            <div className={styles.searchBox}>
-              <Search size={18} className={styles.searchIcon} />
-              <input
-                type="text"
-                placeholder="Search equipment, personnel, inspector..."
-                value={searchTerm}
-                onChange={(e) => {
-                  setSearchTerm(e.target.value);
-                  setCurrentPage(1);
-                }}
-                className={styles.searchInput}
-              />
-            </div>
-
-            {/* Status Filter */}
-            <div className={styles.filterGroup}>
-              <Filter size={16} />
-              <select
-                className={styles.filterSelect}
-                value={selectedStatus}
-                onChange={(e) => {
-                  setSelectedStatus(e.target.value);
-                  setCurrentPage(1);
-                }}
-              >
-                <option value="all">All Status</option>
-                {getUniqueStatuses().map((status, index) => (
-                  <option key={index} value={status}>
-                    {status}
-                  </option>
-                ))}
-              </select>
+              <div className={styles.statCard}>
+                <div className={styles.statIcon}>
+                  <Package size={24} />
+                </div>
+                <span className={styles.statNumber}>{stats.routine}</span>
+                <span className={styles.statLabel}>Routine Inspections</span>
+              </div>
+              <div className={styles.statCard}>
+                <div className={styles.statIcon}>
+                  <User size={24} />
+                </div>
+                <span className={styles.statNumber}>{stats.clearance}</span>
+                <span className={styles.statLabel}>Clearance Inspections</span>
+              </div>
+              <div className={styles.statCard}>
+                <div className={styles.statIcon}>
+                  <UserX size={24} />
+                </div>
+                <span className={styles.statNumber}>{stats.unassigned}</span>
+                <span className={styles.statLabel}>Unassigned</span>
+              </div>
             </div>
 
-            {/* Inspection Type Filter */}
-            <div className={styles.filterGroup}>
-              <select
-                className={styles.filterSelect}
-                value={selectedInspectionType}
-                onChange={(e) => {
-                  setSelectedInspectionType(e.target.value);
-                  setCurrentPage(1);
-                }}
-              >
-                <option value="all">All Inspection Types</option>
-                <option value="routine">Routine Only</option>
-                <option value="clearance">Clearance Only</option>
-              </select>
-            </div>
-
-            {/* Clearance Type Filter */}
-            <div className={styles.filterGroup}>
-              <select
-                className={styles.filterSelect}
-                value={selectedClearanceType}
-                onChange={(e) => {
-                  setSelectedClearanceType(e.target.value);
-                  setCurrentPage(1);
-                }}
-              >
-                <option value="all">All Clearance Types</option>
-                <option value="Resignation">Resignation</option>
-                <option value="Retirement">Retirement</option>
-                <option value="Equipment Completion">
-                  Equipment Completion
-                </option>
-              </select>
-            </div>
-
-            {/* Month Filter */}
-            <div className={styles.filterGroup}>
-              <select
-                className={styles.filterSelect}
-                value={selectedMonth}
-                onChange={(e) => {
-                  setSelectedMonth(e.target.value);
-                  setCurrentPage(1);
-                }}
-              >
-                <option value="">All Months</option>
-                {months.map((month) => (
-                  <option key={month.value} value={month.value}>
-                    {month.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Year Filter */}
-            <div className={styles.filterGroup}>
-              <select
-                className={styles.filterSelect}
-                value={selectedYear}
-                onChange={(e) => {
-                  setSelectedYear(e.target.value);
-                  setCurrentPage(1);
-                }}
-              >
-                <option value="">All Years</option>
-                {years.map((year) => (
-                  <option key={year} value={year}>
-                    {year}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Personnel Filter */}
-            <div className={styles.filterGroup}>
-              <User size={16} />
-              <select
-                className={styles.filterSelect}
-                value={selectedPersonnel}
-                onChange={(e) => {
-                  setSelectedPersonnel(e.target.value);
-                  setCurrentPage(1);
-                }}
-              >
-                <option value="">All Personnel</option>
-                {personnelList.map((person) => (
-                  <option key={person.id} value={person.id}>
-                    {person.display_name}{" "}
-                    {person.badge_number ? `(${person.badge_number})` : ""}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Date Range Filter */}
-            <div className={styles.filterGroup}>
-              <Calendar size={16} />
-              <input
-                type="date"
-                value={dateRange.start}
-                onChange={(e) => {
-                  setDateRange((prev) => ({ ...prev, start: e.target.value }));
-                  setCurrentPage(1);
-                }}
-                className={styles.dateInput}
-                max={dateRange.end || new Date().toISOString().split("T")[0]}
-              />
-              <span className={styles.dateSeparator}>to</span>
-              <input
-                type="date"
-                value={dateRange.end}
-                onChange={(e) => {
-                  setDateRange((prev) => ({ ...prev, end: e.target.value }));
-                  setCurrentPage(1);
-                }}
-                className={styles.dateInput}
-                min={dateRange.start}
-                max={new Date().toISOString().split("T")[0]}
-              />
-            </div>
-
-            {/* Unassigned Toggle */}
-            <div className={styles.filterToggle}>
-              <label className={styles.toggleLabel}>
+            <div className={styles.filtersContainer}>
+              {/* Search */}
+              <div className={styles.searchBox}>
+                <Search size={18} className={styles.searchIcon} />
                 <input
-                  type="checkbox"
-                  checked={showUnassignedOnly}
+                  type="text"
+                  placeholder="Search equipment, personnel, inspector..."
+                  value={searchTerm}
                   onChange={(e) => {
-                    setShowUnassignedOnly(e.target.checked);
+                    setSearchTerm(e.target.value);
                     setCurrentPage(1);
                   }}
-                  className={styles.toggleInput}
+                  className={styles.searchInput}
                 />
-                <span className={styles.toggleSlider}></span>
-                <span className={styles.toggleText}>Show Unassigned Only</span>
-              </label>
+              </div>
+
+              {/* Status Filter */}
+              <div className={styles.filterGroup}>
+                <Filter size={16} />
+                <select
+                  className={styles.filterSelect}
+                  value={selectedStatus}
+                  onChange={(e) => {
+                    setSelectedStatus(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                >
+                  <option value="all">All Status</option>
+                  {getUniqueStatuses().map((status, index) => (
+                    <option key={index} value={status}>
+                      {status}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Inspection Type Filter */}
+              <div className={styles.filterGroup}>
+                <select
+                  className={styles.filterSelect}
+                  value={selectedInspectionType}
+                  onChange={(e) => {
+                    setSelectedInspectionType(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                >
+                  <option value="all">All Inspection Types</option>
+                  <option value="routine">Routine Only</option>
+                  <option value="clearance">Clearance Only</option>
+                </select>
+              </div>
+
+              {/* Clearance Type Filter */}
+              <div className={styles.filterGroup}>
+                <select
+                  className={styles.filterSelect}
+                  value={selectedClearanceType}
+                  onChange={(e) => {
+                    setSelectedClearanceType(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                >
+                  <option value="all">All Clearance Types</option>
+                  <option value="Resignation">Resignation</option>
+                  <option value="Retirement">Retirement</option>
+                  <option value="Equipment Completion">
+                    Equipment Completion
+                  </option>
+                </select>
+              </div>
+
+              {/* Month Filter */}
+              <div className={styles.filterGroup}>
+                <select
+                  className={styles.filterSelect}
+                  value={selectedMonth}
+                  onChange={(e) => {
+                    setSelectedMonth(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                >
+                  <option value="">All Months</option>
+                  {months.map((month) => (
+                    <option key={month.value} value={month.value}>
+                      {month.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Year Filter */}
+              <div className={styles.filterGroup}>
+                <select
+                  className={styles.filterSelect}
+                  value={selectedYear}
+                  onChange={(e) => {
+                    setSelectedYear(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                >
+                  <option value="">All Years</option>
+                  {years.map((year) => (
+                    <option key={year} value={year}>
+                      {year}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Personnel Filter */}
+              <div className={styles.filterGroup}>
+                <User size={16} />
+                <select
+                  className={styles.filterSelect}
+                  value={selectedPersonnel}
+                  onChange={(e) => {
+                    setSelectedPersonnel(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                >
+                  <option value="">All Personnel</option>
+                  {personnelList.map((person) => (
+                    <option key={person.id} value={person.id}>
+                      {person.display_name}{" "}
+                      {person.badge_number ? `(${person.badge_number})` : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Date Range Filter */}
+              <div className={styles.filterGroup}>
+                <Calendar size={16} />
+                <input
+                  type="date"
+                  value={dateRange.start}
+                  onChange={(e) => {
+                    setDateRange((prev) => ({
+                      ...prev,
+                      start: e.target.value,
+                    }));
+                    setCurrentPage(1);
+                  }}
+                  className={styles.dateInput}
+                  max={dateRange.end || new Date().toISOString().split("T")[0]}
+                />
+                <span className={styles.dateSeparator}>to</span>
+                <input
+                  type="date"
+                  value={dateRange.end}
+                  onChange={(e) => {
+                    setDateRange((prev) => ({ ...prev, end: e.target.value }));
+                    setCurrentPage(1);
+                  }}
+                  className={styles.dateInput}
+                  min={dateRange.start}
+                  max={new Date().toISOString().split("T")[0]}
+                />
+              </div>
+
+              {/* Unassigned Toggle */}
+              <div className={styles.filterToggle}>
+                <label className={styles.toggleLabel}>
+                  <input
+                    type="checkbox"
+                    checked={showUnassignedOnly}
+                    onChange={(e) => {
+                      setShowUnassignedOnly(e.target.checked);
+                      setCurrentPage(1);
+                    }}
+                    className={styles.toggleInput}
+                  />
+                  <span className={styles.toggleSlider}></span>
+                  <span className={styles.toggleText}>
+                    Show Unassigned Only
+                  </span>
+                </label>
+              </div>
+
+              {/* Clear Filters Button */}
+              <button
+                className={`${styles.IHBtn} ${styles.IHClear}`}
+                onClick={clearFilters}
+                disabled={deleteLoading}
+              >
+                Clear Filters
+              </button>
             </div>
 
-            {/* Clear Filters Button */}
-            <button
-              className={`${styles.IHBtn} ${styles.IHClear}`}
-              onClick={clearFilters}
-              disabled={deleteLoading}
-            >
-              Clear Filters
-            </button>
-          </div>
+            <div className={styles.resultsCount}>
+              Showing {filteredInspections.length} of {inspections.length}{" "}
+              records
+              {selectedMonth &&
+                ` for ${months.find((m) => m.value === selectedMonth)?.label}`}
+              {selectedYear && ` ${selectedYear}`}
+              {selectedRows.size > 0 && (
+                <span className={styles.selectedCount}>
+                  • {selectedRows.size} selected
+                </span>
+              )}
+            </div>
 
-          <div className={styles.resultsCount}>
-            Showing {filteredInspections.length} of {inspections.length} records
-            {selectedMonth &&
-              ` for ${months.find((m) => m.value === selectedMonth)?.label}`}
-            {selectedYear && ` ${selectedYear}`}
-            {selectedRows.size > 0 && (
-              <span className={styles.selectedCount}>
-                • {selectedRows.size} selected
-              </span>
-            )}
-          </div>
-
-          <div className={styles.tableContainer}>
-            {filteredInspections.length === 0 ? (
-              <div className={styles.noDataMessage}>
-                <FileText size={48} className={styles.noDataIcon} />
-                <h3>No inspection records found</h3>
-                <p>Try adjusting your filters or search terms.</p>
-              </div>
-            ) : (
-              <>
-                <table className={styles.IHTable}>
-                  <thead>
-                    <tr>
-                      <th style={{ width: "40px" }}>
-                        <input
-                          type="checkbox"
-                          checked={
-                            paginatedInspections.length > 0 &&
-                            paginatedInspections.every((item) =>
-                              selectedRows.has(item.id)
-                            )
-                          }
-                          onChange={selectAllRows}
-                          className={styles.selectAllCheckbox}
-                        />
-                      </th>
-                      <th>Date</th>
-                      <th>Item Details</th>
-                      <th>Personnel</th>
-                      <th>Inspector</th>
-                      <th>Type</th>
-                      <th>Status</th>
-                      <th>Clearance Type</th>
-                      <th>Findings</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {paginatedInspections.map((inspection, index) => (
-                      <tr
-                        key={`${inspection.id}-${inspection.source}-${index}`}
-                      >
-                        <td>
+            <div className={styles.tableContainer}>
+              {filteredInspections.length === 0 ? (
+                <div className={styles.noDataMessage}>
+                  <FileText size={48} className={styles.noDataIcon} />
+                  <h3>No inspection records found</h3>
+                  <p>Try adjusting your filters or search terms.</p>
+                </div>
+              ) : (
+                <>
+                  <table className={styles.IHTable}>
+                    <thead>
+                      <tr>
+                        <th style={{ width: "40px" }}>
                           <input
                             type="checkbox"
-                            checked={selectedRows.has(inspection.id)}
-                            onChange={() => toggleRowSelection(inspection.id)}
-                            className={styles.rowCheckbox}
+                            checked={
+                              paginatedInspections.length > 0 &&
+                              paginatedInspections.every((item) =>
+                                selectedRows.has(item.id)
+                              )
+                            }
+                            onChange={selectAllRows}
+                            className={styles.selectAllCheckbox}
                           />
-                        </td>
-                        <td>
-                          <div className={styles.dateCell}>
-                            <Calendar size={12} />
-                            {formatDate(inspection.inspection_date)}
-                          </div>
-                        </td>
-                        <td>
-                          <div className={styles.itemCell}>
-                            <strong>
-                              {inspection.item_name || "Unknown Item"}
-                            </strong>
-                            <div className={styles.itemCode}>
-                              <code>{inspection.item_code || "No Code"}</code>
+                        </th>
+                        <th>Date</th>
+                        <th>Item Details</th>
+                        <th>Personnel</th>
+                        <th>Inspector</th>
+                        <th>Type</th>
+                        <th>Status</th>
+                        <th>Clearance Type</th>
+                        <th>Findings</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {paginatedInspections.map((inspection, index) => (
+                        <tr
+                          key={`${inspection.id}-${inspection.source}-${index}`}
+                        >
+                          <td>
+                            <input
+                              type="checkbox"
+                              checked={selectedRows.has(inspection.id)}
+                              onChange={() => toggleRowSelection(inspection.id)}
+                              className={styles.rowCheckbox}
+                            />
+                          </td>
+                          <td>
+                            <div className={styles.dateCell}>
+                              <Calendar size={12} />
+                              {formatDate(inspection.inspection_date)}
                             </div>
-                          </div>
-                        </td>
-                        <td>
-                          {inspection.is_unassigned ? (
-                            <span className={styles.unassignedBadge}>
-                              <UserX size={14} />
-                              Unassigned
-                            </span>
-                          ) : (
-                            <div className={styles.personnelCell}>
-                              <User size={14} className={styles.cellIcon} />
-                              <div>
-                                <strong>
-                                  {inspection.formatted_personnel_name ||
-                                    inspection.personnel_name ||
-                                    "Unknown"}
-                                </strong>
-                                <div className={styles.personnelDetails}>
-                                  {inspection.personnel_rank && (
-                                    <span className={styles.rankBadge}>
-                                      {inspection.personnel_rank}
-                                    </span>
-                                  )}
-                                  {inspection.personnel_badge && (
-                                    <>
-                                      <span className={styles.badgeSeparator}>
-                                        •
-                                      </span>
-                                      <span>
-                                        Badge: {inspection.personnel_badge}
-                                      </span>
-                                    </>
-                                  )}
-                                </div>
+                          </td>
+                          <td>
+                            <div className={styles.itemCell}>
+                              <strong>
+                                {inspection.item_name || "Unknown Item"}
+                              </strong>
+                              <div className={styles.itemCode}>
+                                <code>{inspection.item_code || "No Code"}</code>
                               </div>
                             </div>
-                          )}
-                        </td>
-                        <td>
-                          <div className={styles.inspectorCell}>
-                            <User size={14} className={styles.cellIcon} />
-                            {inspection.inspector_name || "Unknown"}
-                          </div>
-                        </td>
-                        <td>
-                          <span
-                            className={`${styles.typeBadge} ${
-                              inspection.has_clearance
-                                ? styles.clearanceBadge
-                                : styles.routineBadge
-                            }`}
-                          >
-                            {inspection.has_clearance ? "CLEARANCE" : "ROUTINE"}
-                          </span>
-                        </td>
-                        <td>
-                          <span
-                            className={`${
-                              styles.statusBadge
-                            } ${getStatusBadgeClass(inspection.status)}`}
-                          >
-                            {getStatusIcon(inspection.status)}
-                            {inspection.status || "PENDING"}
-                          </span>
-                        </td>
-                        <td>
-                          {inspection.clearance_type ? (
-                            <div className={styles.clearanceCell}>
-                              {getClearanceIcon(inspection.clearance_type)}
-                              <span>{inspection.clearance_type}</span>
+                          </td>
+                          <td>
+                            {inspection.is_unassigned ? (
+                              <span className={styles.unassignedBadge}>
+                                <UserX size={14} />
+                                Unassigned
+                              </span>
+                            ) : (
+                              <div className={styles.personnelCell}>
+                                <User size={14} className={styles.cellIcon} />
+                                <div>
+                                  <strong>
+                                    {inspection.formatted_personnel_name ||
+                                      inspection.personnel_name ||
+                                      "Unknown"}
+                                  </strong>
+                                  <div className={styles.personnelDetails}>
+                                    {inspection.personnel_rank && (
+                                      <span className={styles.rankBadge}>
+                                        {inspection.personnel_rank}
+                                      </span>
+                                    )}
+                                    {inspection.personnel_badge && (
+                                      <>
+                                        <span className={styles.badgeSeparator}>
+                                          •
+                                        </span>
+                                        <span>
+                                          Badge: {inspection.personnel_badge}
+                                        </span>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </td>
+                          <td>
+                            <div className={styles.inspectorCell}>
+                              <User size={14} className={styles.cellIcon} />
+                              {inspection.inspector_name || "Unknown"}
                             </div>
-                          ) : (
-                            <span className={styles.naText}>N/A</span>
-                          )}
-                        </td>
-                        <td className={styles.findingsCell}>
-                          {inspection.findings || "No findings"}
-                        </td>
-                        <td>
-                          <div className={styles.actionButtons}>
-                            <button
-                              className={`${styles.IHBtn} ${styles.IHView}`}
-                              onClick={() => {
-                                const details = `
+                          </td>
+                          <td>
+                            <span
+                              className={`${styles.typeBadge} ${
+                                inspection.has_clearance
+                                  ? styles.clearanceBadge
+                                  : styles.routineBadge
+                              }`}
+                            >
+                              {inspection.has_clearance
+                                ? "CLEARANCE"
+                                : "ROUTINE"}
+                            </span>
+                          </td>
+                          <td>
+                            <span
+                              className={`${
+                                styles.statusBadge
+                              } ${getStatusBadgeClass(inspection.status)}`}
+                            >
+                              {getStatusIcon(inspection.status)}
+                              {inspection.status || "PENDING"}
+                            </span>
+                          </td>
+                          <td>
+                            {inspection.clearance_type ? (
+                              <div className={styles.clearanceCell}>
+                                {getClearanceIcon(inspection.clearance_type)}
+                                <span>{inspection.clearance_type}</span>
+                              </div>
+                            ) : (
+                              <span className={styles.naText}>N/A</span>
+                            )}
+                          </td>
+                          <td className={styles.findingsCell}>
+                            {inspection.findings || "No findings"}
+                          </td>
+                          <td>
+                            <div className={styles.actionButtons}>
+                              <button
+                                className={`${styles.IHBtn} ${styles.IHView}`}
+                                onClick={() => {
+                                  const details = `
 Inspection Details:
 ────────────────────
 Date: ${formatDate(inspection.inspection_date)}
@@ -1380,106 +1389,107 @@ Notes: ${inspection.notes || "None"}
 ────────────────────
 Record Type: ${inspection.record_type}
 Source: ${inspection.source}
-                                `.trim();
-                                alert(details);
-                              }}
-                              title="View Details"
-                            >
-                              <Eye size={14} />
-                            </button>
-                            <button
-                              className={`${styles.IHBtn} ${styles.IHDeleteSingle}`}
-                              onClick={() =>
-                                deleteSingleRecord(
-                                  inspection.id,
-                                  `inspection of ${
-                                    inspection.item_name || "unknown item"
-                                  }`
-                                )
-                              }
-                              disabled={deleteLoading}
-                              title="Delete Record"
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                                  `.trim();
+                                  alert(details);
+                                }}
+                                title="View Details"
+                              >
+                                <Eye size={14} />
+                              </button>
+                              <button
+                                className={`${styles.IHBtn} ${styles.IHDeleteSingle}`}
+                                onClick={() =>
+                                  deleteSingleRecord(
+                                    inspection.id,
+                                    `inspection of ${
+                                      inspection.item_name || "unknown item"
+                                    }`
+                                  )
+                                }
+                                disabled={deleteLoading}
+                                title="Delete Record"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
 
-                {totalPages > 1 && (
-                  <div className={styles.pagination}>
-                    <div className={styles.paginationInfo}>
-                      Showing{" "}
-                      {Math.min(
-                        (currentPage - 1) * itemsPerPage + 1,
-                        filteredInspections.length
-                      )}{" "}
-                      to{" "}
-                      {Math.min(
-                        currentPage * itemsPerPage,
-                        filteredInspections.length
-                      )}{" "}
-                      of {filteredInspections.length} entries
-                      {selectedRows.size > 0 && (
-                        <span className={styles.selectedInfo}>
-                          • {selectedRows.size} selected
-                        </span>
-                      )}
-                    </div>
-                    <div className={styles.paginationControls}>
-                      <button
-                        className={styles.paginationButton}
-                        onClick={() => handlePageChange(currentPage - 1)}
-                        disabled={currentPage === 1 || deleteLoading}
-                      >
-                        Previous
-                      </button>
-                      {Array.from(
-                        { length: Math.min(5, totalPages) },
-                        (_, i) => {
-                          let pageNum;
-                          if (totalPages <= 5) {
-                            pageNum = i + 1;
-                          } else if (currentPage <= 3) {
-                            pageNum = i + 1;
-                          } else if (currentPage >= totalPages - 2) {
-                            pageNum = totalPages - 4 + i;
-                          } else {
-                            pageNum = currentPage - 2 + i;
+                  {totalPages > 1 && (
+                    <div className={styles.pagination}>
+                      <div className={styles.paginationInfo}>
+                        Showing{" "}
+                        {Math.min(
+                          (currentPage - 1) * itemsPerPage + 1,
+                          filteredInspections.length
+                        )}{" "}
+                        to{" "}
+                        {Math.min(
+                          currentPage * itemsPerPage,
+                          filteredInspections.length
+                        )}{" "}
+                        of {filteredInspections.length} entries
+                        {selectedRows.size > 0 && (
+                          <span className={styles.selectedInfo}>
+                            • {selectedRows.size} selected
+                          </span>
+                        )}
+                      </div>
+                      <div className={styles.paginationControls}>
+                        <button
+                          className={styles.paginationButton}
+                          onClick={() => handlePageChange(currentPage - 1)}
+                          disabled={currentPage === 1 || deleteLoading}
+                        >
+                          Previous
+                        </button>
+                        {Array.from(
+                          { length: Math.min(5, totalPages) },
+                          (_, i) => {
+                            let pageNum;
+                            if (totalPages <= 5) {
+                              pageNum = i + 1;
+                            } else if (currentPage <= 3) {
+                              pageNum = i + 1;
+                            } else if (currentPage >= totalPages - 2) {
+                              pageNum = totalPages - 4 + i;
+                            } else {
+                              pageNum = currentPage - 2 + i;
+                            }
+                            return (
+                              <button
+                                key={pageNum}
+                                className={`${styles.paginationButton} ${
+                                  currentPage === pageNum ? styles.active : ""
+                                }`}
+                                onClick={() => handlePageChange(pageNum)}
+                                disabled={deleteLoading}
+                              >
+                                {pageNum}
+                              </button>
+                            );
                           }
-                          return (
-                            <button
-                              key={pageNum}
-                              className={`${styles.paginationButton} ${
-                                currentPage === pageNum ? styles.active : ""
-                              }`}
-                              onClick={() => handlePageChange(pageNum)}
-                              disabled={deleteLoading}
-                            >
-                              {pageNum}
-                            </button>
-                          );
-                        }
-                      )}
-                      <button
-                        className={styles.paginationButton}
-                        onClick={() => handlePageChange(currentPage + 1)}
-                        disabled={currentPage === totalPages || deleteLoading}
-                      >
-                        Next
-                      </button>
+                        )}
+                        <button
+                          className={styles.paginationButton}
+                          onClick={() => handlePageChange(currentPage + 1)}
+                          disabled={currentPage === totalPages || deleteLoading}
+                        >
+                          Next
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        </section>
+                  )}
+                </>
+              )}
+            </div>
+          </section>
+        </div>
       </div>
-    </div>
+    </>
   );
 };
 

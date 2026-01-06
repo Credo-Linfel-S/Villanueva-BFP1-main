@@ -10,8 +10,6 @@ import {
   FaUserSlash, // ← ADD THIS
   FaArchive, // ← ADD THIS
   FaRedo, // ← ADD THIS
-  FaKey, // ← ADD THIS for password change
-  FaUserEdit, // ← ADD THIS for username change
 } from "react-icons/fa";
 import Flatpickr from "react-flatpickr";
 import "flatpickr/dist/flatpickr.css";
@@ -93,17 +91,6 @@ const PersonnelRegister = () => {
   const [deleteName, setDeleteName] = useState("");
   const [generatedUsername, setGeneratedUsername] = useState("");
   const [generatedPassword, setGeneratedPassword] = useState("");
-
-  // ========== ADD THESE STATES FOR PASSWORD/USERNAME CHANGE ==========
-  const [showPasswordModal, setShowPasswordModal] = useState(false);
-  const [showUsernameModal, setShowUsernameModal] = useState(false);
-  const [passwordModalPersonnel, setPasswordModalPersonnel] = useState(null);
-  const [usernameModalPersonnel, setUsernameModalPersonnel] = useState(null);
-  const [newPassword, setNewPassword] = useState("");
-  const [newUsername, setNewUsername] = useState("");
-  const [showNewPassword, setShowNewPassword] = useState(false);
-  const [isChangingPassword, setIsChangingPassword] = useState(false);
-  const [isChangingUsername, setIsChangingUsername] = useState(false);
 
   // Separate pagination for each table
   const [activeCurrentPage, setActiveCurrentPage] = useState(1);
@@ -1400,71 +1387,23 @@ const PersonnelRegister = () => {
     );
   };
 
-  // ========== UPDATED PASSWORD GENERATION FUNCTION ==========
-  const generatePassword = (length = 12) => {
-    const uppercase = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-    const lowercase = "abcdefghijklmnopqrstuvwxyz";
-    const numbers = "0123456789";
-    const specials = "@#$";
-
-    // Ensure at least one of each type
-    let password = [
-      uppercase[Math.floor(Math.random() * uppercase.length)],
-      lowercase[Math.floor(Math.random() * lowercase.length)],
-      numbers[Math.floor(Math.random() * numbers.length)],
-      specials[Math.floor(Math.random() * specials.length)],
-    ];
-
-    // Fill remaining characters
-    const allChars = uppercase + lowercase + numbers + specials;
-    for (let i = password.length; i < length; i++) {
-      password.push(allChars[Math.floor(Math.random() * allChars.length)]);
-    }
-
-    // Shuffle the password
-    return password.sort(() => Math.random() - 0.5).join("");
+  const generatePassword = (length = 8) => {
+    const chars =
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789@#$";
+    return Array.from(
+      { length },
+      () => chars[Math.floor(Math.random() * chars.length)]
+    ).join("");
   };
 
-  // ========== UPDATED USERNAME GENERATION FUNCTION ==========
+  // UPDATED generateUsername function to include suffix
   const generateUsername = (first, middle, last, suffix) => {
-    // Clean and format the name parts
-    const cleanFirst =
-      first
-        ?.trim()
-        .toLowerCase()
-        .replace(/[^a-z0-9]/g, "") || "";
-    const cleanMiddle =
-      middle
-        ?.trim()
-        .toLowerCase()
-        .replace(/[^a-z0-9]/g, "")
-        .charAt(0) || "";
-    const cleanLast =
-      last
-        ?.trim()
-        .toLowerCase()
-        .replace(/[^a-z0-9]/g, "") || "";
-    const cleanSuffix =
-      suffix
-        ?.trim()
-        .toLowerCase()
-        .replace(/[^a-z0-9]/g, "")
-        .charAt(0) || "";
-
-    // Create base username
-    let baseUsername = `${cleanFirst}${cleanMiddle}${cleanLast}${cleanSuffix}`;
-
-    // If too short, add timestamp
-    if (baseUsername.length < 3) {
-      baseUsername = `user${Date.now().toString().slice(-6)}`;
-    }
-
-    // Add random number to ensure uniqueness
-    const randomNum = Math.floor(Math.random() * 1000)
-      .toString()
-      .padStart(3, "0");
-
-    return `${baseUsername}${randomNum}`;
+    const baseUsername = `${first}${middle ? middle[0] : ""}${last}${
+      suffix ? suffix[0] : ""
+    }`
+      .toLowerCase()
+      .replaceAll(/\s+/g, "");
+    return `${baseUsername}${Date.now().toString().slice(-4)}`;
   };
 
   // UPDATED useEffect for username generation
@@ -2671,382 +2610,6 @@ const PersonnelRegister = () => {
     console.log("4. Manual query:", manualQuery);
   };
 
-  // ========== PASSWORD MODAL COMPONENT ==========
-  const PasswordModal = () => {
-    if (!showPasswordModal || !passwordModalPersonnel) return null;
-
-    const personName = `${passwordModalPersonnel.first_name} ${passwordModalPersonnel.last_name}`;
-
-    const generateNewPassword = () => {
-      setNewPassword(generatePassword());
-    };
-
-    const copyPassword = () => {
-      navigator.clipboard.writeText(newPassword);
-      toast.success("Password copied to clipboard!");
-    };
-
-    const handleChangePassword = async () => {
-      if (!newPassword.trim()) {
-        toast.error("Please generate or enter a new password");
-        return;
-      }
-
-      try {
-        setIsChangingPassword(true);
-
-        const { error } = await supabase
-          .from("personnel")
-          .update({
-            password: newPassword,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", passwordModalPersonnel.id);
-
-        if (error) {
-          throw error;
-        }
-
-        toast.success(`Password updated for ${personName}!`);
-
-        // Refresh personnel data
-        await loadPersonnel(false);
-
-        // Close modal
-        setShowPasswordModal(false);
-        setPasswordModalPersonnel(null);
-        setNewPassword("");
-      } catch (error) {
-        console.error("Error changing password:", error);
-        toast.error("Failed to change password");
-      } finally {
-        setIsChangingPassword(false);
-      }
-    };
-
-    return (
-      <div className={styles.statusModalOverlay}>
-        <div
-          className={styles.statusModalContent}
-          style={{ maxWidth: "500px" }}
-        >
-          <div className={styles.statusModalHeader}>
-            <h3 className={styles.statusModalTitle}>
-              <FaKey /> Change Password - {personName}
-            </h3>
-            <button
-              className={styles.statusModalClose}
-              onClick={() => {
-                setShowPasswordModal(false);
-                setPasswordModalPersonnel(null);
-                setNewPassword("");
-              }}
-              disabled={isChangingPassword}
-            >
-              &times;
-            </button>
-          </div>
-
-          <div className={styles.statusModalBody}>
-            <div className={styles.passwordChangeForm}>
-              <div className={styles.passwordPreview}>
-                <div className={styles.passwordInputGroup}>
-                  <input
-                    type={showNewPassword ? "text" : "password"}
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="Enter or generate new password"
-                    className={styles.passwordInput}
-                  />
-                  <div className={styles.passwordActions}>
-                    <button
-                      type="button"
-                      className={styles.passwordToggleBtn}
-                      onClick={() => setShowNewPassword(!showNewPassword)}
-                      title={
-                        showNewPassword ? "Hide password" : "Show password"
-                      }
-                    >
-                      {showNewPassword ? <FaEyeSlash /> : <FaEye />}
-                    </button>
-                    <button
-                      type="button"
-                      className={styles.copyPasswordBtn}
-                      onClick={copyPassword}
-                      title="Copy password"
-                    >
-                      <FaCopy />
-                    </button>
-                    <button
-                      type="button"
-                      className={styles.regeneratePasswordBtn}
-                      onClick={generateNewPassword}
-                    >
-                      Generate
-                    </button>
-                  </div>
-                </div>
-                <div className={styles.passwordStrength}>
-                  <small>
-                    Password strength:{" "}
-                    {newPassword.length >= 8 ? "Strong" : "Weak"} (
-                    {newPassword.length} characters)
-                  </small>
-                </div>
-              </div>
-
-              <div className={styles.passwordGuidelines}>
-                <h4>Password Guidelines:</h4>
-                <ul>
-                  <li>Minimum 8 characters</li>
-                  <li>Include uppercase and lowercase letters</li>
-                  <li>Include numbers and special characters (@#$)</li>
-                  <li>Should not contain personal information</li>
-                </ul>
-              </div>
-
-              <div className={styles.passwordWarning}>
-                <p>
-                  <strong>Note:</strong> The personnel will need to use this new
-                  password on their next login.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className={styles.statusModalFooter}>
-            <button
-              className={styles.statusCancelBtn}
-              onClick={() => {
-                setShowPasswordModal(false);
-                setPasswordModalPersonnel(null);
-                setNewPassword("");
-              }}
-              disabled={isChangingPassword}
-            >
-              Cancel
-            </button>
-            <button
-              className={styles.statusConfirmBtn}
-              onClick={handleChangePassword}
-              disabled={isChangingPassword || newPassword.length < 8}
-            >
-              {isChangingPassword ? (
-                <>
-                  <span className={styles.statusSpinner}></span>
-                  Updating...
-                </>
-              ) : (
-                "Change Password"
-              )}
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  // ========== USERNAME MODAL COMPONENT ==========
-  const UsernameModal = () => {
-    if (!showUsernameModal || !usernameModalPersonnel) return null;
-
-    const personName = `${usernameModalPersonnel.first_name} ${usernameModalPersonnel.last_name}`;
-    const currentUsername = usernameModalPersonnel.username;
-
-    const generateSuggestedUsername = () => {
-      const suggestedUsername = generateUsername(
-        usernameModalPersonnel.first_name,
-        usernameModalPersonnel.middle_name,
-        usernameModalPersonnel.last_name,
-        usernameModalPersonnel.suffix
-      );
-      setNewUsername(suggestedUsername);
-    };
-
-    const checkUsernameAvailability = async (username) => {
-      if (!username || username === currentUsername) return true;
-
-      try {
-        const { data, error } = await supabase
-          .from("personnel")
-          .select("id")
-          .eq("username", username.trim())
-          .neq("id", usernameModalPersonnel.id)
-          .single();
-
-        return !data; // Available if no data returned
-      } catch (error) {
-        // If no record found, it's available
-        return true;
-      }
-    };
-
-    const handleChangeUsername = async () => {
-      const username = newUsername.trim();
-
-      if (!username) {
-        toast.error("Please enter a new username");
-        return;
-      }
-
-      if (username === currentUsername) {
-        toast.error("New username must be different from current username");
-        return;
-      }
-
-      if (username.length < 3) {
-        toast.error("Username must be at least 3 characters long");
-        return;
-      }
-
-      // Check availability
-      const isAvailable = await checkUsernameAvailability(username);
-      if (!isAvailable) {
-        toast.error("Username is already taken. Please choose another.");
-        return;
-      }
-
-      try {
-        setIsChangingUsername(true);
-
-        const { error } = await supabase
-          .from("personnel")
-          .update({
-            username: username,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", usernameModalPersonnel.id);
-
-        if (error) {
-          throw error;
-        }
-
-        toast.success(`Username updated for ${personName}!`);
-
-        // Refresh personnel data
-        await loadPersonnel(false);
-
-        // Close modal
-        setShowUsernameModal(false);
-        setUsernameModalPersonnel(null);
-        setNewUsername("");
-      } catch (error) {
-        console.error("Error changing username:", error);
-        toast.error("Failed to change username");
-      } finally {
-        setIsChangingUsername(false);
-      }
-    };
-
-    return (
-      <div className={styles.statusModalOverlay}>
-        <div
-          className={styles.statusModalContent}
-          style={{ maxWidth: "500px" }}
-        >
-          <div className={styles.statusModalHeader}>
-            <h3 className={styles.statusModalTitle}>
-              <FaUserEdit /> Change Username - {personName}
-            </h3>
-            <button
-              className={styles.statusModalClose}
-              onClick={() => {
-                setShowUsernameModal(false);
-                setUsernameModalPersonnel(null);
-                setNewUsername("");
-              }}
-              disabled={isChangingUsername}
-            >
-              &times;
-            </button>
-          </div>
-
-          <div className={styles.statusModalBody}>
-            <div className={styles.usernameChangeForm}>
-              <div className={styles.currentUsername}>
-                <p>
-                  <strong>Current Username:</strong> {currentUsername}
-                </p>
-              </div>
-
-              <div className={styles.usernameInputGroup}>
-                <label htmlFor="newUsername">New Username *</label>
-                <div className={styles.usernameInputContainer}>
-                  <input
-                    type="text"
-                    id="newUsername"
-                    value={newUsername}
-                    onChange={(e) => setNewUsername(e.target.value)}
-                    placeholder="Enter new username"
-                    className={styles.usernameInput}
-                    minLength={3}
-                  />
-                  <button
-                    type="button"
-                    className={styles.suggestUsernameBtn}
-                    onClick={generateSuggestedUsername}
-                  >
-                    Suggest
-                  </button>
-                </div>
-              </div>
-
-              <div className={styles.usernameGuidelines}>
-                <h4>Username Guidelines:</h4>
-                <ul>
-                  <li>Minimum 3 characters</li>
-                  <li>Can contain letters, numbers, and underscores</li>
-                  <li>No spaces or special characters</li>
-                  <li>Must be unique across all personnel</li>
-                </ul>
-              </div>
-
-              <div className={styles.usernameWarning}>
-                <p>
-                  <strong>Note:</strong> The personnel will need to use this new
-                  username on their next login.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className={styles.statusModalFooter}>
-            <button
-              className={styles.statusCancelBtn}
-              onClick={() => {
-                setShowUsernameModal(false);
-                setUsernameModalPersonnel(null);
-                setNewUsername("");
-              }}
-              disabled={isChangingUsername}
-            >
-              Cancel
-            </button>
-            <button
-              className={styles.statusConfirmBtn}
-              onClick={handleChangeUsername}
-              disabled={
-                isChangingUsername ||
-                !newUsername.trim() ||
-                newUsername.trim() === currentUsername ||
-                newUsername.trim().length < 3
-              }
-            >
-              {isChangingUsername ? (
-                <>
-                  <span className={styles.statusSpinner}></span>
-                  Updating...
-                </>
-              ) : (
-                "Change Username"
-              )}
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
   // In PersonnelRegister.jsx, update the BFPPreloader usage:
   if (loading) {
     return (
@@ -3087,11 +2650,7 @@ const PersonnelRegister = () => {
   // ========== RENDER ACTIVE PERSONNEL TABLE ==========
   const renderActivePersonnelTable = () => {
     // First filter active personnel using the utility function
-    const activeData = paginate(
-      activePersonnel,
-      activeCurrentPage,
-      rowsPerPage
-    );
+  const activeData = paginate(activePersonnel, activeCurrentPage, rowsPerPage);
 
     return (
       <div className={styles.prTableBorder}>
@@ -3239,58 +2798,6 @@ const PersonnelRegister = () => {
                         ) : (
                           <LockStatusIcon personnelId={person.id} />
                         )}
-
-                        {/* Add Password Change Button */}
-                        <button
-                          className={`${styles.prPasswordChangeBtn} ${
-                            lockedPersonnel[person.id]?.isLocked
-                              ? styles.disabled
-                              : ""
-                          }`}
-                          onClick={() => {
-                            if (lockedPersonnel[person.id]?.isLocked) {
-                              toast.warning(
-                                `Cannot change password: ${
-                                  lockedPersonnel[person.id]?.lockReason
-                                }`
-                              );
-                            } else {
-                              setPasswordModalPersonnel(person);
-                              setNewPassword(generatePassword());
-                              setShowPasswordModal(true);
-                            }
-                          }}
-                          disabled={lockedPersonnel[person.id]?.isLocked}
-                          title="Change Password"
-                        >
-                          <FaKey />
-                        </button>
-
-                        {/* Add Username Change Button */}
-                        <button
-                          className={`${styles.prUsernameChangeBtn} ${
-                            lockedPersonnel[person.id]?.isLocked
-                              ? styles.disabled
-                              : ""
-                          }`}
-                          onClick={() => {
-                            if (lockedPersonnel[person.id]?.isLocked) {
-                              toast.warning(
-                                `Cannot change username: ${
-                                  lockedPersonnel[person.id]?.lockReason
-                                }`
-                              );
-                            } else {
-                              setUsernameModalPersonnel(person);
-                              setNewUsername(person.username);
-                              setShowUsernameModal(true);
-                            }
-                          }}
-                          disabled={lockedPersonnel[person.id]?.isLocked}
-                          title="Change Username"
-                        >
-                          <FaUserEdit />
-                        </button>
 
                         <button
                           className={`${styles.prEditBtn} ${
@@ -3506,58 +3013,6 @@ const PersonnelRegister = () => {
                             ) : (
                               <LockStatusIcon personnelId={person.id} />
                             )}
-
-                            {/* Add Password Change Button for active personnel */}
-                            <button
-                              className={`${styles.prPasswordChangeBtn} ${
-                                lockedPersonnel[person.id]?.isLocked
-                                  ? styles.disabled
-                                  : ""
-                              }`}
-                              onClick={() => {
-                                if (lockedPersonnel[person.id]?.isLocked) {
-                                  toast.warning(
-                                    `Cannot change password: ${
-                                      lockedPersonnel[person.id]?.lockReason
-                                    }`
-                                  );
-                                } else {
-                                  setPasswordModalPersonnel(person);
-                                  setNewPassword(generatePassword());
-                                  setShowPasswordModal(true);
-                                }
-                              }}
-                              disabled={lockedPersonnel[person.id]?.isLocked}
-                              title="Change Password"
-                            >
-                              <FaKey />
-                            </button>
-
-                            {/* Add Username Change Button for active personnel */}
-                            <button
-                              className={`${styles.prUsernameChangeBtn} ${
-                                lockedPersonnel[person.id]?.isLocked
-                                  ? styles.disabled
-                                  : ""
-                              }`}
-                              onClick={() => {
-                                if (lockedPersonnel[person.id]?.isLocked) {
-                                  toast.warning(
-                                    `Cannot change username: ${
-                                      lockedPersonnel[person.id]?.lockReason
-                                    }`
-                                  );
-                                } else {
-                                  setUsernameModalPersonnel(person);
-                                  setNewUsername(person.username);
-                                  setShowUsernameModal(true);
-                                }
-                              }}
-                              disabled={lockedPersonnel[person.id]?.isLocked}
-                              title="Change Username"
-                            >
-                              <FaUserEdit />
-                            </button>
 
                             <button
                               className={`${styles.prEditBtn} ${
@@ -3776,115 +3231,113 @@ const PersonnelRegister = () => {
     );
   };
 
-  const renderFilterPanel = () => {
-    // Get truly active personnel count
-    const trulyActivePersonnel = activePersonnel.filter((person) => {
-      const status = checkPersonnelStatus(person);
-      return status.shouldDisplay;
-    });
+const renderFilterPanel = () => {
+  // Get truly active personnel count
+  const trulyActivePersonnel = activePersonnel.filter((person) => {
+    const status = checkPersonnelStatus(person);
+    return status.shouldDisplay;
+  });
 
-    const filteredActiveData = applyFilters(trulyActivePersonnel);
+  const filteredActiveData = applyFilters(trulyActivePersonnel);
 
-    return (
-      <div className={styles.prFilterPanel}>
-        {/* Status Summary */}
-        <div className={styles.statusSummary}>
-          <div
-            className={`${styles.statusSummaryItem} ${styles.statusSummaryActive}`}
-          >
-            <div className={styles.statusSummaryValue}>
-              {statusSummary.active}
-            </div>
-            <div className={styles.statusSummaryLabel}>Active</div>
+  return (
+    <div className={styles.prFilterPanel}>
+      {/* Status Summary */}
+      <div className={styles.statusSummary}>
+        <div
+          className={`${styles.statusSummaryItem} ${styles.statusSummaryActive}`}
+        >
+          <div className={styles.statusSummaryValue}>
+            {statusSummary.active}
           </div>
-          <div
-            className={`${styles.statusSummaryItem} ${styles.statusSummaryInactive}`}
-          >
-            <div className={styles.statusSummaryValue}>
-              {statusSummary.inactive}
-            </div>
-            <div className={styles.statusSummaryLabel}>Inactive</div>
-          </div>
-          <div
-            className={`${styles.statusSummaryItem} ${styles.statusSummaryRetired}`}
-          >
-            <div className={styles.statusSummaryValue}>
-              {statusSummary.retired}
-            </div>
-            <div className={styles.statusSummaryLabel}>Retired</div>
-          </div>
-          <div
-            className={`${styles.statusSummaryItem} ${styles.statusSummaryResigned}`}
-          >
-            <div className={styles.statusSummaryValue}>
-              {statusSummary.resigned}
-            </div>
-            <div className={styles.statusSummaryLabel}>Resigned</div>
-          </div>
-          <div className={styles.statusSummaryItem}>
-            <div className={styles.statusSummaryValue}>
-              {statusSummary.total}
-            </div>
-            <div className={styles.statusSummaryLabel}>Total</div>
-          </div>
+          <div className={styles.statusSummaryLabel}>Active</div>
         </div>
-
-        <div className={styles.prFilterRow}>
-          <div className={styles.prFilterGroup}>
-            <input
-              type="text"
-              className={styles.prSearchBar}
-              placeholder="🔍 Search name, rank, station, badge..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
+        <div
+          className={`${styles.statusSummaryItem} ${styles.statusSummaryInactive}`}
+        >
+          <div className={styles.statusSummaryValue}>
+            {statusSummary.inactive}
           </div>
-          <div className={styles.prFilterGroup}>
-            <select
-              className={styles.prFilterSelect}
-              value={filterRank}
-              onChange={(e) => setFilterRank(e.target.value)}
-            >
-              <option value="">All Ranks</option>
-              {rankOptions.map((rank) => (
-                <option key={rank.rank} value={rank.rank}>
-                  {rank.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className={styles.prFilterGroup}>
-            <select
-              className={styles.prFilterSelect}
-              value={filterStation}
-              onChange={(e) => setFilterStation(e.target.value)}
-            >
-              <option value="">All Stations</option>
-              {getUniqueStations().map((station) => (
-                <option key={station} value={station}>
-                  {station}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className={styles.prFilterGroup}>
-            <button
-              className={styles.prClearFiltersBtn}
-              onClick={clearFilters}
-              type="button"
-            >
-              Clear Filters
-            </button>
-          </div>
+          <div className={styles.statusSummaryLabel}>Inactive</div>
         </div>
-        <div className={styles.prFilterInfo}>
-          Showing {filteredActiveData.length} of {trulyActivePersonnel.length}{" "}
-          active personnel
-          {search || filterRank || filterStation ? " (filtered)" : ""}
+        <div
+          className={`${styles.statusSummaryItem} ${styles.statusSummaryRetired}`}
+        >
+          <div className={styles.statusSummaryValue}>
+            {statusSummary.retired}
+          </div>
+          <div className={styles.statusSummaryLabel}>Retired</div>
+        </div>
+        <div
+          className={`${styles.statusSummaryItem} ${styles.statusSummaryResigned}`}
+        >
+          <div className={styles.statusSummaryValue}>
+            {statusSummary.resigned}
+          </div>
+          <div className={styles.statusSummaryLabel}>Resigned</div>
+        </div>
+        <div className={styles.statusSummaryItem}>
+          <div className={styles.statusSummaryValue}>{statusSummary.total}</div>
+          <div className={styles.statusSummaryLabel}>Total</div>
         </div>
       </div>
-    );
-  };
+
+      <div className={styles.prFilterRow}>
+        <div className={styles.prFilterGroup}>
+          <input
+            type="text"
+            className={styles.prSearchBar}
+            placeholder="🔍 Search name, rank, station, badge..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        <div className={styles.prFilterGroup}>
+          <select
+            className={styles.prFilterSelect}
+            value={filterRank}
+            onChange={(e) => setFilterRank(e.target.value)}
+          >
+            <option value="">All Ranks</option>
+            {rankOptions.map((rank) => (
+              <option key={rank.rank} value={rank.rank}>
+                {rank.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className={styles.prFilterGroup}>
+          <select
+            className={styles.prFilterSelect}
+            value={filterStation}
+            onChange={(e) => setFilterStation(e.target.value)}
+          >
+            <option value="">All Stations</option>
+            {getUniqueStations().map((station) => (
+              <option key={station} value={station}>
+                {station}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className={styles.prFilterGroup}>
+          <button
+            className={styles.prClearFiltersBtn}
+            onClick={clearFilters}
+            type="button"
+          >
+            Clear Filters
+          </button>
+        </div>
+      </div>
+      <div className={styles.prFilterInfo}>
+        Showing {filteredActiveData.length} of {trulyActivePersonnel.length}{" "}
+        active personnel
+        {search || filterRank || filterStation ? " (filtered)" : ""}
+      </div>
+    </div>
+  );
+};
 
   const formatDateTimeHired = (person) => {
     if (!person.date_hired) return "-";
@@ -3967,8 +3420,6 @@ const PersonnelRegister = () => {
       />
       <Sidebar />
       <StatusManagementModal />
-      <PasswordModal /> {/* ADD THIS */}
-      <UsernameModal /> {/* ADD THIS */}
       <div className={`main-content ${isSidebarCollapsed ? "collapsed" : ""}`}>
         <h1>Personnel Registration</h1>
 
@@ -4449,6 +3900,7 @@ const PersonnelRegister = () => {
 
         {renderAllPersonnelTable()}
       </div>
+
       {/* Edit Modal - Fixed version */}
       {showEditModal && (
         <div
@@ -5182,6 +4634,7 @@ const PersonnelRegister = () => {
           </div>
         </div>
       )}
+
       {/* Edit Rank Modal */}
       {showEditRankModal && (
         <div
@@ -5222,6 +4675,7 @@ const PersonnelRegister = () => {
           </div>
         </div>
       )}
+
       {/* Rank Modal */}
       {showRankModal && (
         <div
@@ -5263,6 +4717,7 @@ const PersonnelRegister = () => {
           </div>
         </div>
       )}
+
       {showLeaveModal && (
         <div className={styles.smallModalOverlay}>
           <div className={styles.smallModalContent}>
@@ -5405,6 +4860,7 @@ const PersonnelRegister = () => {
           </div>
         </div>
       )}
+
       {/* Delete Modal */}
       {showDeleteConfirm && (
         <div

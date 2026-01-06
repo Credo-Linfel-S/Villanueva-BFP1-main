@@ -2269,7 +2269,7 @@ max-width: auto;
 /* Add suffix field styling */
 .prTable th:nth-child(15), /* Adjust for suffix column */
 .prTable td:nth-child(15) {
-  min-width: 200px;
+  min-width: 300px;
   max-width: auto;
 
 }
@@ -3536,3 +3536,213 @@ max-width: auto;
     border-radius: 6px;
     font-size: 14px;
   }
+
+
+
+  /* Password and Username Change Buttons */
+.prPasswordChangeBtn,
+.prUsernameChangeBtn {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.2s;
+}
+
+.prPasswordChangeBtn {
+  background-color: #4caf50;
+  color: white;
+}
+
+.prPasswordChangeBtn:hover:not(:disabled) {
+  background-color: #45a049;
+}
+
+.prUsernameChangeBtn {
+  background-color: #2196f3;
+  color: white;
+}
+
+.prUsernameChangeBtn:hover:not(:disabled) {
+  background-color: #0b7dda;
+}
+
+.prPasswordChangeBtn.disabled,
+.prUsernameChangeBtn.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Password Modal Styles */
+.passwordChangeForm {
+  padding: 15px;
+}
+
+.passwordPreview {
+  margin-bottom: 20px;
+}
+
+.passwordInputGroup {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.passwordInput {
+  flex: 1;
+  padding: 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 16px;
+  font-family: monospace;
+}
+
+.passwordActions {
+  display: flex;
+  gap: 4px;
+}
+
+.passwordToggleBtn,
+.copyPasswordBtn,
+.regeneratePasswordBtn {
+  padding: 10px;
+  border: 1px solid #ddd;
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.passwordToggleBtn:hover,
+.copyPasswordBtn:hover {
+  background-color: #f5f5f5;
+}
+
+.regeneratePasswordBtn {
+  background-color: #4caf50;
+  color: white;
+  border-color: #4caf50;
+}
+
+.regeneratePasswordBtn:hover {
+  background-color: #45a049;
+}
+
+.passwordStrength {
+  font-size: 12px;
+  color: #666;
+  text-align: center;
+}
+
+.passwordGuidelines,
+.usernameGuidelines {
+  background-color: #f9f9f9;
+  padding: 15px;
+  border-radius: 6px;
+  margin: 15px 0;
+}
+
+.passwordGuidelines h4,
+.usernameGuidelines h4 {
+  margin-top: 0;
+  margin-bottom: 10px;
+  color: #333;
+}
+
+.passwordGuidelines ul,
+.usernameGuidelines ul {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 14px;
+  color: #555;
+}
+
+.passwordGuidelines li,
+.usernameGuidelines li {
+  margin-bottom: 5px;
+}
+
+.passwordWarning,
+.usernameWarning {
+  background-color: #fff3cd;
+  border: 1px solid #ffeaa7;
+  padding: 12px;
+  border-radius: 4px;
+  margin-top: 15px;
+}
+
+.passwordWarning p,
+.usernameWarning p {
+  margin: 0;
+  font-size: 14px;
+  color: #856404;
+}
+
+/* Username Modal Styles */
+.usernameChangeForm {
+  padding: 15px;
+}
+
+.currentUsername {
+  background-color: #f0f0f0;
+  padding: 10px;
+  border-radius: 4px;
+  margin-bottom: 20px;
+}
+
+.currentUsername p {
+  margin: 0;
+}
+
+.usernameInputGroup label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 600;
+  color: #333;
+}
+
+.usernameInputContainer {
+  display: flex;
+  gap: 8px;
+}
+
+.usernameInput {
+  flex: 1;
+  padding: 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 16px;
+}
+
+.suggestUsernameBtn {
+  padding: 12px 20px;
+  background-color: #4caf50;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.suggestUsernameBtn:hover {
+  background-color: #45a049;
+}
+
+.usernameAvailability {
+  margin-top: 5px;
+  font-size: 14px;
+}
+
+.usernameAvailable {
+  color: #4caf50;
+}
+
+.usernameUnavailable {
+  color: #f44336;
+}

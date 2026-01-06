@@ -1,4 +1,4 @@
-// InspectorDashboard.jsx - CORRECTED VERSION
+// InspectorDashboard.jsx - CORRECTED VERSION WITH PRELOADER
 import React, { useState, useEffect } from "react";
 import styles from "../styles/InspectorDashboard.module.css";
 import { Title, Meta } from "react-head";
@@ -28,6 +28,9 @@ import {
   FileText,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+
+// Import the BFPPreloader component
+import BFPPreloader from "../../BFPPreloader.jsx"; // Adjust the path as needed
 
 const InspectorDashboard = () => {
   const { isSidebarCollapsed } = useSidebar();
@@ -512,19 +515,32 @@ const InspectorDashboard = () => {
   };
 
   const handleViewInspection = (id) => {
-    navigate(`/inspectorEquipmentInspection?inspectionId=${id}`);
+    navigate(`/inspector/equipment?inspectionId=${id}`);
   };
 
   const handleViewEquipment = (id) => {
-    navigate(`/inspectorInventoryControl?equipmentId=${id}`);
+    navigate(`/inspector/inventory?equipmentId=${id}`);
   };
 
   const handleViewClearance = (id) => {
-    navigate(`/inspectorInspectionReport?clearanceId=${id}`);
+    navigate(`/inspector/report?clearanceId=${id}`);
   };
 
-  if (loading) {
-    return (
+  // Render BFPPreloader at the top of the component
+  return (
+    <>
+      {/* BFP Preloader - shows while loading or on network issues */}
+      <BFPPreloader
+        loading={loading}
+        progress={0}
+        moduleTitle="INSPECTOR DASHBOARD • Loading Equipment Status..."
+        onRetry={() => {
+          setLoading(true);
+          loadDashboardSummary();
+        }}
+      />
+
+      {/* Main content - only shown when preloader is not visible */}
       <div className="AppInspector">
         <Title>Inspector Dashboard | BFP Villanueva</Title>
         <Meta name="robots" content="noindex, nofollow" />
@@ -533,515 +549,498 @@ const InspectorDashboard = () => {
         <div
           className={`main-content ${isSidebarCollapsed ? "collapsed" : ""}`}
         >
-          <div className={styles.loadingContainer}>
-            <RefreshCw size={48} className={styles.spinningIcon} />
-            <h2>Loading Inspector Dashboard...</h2>
-            <p>Please wait while we load your dashboard data.</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="AppInspector">
-      <Title>Inspector Dashboard | BFP Villanueva</Title>
-      <Meta name="robots" content="noindex, nofollow" />
-      <InspectorSidebar />
-      <Hamburger />
-      <div className={`main-content ${isSidebarCollapsed ? "collapsed" : ""}`}>
-        {/* Header */}
-        <div className={styles.INSHeader}>
-          <div className={styles.headerContent}>
-            <h1>
-              <Shield size={32} className={styles.headerIcon} />
-              Inspector Dashboard
-            </h1>
-            <p className={styles.welcomeText}>
-              Welcome back! Here's your equipment accountability overview for{" "}
-              {currentDate.toLocaleDateString("en-US", {
-                weekday: "long",
-                year: "numeric",
-                month: "long",
-                day: "numeric",
-              })}
-            </p>
-          </div>
-          <div className={styles.headerActions}>
-            <button
-              className={`${styles.refreshBtn} ${
-                statsLoading ? styles.loading : ""
-              }`}
-              onClick={loadDashboardSummary}
-              disabled={statsLoading}
-            >
-              <RefreshCw
-                size={16}
-                className={statsLoading ? styles.spinningIcon : ""}
-              />
-              {statsLoading ? "Refreshing..." : "Refresh Data"}
-            </button>
-          </div>
-        </div>
-
-        {/* Stats Grid */}
-        <div className={styles.statsGrid}>
-          {/* Row 1: Inspection Metrics */}
-          <div className={`${styles.statCard} ${styles.inspectionCard}`}>
-            <div className={styles.statHeader}>
-              <div className={styles.statIcon}>
-                <Calendar size={20} />
-              </div>
-              <span className={styles.statLabel}>Inspections Due Today</span>
+          {/* Header */}
+          <div className={styles.INSHeader}>
+            <div className={styles.headerContent}>
+              <h1>
+                <Shield size={32} className={styles.headerIcon} />
+                Inspector Dashboard
+              </h1>
+              <p className={styles.welcomeText}>
+                Welcome back! Here's your equipment accountability overview for{" "}
+                {currentDate.toLocaleDateString("en-US", {
+                  weekday: "long",
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
+                })}
+              </p>
             </div>
-            <div className={styles.statMain}>
-              <span className={styles.statNumber}>
-                {dashboardData.inspectionsDueToday}
-              </span>
-              <div className={styles.statTrend}>
-                <ArrowUpRight size={14} />
-                <span>{dashboardData.inspectionsThisWeek} this week</span>
-              </div>
-            </div>
-            <div className={styles.statFooter}>
-              <span className={styles.statSubtext}>
-                {dashboardData.overdueInspections} overdue •{" "}
-                {dashboardData.completedInspections} completed
-              </span>
-            </div>
-          </div>
-
-          <div className={`${styles.statCard} ${styles.equipmentCard}`}>
-            <div className={styles.statHeader}>
-              <div className={styles.statIcon}>
-                <Package size={20} />
-              </div>
-              <span className={styles.statLabel}>Operational Equipment</span>
-            </div>
-            <div className={styles.statMain}>
-              <span className={styles.statNumber}>
-                {dashboardData.operationalEquipment}
-              </span>
-              <div className={styles.statProgress}>
-                <div
-                  className={styles.progressBar}
-                  style={{
-                    width: `${
-                      (dashboardData.operationalEquipment /
-                        dashboardData.totalEquipment) *
-                        100 || 0
-                    }%`,
-                  }}
+            <div className={styles.headerActions}>
+              <button
+                className={`${styles.refreshBtn} ${
+                  statsLoading ? styles.loading : ""
+                }`}
+                onClick={loadDashboardSummary}
+                disabled={statsLoading}
+              >
+                <RefreshCw
+                  size={16}
+                  className={statsLoading ? styles.spinningIcon : ""}
                 />
-              </div>
-            </div>
-            <div className={styles.statFooter}>
-              <span className={styles.statSubtext}>
-                of {dashboardData.totalEquipment} total •{" "}
-                {dashboardData.maintenanceNeeded} need maintenance
-              </span>
+                {statsLoading ? "Refreshing..." : "Refresh Data"}
+              </button>
             </div>
           </div>
 
-          <div className={`${styles.statCard} ${styles.clearanceCard}`}>
-            <div className={styles.statHeader}>
-              <div className={styles.statIcon}>
-                <FileCheck size={20} />
+          {/* Stats Grid */}
+          <div className={styles.statsGrid}>
+            {/* Row 1: Inspection Metrics */}
+            <div className={`${styles.statCard} ${styles.inspectionCard}`}>
+              <div className={styles.statHeader}>
+                <div className={styles.statIcon}>
+                  <Calendar size={20} />
+                </div>
+                <span className={styles.statLabel}>Inspections Due Today</span>
               </div>
-              <span className={styles.statLabel}>Pending Clearances</span>
-            </div>
-            <div className={styles.statMain}>
-              <span className={styles.statNumber}>
-                {dashboardData.pendingClearances}
-              </span>
-              <div className={styles.statTrend}>
-                <Users size={14} />
-                <span>{dashboardData.personnelDueClearance} personnel</span>
+              <div className={styles.statMain}>
+                <span className={styles.statNumber}>
+                  {dashboardData.inspectionsDueToday}
+                </span>
+                <div className={styles.statTrend}>
+                  <ArrowUpRight size={14} />
+                  <span>{dashboardData.inspectionsThisWeek} this week</span>
+                </div>
               </div>
-            </div>
-            <div className={styles.statFooter}>
-              <span className={styles.statSubtext}>
-                {dashboardData.clearanceThisWeek} this week • Mostly{" "}
-                {dashboardData.pendingClearances > 0 ? "Resignation" : "None"}
-              </span>
-            </div>
-          </div>
-
-          <div className={`${styles.statCard} ${styles.financialCard}`}>
-            <div className={styles.statHeader}>
-              <div className={styles.statIcon}>
-                <DollarSign size={20} />
-              </div>
-              <span className={styles.statLabel}>
-                Outstanding Accountability
-              </span>
-            </div>
-            <div className={styles.statMain}>
-              <span className={styles.statNumber}>
-                {formatCurrency(dashboardData.totalOutstanding)}
-              </span>
-              <div className={styles.statTrend}>
-                <TrendingUp size={14} />
-                <span>
-                  {dashboardData.pendingSettlements} pending settlements
+              <div className={styles.statFooter}>
+                <span className={styles.statSubtext}>
+                  {dashboardData.overdueInspections} overdue •{" "}
+                  {dashboardData.completedInspections} completed
                 </span>
               </div>
             </div>
-            <div className={styles.statFooter}>
-              <span className={styles.statSubtext}>
-                {formatCurrency(dashboardData.settledAccountability)} settled
-                this week
+
+            <div className={`${styles.statCard} ${styles.equipmentCard}`}>
+              <div className={styles.statHeader}>
+                <div className={styles.statIcon}>
+                  <Package size={20} />
+                </div>
+                <span className={styles.statLabel}>Operational Equipment</span>
+              </div>
+              <div className={styles.statMain}>
+                <span className={styles.statNumber}>
+                  {dashboardData.operationalEquipment}
+                </span>
+                <div className={styles.statProgress}>
+                  <div
+                    className={styles.progressBar}
+                    style={{
+                      width: `${
+                        (dashboardData.operationalEquipment /
+                          dashboardData.totalEquipment) *
+                          100 || 0
+                      }%`,
+                    }}
+                  />
+                </div>
+              </div>
+              <div className={styles.statFooter}>
+                <span className={styles.statSubtext}>
+                  of {dashboardData.totalEquipment} total •{" "}
+                  {dashboardData.maintenanceNeeded} need maintenance
+                </span>
+              </div>
+            </div>
+
+            <div className={`${styles.statCard} ${styles.clearanceCard}`}>
+              <div className={styles.statHeader}>
+                <div className={styles.statIcon}>
+                  <FileCheck size={20} />
+                </div>
+                <span className={styles.statLabel}>Pending Clearances</span>
+              </div>
+              <div className={styles.statMain}>
+                <span className={styles.statNumber}>
+                  {dashboardData.pendingClearances}
+                </span>
+                <div className={styles.statTrend}>
+                  <Users size={14} />
+                  <span>{dashboardData.personnelDueClearance} personnel</span>
+                </div>
+              </div>
+              <div className={styles.statFooter}>
+                <span className={styles.statSubtext}>
+                  {dashboardData.clearanceThisWeek} this week • Mostly{" "}
+                  {dashboardData.pendingClearances > 0 ? "Resignation" : "None"}
+                </span>
+              </div>
+            </div>
+
+            <div className={`${styles.statCard} ${styles.financialCard}`}>
+              <div className={styles.statHeader}>
+                <div className={styles.statIcon}>
+                  <DollarSign size={20} />
+                </div>
+                <span className={styles.statLabel}>
+                  Outstanding Accountability
+                </span>
+              </div>
+              <div className={styles.statMain}>
+                <span className={styles.statNumber}>
+                  {formatCurrency(dashboardData.totalOutstanding)}
+                </span>
+                <div className={styles.statTrend}>
+                  <TrendingUp size={14} />
+                  <span>
+                    {dashboardData.pendingSettlements} pending settlements
+                  </span>
+                </div>
+              </div>
+              <div className={styles.statFooter}>
+                <span className={styles.statSubtext}>
+                  {formatCurrency(dashboardData.settledAccountability)} settled
+                  this week
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Main Dashboard Grid */}
+          <div className={styles.dashboardGrid}>
+            {/* Left Column: Upcoming Inspections */}
+            <div className={styles.sectionCard}>
+              <div className={styles.sectionHeader}>
+                <h3>
+                  <Calendar size={20} />
+                  Upcoming Inspections (Next 3 Days)
+                </h3>
+                <button
+                  className={styles.viewAllBtn}
+                  onClick={() => handleNavigate("/inspector/equipment")}
+                >
+                  View All
+                </button>
+              </div>
+              <div className={styles.contentSection}>
+                {upcomingInspections.length > 0 ? (
+                  <div className={styles.listContainer}>
+                    {upcomingInspections.map((inspection, index) => (
+                      <div
+                        key={inspection.id}
+                        className={`${styles.listItem} ${styles.clickable}`}
+                        onClick={() => handleViewInspection(inspection.id)}
+                      >
+                        <div className={styles.itemMain}>
+                          <div className={styles.itemTitle}>
+                            {inspection.equipment?.item_name || "Equipment"}
+                            <span className={styles.itemCode}>
+                              {inspection.equipment?.item_code || "N/A"}
+                            </span>
+                          </div>
+                          <div className={styles.itemDetails}>
+                            {inspection.assigned_personnel
+                              ? `${
+                                  inspection.assigned_personnel.first_name || ""
+                                } ${
+                                  inspection.assigned_personnel.last_name || ""
+                                }`.trim()
+                              : inspection.assigned_to || "Unassigned"}
+                          </div>
+                        </div>
+                        <div className={styles.itemMeta}>
+                          <div className={styles.itemDate}>
+                            {formatDate(inspection.schedule_inspection_date)}
+                          </div>
+                          <div className={styles.itemStatus}>
+                            <span
+                              className={`${styles.statusBadge} ${styles.pending}`}
+                            >
+                              {inspection.status}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className={styles.emptyState}>
+                    <Calendar size={32} className={styles.emptyIcon} />
+                    <p>No upcoming inspections scheduled</p>
+                    <button
+                      className={styles.actionBtn}
+                      onClick={() => handleNavigate("/inspector/equipment")}
+                    >
+                      Schedule Inspection
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Middle Column: Urgent Items */}
+            <div className={styles.sectionCard}>
+              <div className={styles.sectionHeader}>
+                <h3>
+                  <AlertTriangle size={20} />
+                  Urgent Items Needing Attention
+                </h3>
+                <button
+                  className={styles.viewAllBtn}
+                  onClick={() => handleNavigate("/inspector/inventory")}
+                >
+                  View All
+                </button>
+              </div>
+              <div className={styles.contentSection}>
+                {urgentItems.length > 0 ? (
+                  <div className={styles.listContainer}>
+                    {urgentItems.map((item, index) => (
+                      <div
+                        key={item.id}
+                        className={`${styles.listItem} ${styles.clickable}`}
+                        onClick={() => handleViewEquipment(item.id)}
+                      >
+                        <div className={styles.itemMain}>
+                          <div className={styles.itemTitle}>
+                            {item.item_name}
+                            <span className={styles.itemCode}>
+                              {item.item_code}
+                            </span>
+                          </div>
+                          <div className={styles.itemDetails}>
+                            {item.assigned_personnel
+                              ? `${item.assigned_personnel.first_name || ""} ${
+                                  item.assigned_personnel.last_name || ""
+                                }`.trim()
+                              : "Unassigned"}
+                          </div>
+                        </div>
+                        <div className={styles.itemMeta}>
+                          <div className={styles.itemStatus}>
+                            <span
+                              className={`${styles.statusBadge} ${
+                                item.status === "Damaged"
+                                  ? styles.damaged
+                                  : item.status === "Lost"
+                                  ? styles.lost
+                                  : styles.maintenance
+                              }`}
+                            >
+                              {item.status}
+                            </span>
+                          </div>
+                          <div className={styles.itemDate}>
+                            Last checked:{" "}
+                            {item.last_checked
+                              ? formatDate(item.last_checked)
+                              : "Never"}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className={styles.emptyState}>
+                    <CheckCircle size={32} className={styles.emptyIcon} />
+                    <p>All equipment is in good condition</p>
+                    <button
+                      className={styles.actionBtn}
+                      onClick={() =>
+                        handleNavigate("/inspectorInventoryControl")
+                      }
+                    >
+                      Check Inventory
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Right Column: Quick Stats */}
+            <div className={styles.sectionCard}>
+              <div className={styles.sectionHeader}>
+                <h3>
+                  <BarChart3 size={20} />
+                  Quick Stats
+                </h3>
+              </div>
+              <div className={styles.quickStats}>
+                <div className={styles.quickStatItem}>
+                  <div className={styles.quickStatIcon}>
+                    <Wrench size={18} />
+                  </div>
+                  <div className={styles.quickStatContent}>
+                    <span className={styles.quickStatLabel}>
+                      Maintenance Needed
+                    </span>
+                    <span className={styles.quickStatValue}>
+                      {dashboardData.maintenanceNeeded}
+                    </span>
+                  </div>
+                </div>
+
+                <div className={styles.quickStatItem}>
+                  <div className={styles.quickStatIcon}>
+                    <UserX size={18} />
+                  </div>
+                  <div className={styles.quickStatContent}>
+                    <span className={styles.quickStatLabel}>
+                      Unassigned Equipment
+                    </span>
+                    <span className={styles.quickStatValue}>
+                      {dashboardData.unassignedEquipment}
+                    </span>
+                  </div>
+                </div>
+
+                <div className={styles.quickStatItem}>
+                  <div className={styles.quickStatIcon}>
+                    <CheckSquare size={18} />
+                  </div>
+                  <div className={styles.quickStatContent}>
+                    <span className={styles.quickStatLabel}>
+                      Pending Inspections
+                    </span>
+                    <span className={styles.quickStatValue}>
+                      {dashboardData.pendingInspections}
+                    </span>
+                  </div>
+                </div>
+
+                <div className={styles.quickStatItem}>
+                  <div className={styles.quickStatIcon}>
+                    <Users size={18} />
+                  </div>
+                  <div className={styles.quickStatContent}>
+                    <span className={styles.quickStatLabel}>
+                      Personnel with Equipment
+                    </span>
+                    <span className={styles.quickStatValue}>
+                      {dashboardData.personnelWithEquipment}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Quick Actions */}
+              <div className={styles.quickActionsSection}>
+                <h4>Quick Actions</h4>
+                <div className={styles.quickActionButtons}>
+                  <button
+                    className={`${styles.quickActionBtn} ${styles.primary}`}
+                    onClick={() => handleNavigate("/inspector/equipment")}
+                  >
+                    <Calendar size={16} />
+                    Schedule Inspection
+                  </button>
+                  <button
+                    className={`${styles.quickActionBtn} ${styles.secondary}`}
+                    onClick={() => handleNavigate("/inspector/report")}
+                  >
+                    <FileCheck size={16} />
+                    Review Clearances
+                  </button>
+                  <button
+                    className={`${styles.quickActionBtn} ${styles.tertiary}`}
+                    onClick={() => handleNavigate("/inspector/inventory")}
+                  >
+                    <Package size={16} />
+                    Inventory Control
+                  </button>
+                  <button
+                    className={`${styles.quickActionBtn} ${styles.quaternary}`}
+                    onClick={() => handleNavigate("/inspector/history")}
+                  >
+                    <FileText size={16} />
+                    View History
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Bottom Section: Recent Activity */}
+          <div className={styles.sectionCard}>
+            <div className={styles.sectionHeader}>
+              <h3>
+                <Clock size={20} />
+                Recent Activity
+              </h3>
+              <button
+                className={styles.viewAllBtn}
+                onClick={() => handleNavigate("/inspector/history")}
+              >
+                View All
+              </button>
+            </div>
+            <div className={styles.activityContainer}>
+              {recentActivities.length > 0 ? (
+                <div className={styles.activityList}>
+                  {recentActivities.map((activity, index) => (
+                    <div
+                      key={activity.id || index}
+                      className={styles.activityItem}
+                    >
+                      <div
+                        className={styles.activityIcon}
+                        style={{ color: activity.color }}
+                      >
+                        {activity.icon}
+                      </div>
+                      <div className={styles.activityContent}>
+                        <div className={styles.activityTitle}>
+                          {activity.type === "INSPECTION"
+                            ? "Inspection"
+                            : "Clearance"}{" "}
+                          {activity.action}
+                        </div>
+                        <div className={styles.activityDetails}>
+                          {activity.details}
+                        </div>
+                      </div>
+                      <div className={styles.activityTime}>
+                        {formatDate(activity.timestamp)}
+                      </div>
+                      {activity.type === "INSPECTION" && (
+                        <button
+                          className={styles.viewActivityBtn}
+                          onClick={() => handleViewInspection(activity.id)}
+                        >
+                          <Eye size={14} />
+                        </button>
+                      )}
+                      {activity.type === "CLEARANCE" && (
+                        <button
+                          className={styles.viewActivityBtn}
+                          onClick={() => handleViewClearance(activity.id)}
+                        >
+                          <Eye size={14} />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className={styles.emptyState}>
+                  <Clock size={32} className={styles.emptyIcon} />
+                  <p>No recent activity found</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* System Status Footer */}
+          <div className={styles.systemStatus}>
+            <div className={styles.statusItem}>
+              <span className={`${styles.statusDot} ${styles.healthy}`} />
+              <span>Database: Connected</span>
+            </div>
+            <div className={styles.statusItem}>
+              <span className={`${styles.statusDot} ${styles.healthy}`} />
+              <span>Last Updated: {new Date().toLocaleTimeString()}</span>
+            </div>
+            <div className={styles.statusItem}>
+              <span className={`${styles.statusDot} ${styles.healthy}`} />
+              <span>
+                Records Loaded:{" "}
+                {dashboardData.totalEquipment +
+                  dashboardData.pendingInspections}
               </span>
             </div>
           </div>
         </div>
-
-        {/* Main Dashboard Grid */}
-        <div className={styles.dashboardGrid}>
-          {/* Left Column: Upcoming Inspections */}
-          <div className={styles.sectionCard}>
-            <div className={styles.sectionHeader}>
-              <h3>
-                <Calendar size={20} />
-                Upcoming Inspections (Next 3 Days)
-              </h3>
-              <button
-                className={styles.viewAllBtn}
-                onClick={() => handleNavigate("/inspectorEquipmentInspection")}
-              >
-                View All
-              </button>
-            </div>
-            <div className={styles.contentSection}>
-              {upcomingInspections.length > 0 ? (
-                <div className={styles.listContainer}>
-                  {upcomingInspections.map((inspection, index) => (
-                    <div
-                      key={inspection.id}
-                      className={`${styles.listItem} ${styles.clickable}`}
-                      onClick={() => handleViewInspection(inspection.id)}
-                    >
-                      <div className={styles.itemMain}>
-                        <div className={styles.itemTitle}>
-                          {inspection.equipment?.item_name || "Equipment"}
-                          <span className={styles.itemCode}>
-                            {inspection.equipment?.item_code || "N/A"}
-                          </span>
-                        </div>
-                        <div className={styles.itemDetails}>
-                          {inspection.assigned_personnel
-                            ? `${
-                                inspection.assigned_personnel.first_name || ""
-                              } ${
-                                inspection.assigned_personnel.last_name || ""
-                              }`.trim()
-                            : inspection.assigned_to || "Unassigned"}
-                        </div>
-                      </div>
-                      <div className={styles.itemMeta}>
-                        <div className={styles.itemDate}>
-                          {formatDate(inspection.schedule_inspection_date)}
-                        </div>
-                        <div className={styles.itemStatus}>
-                          <span
-                            className={`${styles.statusBadge} ${styles.pending}`}
-                          >
-                            {inspection.status}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className={styles.emptyState}>
-                  <Calendar size={32} className={styles.emptyIcon} />
-                  <p>No upcoming inspections scheduled</p>
-                  <button
-                    className={styles.actionBtn}
-                    onClick={() =>
-                      handleNavigate("/inspectorEquipmentInspection")
-                    }
-                  >
-                    Schedule Inspection
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Middle Column: Urgent Items */}
-          <div className={styles.sectionCard}>
-            <div className={styles.sectionHeader}>
-              <h3>
-                <AlertTriangle size={20} />
-                Urgent Items Needing Attention
-              </h3>
-              <button
-                className={styles.viewAllBtn}
-                onClick={() => handleNavigate("/inspectorInventoryControl")}
-              >
-                View All
-              </button>
-            </div>
-            <div className={styles.contentSection}>
-              {urgentItems.length > 0 ? (
-                <div className={styles.listContainer}>
-                  {urgentItems.map((item, index) => (
-                    <div
-                      key={item.id}
-                      className={`${styles.listItem} ${styles.clickable}`}
-                      onClick={() => handleViewEquipment(item.id)}
-                    >
-                      <div className={styles.itemMain}>
-                        <div className={styles.itemTitle}>
-                          {item.item_name}
-                          <span className={styles.itemCode}>
-                            {item.item_code}
-                          </span>
-                        </div>
-                        <div className={styles.itemDetails}>
-                          {item.assigned_personnel
-                            ? `${item.assigned_personnel.first_name || ""} ${
-                                item.assigned_personnel.last_name || ""
-                              }`.trim()
-                            : "Unassigned"}
-                        </div>
-                      </div>
-                      <div className={styles.itemMeta}>
-                        <div className={styles.itemStatus}>
-                          <span
-                            className={`${styles.statusBadge} ${
-                              item.status === "Damaged"
-                                ? styles.damaged
-                                : item.status === "Lost"
-                                ? styles.lost
-                                : styles.maintenance
-                            }`}
-                          >
-                            {item.status}
-                          </span>
-                        </div>
-                        <div className={styles.itemDate}>
-                          Last checked:{" "}
-                          {item.last_checked
-                            ? formatDate(item.last_checked)
-                            : "Never"}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className={styles.emptyState}>
-                  <CheckCircle size={32} className={styles.emptyIcon} />
-                  <p>All equipment is in good condition</p>
-                  <button
-                    className={styles.actionBtn}
-                    onClick={() => handleNavigate("/inspectorInventoryControl")}
-                  >
-                    Check Inventory
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Right Column: Quick Stats */}
-          <div className={styles.sectionCard}>
-            <div className={styles.sectionHeader}>
-              <h3>
-                <BarChart3 size={20} />
-                Quick Stats
-              </h3>
-            </div>
-            <div className={styles.quickStats}>
-              <div className={styles.quickStatItem}>
-                <div className={styles.quickStatIcon}>
-                  <Wrench size={18} />
-                </div>
-                <div className={styles.quickStatContent}>
-                  <span className={styles.quickStatLabel}>
-                    Maintenance Needed
-                  </span>
-                  <span className={styles.quickStatValue}>
-                    {dashboardData.maintenanceNeeded}
-                  </span>
-                </div>
-              </div>
-
-              <div className={styles.quickStatItem}>
-                <div className={styles.quickStatIcon}>
-                  <UserX size={18} />
-                </div>
-                <div className={styles.quickStatContent}>
-                  <span className={styles.quickStatLabel}>
-                    Unassigned Equipment
-                  </span>
-                  <span className={styles.quickStatValue}>
-                    {dashboardData.unassignedEquipment}
-                  </span>
-                </div>
-              </div>
-
-              <div className={styles.quickStatItem}>
-                <div className={styles.quickStatIcon}>
-                  <CheckSquare size={18} />
-                </div>
-                <div className={styles.quickStatContent}>
-                  <span className={styles.quickStatLabel}>
-                    Pending Inspections
-                  </span>
-                  <span className={styles.quickStatValue}>
-                    {dashboardData.pendingInspections}
-                  </span>
-                </div>
-              </div>
-
-              <div className={styles.quickStatItem}>
-                <div className={styles.quickStatIcon}>
-                  <Users size={18} />
-                </div>
-                <div className={styles.quickStatContent}>
-                  <span className={styles.quickStatLabel}>
-                    Personnel with Equipment
-                  </span>
-                  <span className={styles.quickStatValue}>
-                    {dashboardData.personnelWithEquipment}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Quick Actions */}
-            <div className={styles.quickActionsSection}>
-              <h4>Quick Actions</h4>
-              <div className={styles.quickActionButtons}>
-                <button
-                  className={`${styles.quickActionBtn} ${styles.primary}`}
-                  onClick={() =>
-                    handleNavigate("/inspectorEquipmentInspection")
-                  }
-                >
-                  <Calendar size={16} />
-                  Schedule Inspection
-                </button>
-                <button
-                  className={`${styles.quickActionBtn} ${styles.secondary}`}
-                  onClick={() => handleNavigate("/inspectorInspectionReport")}
-                >
-                  <FileCheck size={16} />
-                  Review Clearances
-                </button>
-                <button
-                  className={`${styles.quickActionBtn} ${styles.tertiary}`}
-                  onClick={() => handleNavigate("/inspectorInventoryControl")}
-                >
-                  <Package size={16} />
-                  Inventory Control
-                </button>
-                <button
-                  className={`${styles.quickActionBtn} ${styles.quaternary}`}
-                  onClick={() => handleNavigate("/inspectionHistory")}
-                >
-                  <FileText size={16} />
-                  View History
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Bottom Section: Recent Activity */}
-        <div className={styles.sectionCard}>
-          <div className={styles.sectionHeader}>
-            <h3>
-              <Clock size={20} />
-              Recent Activity
-            </h3>
-            <button
-              className={styles.viewAllBtn}
-              onClick={() => handleNavigate("/inspectionHistory")}
-            >
-              View All
-            </button>
-          </div>
-          <div className={styles.activityContainer}>
-            {recentActivities.length > 0 ? (
-              <div className={styles.activityList}>
-                {recentActivities.map((activity, index) => (
-                  <div
-                    key={activity.id || index}
-                    className={styles.activityItem}
-                  >
-                    <div
-                      className={styles.activityIcon}
-                      style={{ color: activity.color }}
-                    >
-                      {activity.icon}
-                    </div>
-                    <div className={styles.activityContent}>
-                      <div className={styles.activityTitle}>
-                        {activity.type === "INSPECTION"
-                          ? "Inspection"
-                          : "Clearance"}{" "}
-                        {activity.action}
-                      </div>
-                      <div className={styles.activityDetails}>
-                        {activity.details}
-                      </div>
-                    </div>
-                    <div className={styles.activityTime}>
-                      {formatDate(activity.timestamp)}
-                    </div>
-                    {activity.type === "INSPECTION" && (
-                      <button
-                        className={styles.viewActivityBtn}
-                        onClick={() => handleViewInspection(activity.id)}
-                      >
-                        <Eye size={14} />
-                      </button>
-                    )}
-                    {activity.type === "CLEARANCE" && (
-                      <button
-                        className={styles.viewActivityBtn}
-                        onClick={() => handleViewClearance(activity.id)}
-                      >
-                        <Eye size={14} />
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className={styles.emptyState}>
-                <Clock size={32} className={styles.emptyIcon} />
-                <p>No recent activity found</p>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* System Status Footer */}
-        <div className={styles.systemStatus}>
-          <div className={styles.statusItem}>
-            <span className={`${styles.statusDot} ${styles.healthy}`} />
-            <span>Database: Connected</span>
-          </div>
-          <div className={styles.statusItem}>
-            <span className={`${styles.statusDot} ${styles.healthy}`} />
-            <span>Last Updated: {new Date().toLocaleTimeString()}</span>
-          </div>
-          <div className={styles.statusItem}>
-            <span className={`${styles.statusDot} ${styles.healthy}`} />
-            <span>
-              Records Loaded:{" "}
-              {dashboardData.totalEquipment + dashboardData.pendingInspections}
-            </span>
-          </div>
-        </div>
       </div>
-    </div>
+    </>
   );
 };
 

@@ -393,10 +393,32 @@ h1 {
 
 .formGroup {
   position: relative;
+  margin-bottom: 25px; /* Ensure proper spacing between form groups */
+}
+.formGroup > .generatePasswordBtn:hover:not(:disabled) {
+  background: #2980b9;
 }
 
+.formGroup > .generatePasswordBtn:disabled {
+  background: #95a5a6;
+  cursor: not-allowed;
+}
+.formGroup > .generatePasswordBtn {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: #3498db;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  width: 100%;
+  transition: background-color 0.3s ease;
+}
 .floatingGroup {
   position: relative;
+  margin-bottom: 5px; /* Reduced since Generate button is below */
 }
 
 .floatingInput, .floatingSelect {
@@ -426,14 +448,13 @@ h1 {
   pointer-events: none;
 }
 
-.floatingInput:focus + .floatingLabel,
-.floatingInput:not(:placeholder-shown) + .floatingLabel,
-.floatingSelect:focus + .floatingLabel,
-.floatingSelect:not([value=""]) + .floatingLabel {
-  top: 0;
-  transform: translateY(-50%);
+.passwordInputGroup .floatingInput:focus + .floatingLabel,
+.passwordInputGroup .floatingInput:not(:placeholder-shown) + .floatingLabel {
+  top: -5px;
   font-size: 12px;
   color: #3498db;
+  background: #fff;
+  padding: 0 5px;
 }
 
 /* Form Actions */
@@ -2037,11 +2058,10 @@ h1 {
   min-width: 0;
 }
 
-/* Fix for password input group */
 .passwordInputGroup {
   position: relative;
+  width: 100%;
 }
-
 .showPasswordBtn {
   position: absolute;
   right: 10px;
@@ -2050,10 +2070,12 @@ h1 {
   background: none;
   border: none;
   cursor: pointer;
-  font-size: 16px;
+  font-size: 18px;
   padding: 5px;
+  z-index: 2;
+  color: #666;
+  transition: color 0.2s ease;
 }
-
 .generatePasswordBtn {
   margin-top: 5px;
   padding: 6px 12px;
@@ -2198,3 +2220,429 @@ h1 {
   padding: 5px;
   z-index: 2;
 }
+/* ================================
+    FIX FOR FLOATING LABELS ON PASSWORD INPUTS
+  =============================== */
+
+/* Container for password input with eye icon */
+.passwordInputContainer {
+  position: relative;
+  width: 100%;
+}
+
+/* Make sure floating input has right padding for the eye icon */
+.passwordInputContainer .floatingInput {
+  padding-right: 40px !important;
+  width: 100%;
+}
+
+/* Eye toggle button styling */
+.eyeToggleBtn {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: #666;
+  font-size: 16px;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  z-index: 3; /* Ensure it's above the label */
+}
+
+.eyeToggleBtn:hover {
+  background: #f5f5f5;
+  color: #3498db;
+}
+
+.eyeToggleBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Ensure the floating label works correctly with the eye button */
+.passwordInputContainer .floatingInput:focus + .floatingLabel,
+.passwordInputContainer .floatingInput:not(:placeholder-shown) + .floatingLabel {
+  top: -5px !important;
+  font-size: 12px !important;
+  color: #3498db !important;
+  background: #fff !important;
+  padding: 0 5px !important;
+  z-index: 2 !important;
+}
+
+/* Fix for edit modal specific styling */
+.prEditModalLayout .passwordInputContainer .floatingInput:focus + .floatingLabel,
+.prEditModalLayout .passwordInputContainer .floatingInput:not(:placeholder-shown) + .floatingLabel {
+  top: -5px !important;
+  font-size: 12px !important;
+  color: #3498db !important;
+  background: #fff !important;
+  padding: 0 5px !important;
+}
+
+/* Generate password button styling */
+.generatePasswordBtn {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: #3498db;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  width: 100%;
+  transition: background-color 0.3s ease;
+}
+
+.generatePasswordBtn:hover:not(:disabled) {
+  background: #2980b9;
+}
+
+.generatePasswordBtn:disabled {
+  background: #95a5a6;
+  cursor: not-allowed;
+}
+
+/* Fix for form groups to prevent label overlapping */
+.formGroup {
+  position: relative;
+  margin-bottom: 25px;
+}
+
+.floatingGroup {
+  position: relative;
+  margin-bottom: 5px;
+}
+
+/* Make sure labels have proper z-index */
+.floatingLabel {
+  position: absolute;
+  top: 50%;
+  left: 12px;
+  transform: translateY(-50%);
+  background: #fff;
+  padding: 0 5px;
+  color: #666;
+  font-size: 14px;
+  pointer-events: none;
+  transition: all 0.2s ease;
+  z-index: 2; /* Ensure label is above input but below eye button */
+}
+
+/* Floating label active state */
+.floatingInput:focus + .floatingLabel,
+.floatingInput:not(:placeholder-shown) + .floatingLabel,
+.floatingSelect:focus + .floatingLabel,
+.floatingSelect:not([value=""]) + .floatingLabel {
+  top: -5px;
+  font-size: 12px;
+  color: #3498db;
+  background: #fff;
+  padding: 0 8px;
+  z-index: 2;
+}
+
+/* For select elements */
+.floatingSelect:required:invalid + .floatingLabel {
+  color: #666;
+}
+
+/* Edit modal specific fixes */
+.prEditModalLayout .floatingGroup {
+  position: relative;
+  margin-bottom: 5px;
+}
+
+.prEditModalLayout .floatingLabel {
+  z-index: 2;
+}
+
+.prEditModalLayout .floatingInput:focus + .floatingLabel,
+.prEditModalLayout .floatingInput:not(:placeholder-shown) + .floatingLabel,
+.prEditModalLayout .floatingSelect:focus + .floatingLabel,
+.prEditModalLayout .floatingSelect:not([value=""]) + .floatingLabel {
+  top: -5px;
+  font-size: 12px;
+  color: #3498db;
+  background: #fff;
+  padding: 0 8px;
+  z-index: 2;
+}
+
+/* Edit Modal Close Button */
+.ShowEditModalCloseBtn {
+  position: absolute;
+  top: 10px;
+  right: 15px;
+  font-size: 34px;
+  font-weight: bold;
+  color: #333;
+  cursor: pointer;
+  transition: color 0.2s;
+  background-color: transparent;
+  border: none;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  z-index: 1000;
+}
+
+.ShowEditModalCloseBtn:hover {
+  color: #e63946;
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Adjust modal header to accommodate the close button */
+.modalHeader {
+  position: relative;
+  padding-right: 60px; /* Make space for the close button */
+}/* Delete Modal Styles - Matching Personnel Register */
+.preModalDelete {
+  position: fixed;
+  z-index: 1000;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+.preModalContentDelete {
+  background: white;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 450px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+  animation: inventorySlideFadeIn 0.3s ease;
+}
+
+.preModalHeaderDelete {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 20px 0 20px;
+  margin-bottom: 15px;
+}
+
+.preModalHeaderDelete h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #333;
+  text-align: center;
+  flex: 1;
+}
+
+.preCloseBtn {
+  background: none;
+  border: none;
+  font-size: 34px;
+  font-weight: bold;
+  cursor: pointer;
+  color: #000;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.25s ease;
+  border-radius: 50%;
+  position: relative;
+  left: 25px;
+  bottom: 20px;
+}
+
+.preCloseBtn:hover {
+  color: #ff4444;
+  transform: scale(1.1);
+}
+
+.preModalBody {
+  padding: 30px;
+}
+
+.deleteConfirmationContent {
+  text-align: center;
+}
+
+.deleteWarningIcon {
+  font-size: 48px;
+  margin-bottom: 20px;
+}
+
+.deleteConfirmationText {
+  margin: 0 0 10px 0;
+  color: #333;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.documentNameHighlight {
+  margin: 0 0 15px 0;
+  color: #1060af;
+  font-weight: 600;
+  font-size: 16px;
+  word-break: break-word;
+}
+
+.deleteWarning {
+  margin: 0;
+  color: #ff4444;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.preModalActions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  padding: 24px;
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  margin-top: 10px;
+  background: rgba(0, 0, 0, 0.02);
+  border-bottom-left-radius: 16px;
+  border-bottom-right-radius: 16px;
+}
+
+.preBtn {
+  padding: 12px 24px;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.preCancelBtn {
+  background: #6c757d;
+  color: white;
+}
+
+.preCancelBtn:hover {
+  background: #5a6268;
+  transform: translateY(-1px);
+}
+
+.deleteConfirmBtn {
+  background: linear-gradient(135deg, #dc3545, #c82333);
+  color: white;
+  box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3);
+}
+
+.deleteConfirmBtn:hover {
+  background: linear-gradient(135deg, #c82333, #bd2130);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(220, 53, 69, 0.4);
+}
+
+.deleteConfirmBtnLoading {
+  opacity: 0.8;
+  cursor: wait !important;
+}
+
+.deleteConfirmBtnLoading:hover {
+  transform: none !important;
+  box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3) !important;
+}
+
+.deleteSpinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: white;
+  animation: spin 1s ease-in-out infinite;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes inventorySlideFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-30px) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .preModalContentDelete {
+    width: 95%;
+    margin: 10px;
+  }
+
+  .preModalActions {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .preCancelBtn,
+  .deleteConfirmBtn {
+    width: 100%;
+    margin: 0 !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .preModalHeaderDelete h2 {
+    font-size: 1.3rem;
+  }
+
+  .preModalBody {
+    padding: 20px;
+  }
+
+  .deleteWarningIcon {
+    font-size: 40px;
+  }
+
+  .deleteConfirmationText {
+    font-size: 15px;
+  }
+
+  .documentNameHighlight {
+    font-size: 15px;
+  }
+}
+.animatedEmoji {
+  display: inline-block;
+  animation: bounceUpDown 2s ease-in-out infinite;
+}
+
+@keyframes bounceUpDown {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+} 

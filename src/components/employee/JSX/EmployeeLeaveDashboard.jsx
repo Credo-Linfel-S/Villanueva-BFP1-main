@@ -6,6 +6,7 @@ import { useSidebar } from "../../SidebarContext.jsx";
 import { Title, Meta } from "react-head";
 import { supabase } from "../../../lib/supabaseClient.js";
 import { useAuth } from "../../AuthContext.jsx";
+import LeaveMeter from "../JSX/LeaveMeter.jsx";
 
 const EmployeeLeaveDashboard = () => {
   const { user } = useAuth(); // Get user from AuthContext
@@ -20,6 +21,13 @@ const EmployeeLeaveDashboard = () => {
   const [deleteId, setDeleteId] = useState(null);
   const [loading, setLoading] = useState(true);
   const { isSidebarCollapsed } = useSidebar();
+
+  // ===== NEW STATE VARIABLES =====
+  const [showInsufficientModal, setShowInsufficientModal] = useState(false);
+  const [insufficientModalData, setInsufficientModalData] = useState(null);
+  const [pendingEditData, setPendingEditData] = useState(null);
+  const [isWithoutPay, setIsWithoutPay] = useState(false);
+  // ===== END NEW STATE VARIABLES =====
 
   // Table and pagination states
   const [currentPage, setCurrentPage] = useState(1);
@@ -153,6 +161,224 @@ const EmployeeLeaveDashboard = () => {
       setLoading(false);
     }
   }, [user, calculateDays]);
+
+  // ===== NEW HELPER FUNCTIONS =====
+  const processLeaveEditUpdate = async (
+    formData,
+    oldLeaveType,
+    newLeaveType,
+    oldDays,
+    newDays,
+    isWithoutPay = false
+  ) => {
+    try {
+      // 1. First, get current leave balances
+      const { data: currentBalance, error: balanceError } = await supabase
+        .from("leave_balances")
+        .select("*")
+        .eq("personnel_id", employee.id)
+        .eq("year", new Date().getFullYear())
+        .single();
+
+      if (balanceError) {
+        console.error("Error fetching leave balances:", balanceError);
+        throw new Error("Could not fetch leave balances");
+      }
+
+      // 2. Prepare updates for leave_balances
+      let balanceUpdates = {};
+      let finalBalanceUpdates = {};
+
+      if (oldLeaveType !== newLeaveType) {
+        // Remove days from old leave type's used credits (if not without pay)
+        if (!isWithoutPay && oldLeaveType) {
+          switch (oldLeaveType) {
+            case "Vacation":
+              balanceUpdates.vacation_used = Math.max(
+                0,
+                (currentBalance.vacation_used || 0) - oldDays
+              );
+              break;
+            case "Sick":
+              balanceUpdates.sick_used = Math.max(
+                0,
+                (currentBalance.sick_used || 0) - oldDays
+              );
+              break;
+            case "Emergency":
+              balanceUpdates.emergency_used = Math.max(
+                0,
+                (currentBalance.emergency_used || 0) - oldDays
+              );
+              break;
+          }
+        }
+
+        // Add days to new leave type's used credits (if not without pay)
+        if (!isWithoutPay) {
+          switch (newLeaveType) {
+            case "Vacation":
+              balanceUpdates.vacation_used =
+                (currentBalance.vacation_used || 0) + newDays;
+              break;
+            case "Sick":
+              balanceUpdates.sick_used =
+                (currentBalance.sick_used || 0) + newDays;
+              break;
+            case "Emergency":
+              balanceUpdates.emergency_used =
+                (currentBalance.emergency_used || 0) + newDays;
+              break;
+          }
+        }
+      } else {
+        // Same leave type, just adjust the days difference (if not without pay)
+        if (!isWithoutPay) {
+          const dayDifference = newDays - oldDays;
+          switch (newLeaveType) {
+            case "Vacation":
+              balanceUpdates.vacation_used = Math.max(
+                0,
+                (currentBalance.vacation_used || 0) + dayDifference
+              );
+              break;
+            case "Sick":
+              balanceUpdates.sick_used = Math.max(
+                0,
+                (currentBalance.sick_used || 0) + dayDifference
+              );
+              break;
+            case "Emergency":
+              balanceUpdates.emergency_used = Math.max(
+                0,
+                (currentBalance.emergency_used || 0) + dayDifference
+              );
+              break;
+          }
+        }
+      }
+
+      // 3. Calculate new balances
+      if (!isWithoutPay) {
+        finalBalanceUpdates = {
+          vacation_balance: Math.max(
+            0,
+            (currentBalance.initial_vacation_credits || 0) -
+              (balanceUpdates.vacation_used ||
+                currentBalance.vacation_used ||
+                0)
+          ),
+          sick_balance: Math.max(
+            0,
+            (currentBalance.initial_sick_credits || 0) -
+              (balanceUpdates.sick_used || currentBalance.sick_used || 0)
+          ),
+          emergency_balance: Math.max(
+            0,
+            (currentBalance.initial_emergency_credits || 0) -
+              (balanceUpdates.emergency_used ||
+                currentBalance.emergency_used ||
+                0)
+          ),
+          ...balanceUpdates,
+        };
+      }
+
+      // 4. Update leave balances if there are changes
+      if (Object.keys(finalBalanceUpdates).length > 0) {
+        const { error: balanceUpdateError } = await supabase
+          .from("leave_balances")
+          .update(finalBalanceUpdates)
+          .eq("personnel_id", employee.id)
+          .eq("year", new Date().getFullYear());
+
+        if (balanceUpdateError) {
+          console.error("Error updating leave balances:", balanceUpdateError);
+          throw new Error("Could not update leave balances");
+        }
+      }
+
+      // 5. Update the leave request
+      const updatedRequest = {
+        leave_type: newLeaveType,
+        start_date: formData.get("startDate"),
+        end_date: formData.get("endDate"),
+        num_days: newDays,
+        updated_at: new Date().toISOString(),
+        approve_for: isWithoutPay ? "without_pay" : "with_pay",
+        paid_days: isWithoutPay ? 0 : newDays,
+        unpaid_days: isWithoutPay ? newDays : 0,
+      };
+
+      const { error } = await supabase
+        .from("leave_requests")
+        .update(updatedRequest)
+        .eq("id", selectedRequest.id)
+        .eq("personnel_id", employee.id);
+
+      if (error) throw error;
+
+      // 6. Refresh all data
+      await Promise.all([refreshLeaveRequests(), refreshLeaveBalances()]);
+
+      setEditModalOpen(false);
+      setSelectedRequest(null);
+      setIsWithoutPay(false);
+      setShowInsufficientModal(false);
+      setInsufficientModalData(null);
+      setPendingEditData(null);
+
+      alert(
+        `Leave request updated successfully!${
+          isWithoutPay ? " (Leave without pay)" : ""
+        }`
+      );
+    } catch (error) {
+      console.error("Error updating leave request:", error);
+      alert(
+        "Error updating leave request: " +
+          (error.message || "Please try again.")
+      );
+    }
+  };
+
+  const refreshLeaveRequests = async () => {
+    if (!employee) return;
+
+    const { data: leaveRequests, error } = await supabase
+      .from("leave_requests")
+      .select("*")
+      .eq("personnel_id", employee.id)
+      .order("date_of_filing", { ascending: false });
+
+    if (error) {
+      console.error("Error refreshing leave requests:", error);
+      return;
+    }
+
+    // Recalculate leave counts for APPROVED requests only
+    const leaveCounts = { vacation: 0, sick: 0, emergency: 0 };
+    (leaveRequests || []).forEach((req) => {
+      if (req.status === "Approved") {
+        const days =
+          req.num_days || calculateDays(req.start_date, req.end_date);
+        if (req.leave_type === "Vacation") leaveCounts.vacation += days;
+        if (req.leave_type === "Sick") leaveCounts.sick += days;
+        if (req.leave_type === "Emergency") leaveCounts.emergency += days;
+      }
+    });
+
+    setLeaveData({
+      leaveCounts,
+      userRequests: leaveRequests || [],
+    });
+  };
+
+  const refreshLeaveBalances = async () => {
+    if (!employee) return;
+    console.log("Leave balances should be refreshed");
+  };
+  // ===== END NEW HELPER FUNCTIONS =====
 
   // Update leave cards
   const getLeaveCardData = () => {
@@ -306,77 +532,129 @@ const EmployeeLeaveDashboard = () => {
     setDeleteModalOpen(true);
   };
 
+  // ===== UPDATED handleEditSubmit FUNCTION =====
   const handleEditSubmit = async (e) => {
     e.preventDefault();
     if (!selectedRequest || !selectedRequest.id || !employee) return;
 
     const formData = new FormData(e.target);
-    const updatedRequest = {
-      leave_type: formData.get("leaveType"),
-      start_date: formData.get("startDate"),
-      end_date: formData.get("endDate"),
-      num_days: calculateDays(
-        formData.get("startDate"),
-        formData.get("endDate")
-      ),
-      updated_at: new Date().toISOString(),
-    };
+    const oldLeaveType = selectedRequest.leave_type;
+    const newLeaveType = formData.get("leaveType");
+    const oldDays = selectedRequest.num_days;
+    const newDays = calculateDays(
+      formData.get("startDate"),
+      formData.get("endDate")
+    );
 
-    try {
-      const { error } = await supabase
-        .from("leave_requests")
-        .update(updatedRequest)
-        .eq("id", selectedRequest.id)
-        .eq("personnel_id", employee.id)
-        .eq("status", "Pending");
-
-      if (error) throw error;
-
-      // Refresh leave requests
-      const { data: leaveRequests, error: refreshError } = await supabase
-        .from("leave_requests")
-        .select("*")
-        .eq("personnel_id", employee.id)
-        .order("date_of_filing", { ascending: false });
-
-      if (refreshError) throw refreshError;
-
-      // Recalculate leave counts
-      const leaveCounts = { vacation: 0, sick: 0, emergency: 0 };
-      (leaveRequests || []).forEach((req) => {
-        if (req.status === "Approved") {
-          const days =
-            req.num_days || calculateDays(req.start_date, req.end_date);
-          if (req.leave_type === "Vacation") leaveCounts.vacation += days;
-          if (req.leave_type === "Sick") leaveCounts.sick += days;
-          if (req.leave_type === "Emergency") leaveCounts.emergency += days;
-        }
-      });
-
-      setLeaveData({
-        leaveCounts,
-        userRequests: leaveRequests || [],
-      });
-
+    // Only proceed if the request is still pending
+    if (selectedRequest.status !== "Pending") {
+      alert("Only pending leave requests can be edited.");
       setEditModalOpen(false);
       setSelectedRequest(null);
-      alert("Leave request updated successfully!");
-    } catch (error) {
-      console.error("Error updating leave request:", error);
-      alert(
-        "Error updating leave request. Only pending requests can be edited."
-      );
+      return;
     }
-  };
 
+    // VALIDATION 1: Emergency leave cannot exceed 5 days
+    if (newLeaveType === "Emergency" && newDays > 5) {
+      alert(
+        "❌ Emergency leave cannot exceed 5 days per request. Please adjust your dates."
+      );
+      return;
+    }
+
+    // VALIDATION 2: Check if insufficient credits for Vacation/Sick leave
+    let showWarningModal = false;
+    let insufficientData = null;
+
+    if (newLeaveType === "Vacation" || newLeaveType === "Sick") {
+      // Get current leave balances
+      const { data: currentBalance, error: balanceError } = await supabase
+        .from("leave_balances")
+        .select("*")
+        .eq("personnel_id", employee.id)
+        .eq("year", new Date().getFullYear())
+        .single();
+
+      if (!balanceError && currentBalance) {
+        const availableBalance =
+          newLeaveType === "Vacation"
+            ? parseFloat(currentBalance.vacation_balance)
+            : parseFloat(currentBalance.sick_balance);
+
+        const newDaysRequested = newDays;
+
+        // Check if editing will result in insufficient credits
+        let finalRequestedDays = newDaysRequested;
+        if (oldLeaveType === newLeaveType) {
+          // Same type, adjust for the difference
+          finalRequestedDays = Math.max(0, newDaysRequested - oldDays);
+        } else if (oldLeaveType !== newLeaveType && oldLeaveType) {
+          // Changing from another type, count full new days
+          finalRequestedDays = newDaysRequested;
+        }
+
+        // Show warning if less than 1.25 credits will remain
+        const remainingAfterRequest = availableBalance - finalRequestedDays;
+        if (remainingAfterRequest < 1.25 && remainingAfterRequest >= 0) {
+          showWarningModal = true;
+          insufficientData = {
+            leaveType: newLeaveType,
+            requestedDays: finalRequestedDays,
+            availableBalance: availableBalance,
+            remainingAfter: remainingAfterRequest,
+            willBeWithoutPay: false,
+          };
+        }
+
+        // Check if completely insufficient (negative balance)
+        if (availableBalance < finalRequestedDays) {
+          showWarningModal = true;
+          insufficientData = {
+            leaveType: newLeaveType,
+            requestedDays: finalRequestedDays,
+            availableBalance: availableBalance,
+            remainingAfter: remainingAfterRequest,
+            willBeWithoutPay: true,
+          };
+        }
+      }
+    }
+
+    // If we need to show warning, store data and show modal
+    if (showWarningModal && insufficientData) {
+      setShowInsufficientModal(true);
+      setInsufficientModalData(insufficientData);
+      setPendingEditData({
+        formData,
+        oldLeaveType,
+        newLeaveType,
+        oldDays,
+        newDays,
+      });
+      return;
+    }
+
+    // Proceed with normal update if no warnings
+    await processLeaveEditUpdate(
+      formData,
+      oldLeaveType,
+      newLeaveType,
+      oldDays,
+      newDays,
+      false // isWithoutPay
+    );
+  };
+  // ===== END UPDATED handleEditSubmit =====
+
+  // ===== UPDATED handleDeleteConfirm FUNCTION =====
   const handleDeleteConfirm = async () => {
     if (!deleteId || !employee) return;
 
     try {
-      // Check if the request is still pending before deleting
+      // Get the request details before deleting
       const { data: request, error: fetchError } = await supabase
         .from("leave_requests")
-        .select("status")
+        .select("status, leave_type, num_days")
         .eq("id", deleteId)
         .eq("personnel_id", employee.id)
         .single();
@@ -390,6 +668,53 @@ const EmployeeLeaveDashboard = () => {
         return;
       }
 
+      // If it's a pending request, adjust leave balances
+      if (request.status === "Pending") {
+        // Get current leave balances
+        const { data: currentBalance, error: balanceError } = await supabase
+          .from("leave_balances")
+          .select("*")
+          .eq("personnel_id", employee.id)
+          .eq("year", new Date().getFullYear())
+          .single();
+
+        if (!balanceError && currentBalance) {
+          // Remove the days from used credits
+          let balanceUpdates = {};
+
+          switch (request.leave_type) {
+            case "Vacation":
+              balanceUpdates.vacation_used = Math.max(
+                0,
+                (currentBalance.vacation_used || 0) - (request.num_days || 0)
+              );
+              break;
+            case "Sick":
+              balanceUpdates.sick_used = Math.max(
+                0,
+                (currentBalance.sick_used || 0) - (request.num_days || 0)
+              );
+              break;
+            case "Emergency":
+              balanceUpdates.emergency_used = Math.max(
+                0,
+                (currentBalance.emergency_used || 0) - (request.num_days || 0)
+              );
+              break;
+          }
+
+          // Update leave balances
+          if (Object.keys(balanceUpdates).length > 0) {
+            await supabase
+              .from("leave_balances")
+              .update(balanceUpdates)
+              .eq("personnel_id", employee.id)
+              .eq("year", new Date().getFullYear());
+          }
+        }
+      }
+
+      // Now delete the request
       const { error } = await supabase
         .from("leave_requests")
         .delete()
@@ -398,31 +723,8 @@ const EmployeeLeaveDashboard = () => {
 
       if (error) throw error;
 
-      // Refresh leave requests
-      const { data: leaveRequests, error: refreshError } = await supabase
-        .from("leave_requests")
-        .select("*")
-        .eq("personnel_id", employee.id)
-        .order("date_of_filing", { ascending: false });
-
-      if (refreshError) throw refreshError;
-
-      // Recalculate leave counts
-      const leaveCounts = { vacation: 0, sick: 0, emergency: 0 };
-      (leaveRequests || []).forEach((req) => {
-        if (req.status === "Approved") {
-          const days =
-            req.num_days || calculateDays(req.start_date, req.end_date);
-          if (req.leave_type === "Vacation") leaveCounts.vacation += days;
-          if (req.leave_type === "Sick") leaveCounts.sick += days;
-          if (req.leave_type === "Emergency") leaveCounts.emergency += days;
-        }
-      });
-
-      setLeaveData({
-        leaveCounts,
-        userRequests: leaveRequests || [],
-      });
+      // Refresh data
+      await Promise.all([refreshLeaveRequests(), refreshLeaveBalances()]);
 
       setDeleteModalOpen(false);
       setDeleteId(null);
@@ -432,6 +734,7 @@ const EmployeeLeaveDashboard = () => {
       alert("Error deleting leave request. Please try again.");
     }
   };
+  // ===== END UPDATED handleDeleteConfirm =====
 
   // Pagination logic
   const filteredRequests = applyFilters(leaveData.userRequests);
@@ -673,60 +976,8 @@ const EmployeeLeaveDashboard = () => {
           </button>
         </div>
 
-        {/* Leave Cards */}
-        <div className={styles.EMPLDleaveCards}>
-          <div className={styles.EMPLDleaveCard}>
-            <h4>Vacation Leave</h4>
-            <p>
-              Total Earned This Month:{" "}
-              <span>{leaveCardData?.vacation.earned || "0"}</span> days
-            </p>
-            <div className={styles.EMPLDprogressBar}>
-              <div
-                className={styles.EMPLDleaveProgress}
-                style={{ width: `${leaveCardData?.vacation.progress || 0}%` }}
-              ></div>
-            </div>
-            <p>
-              <span>{leaveCardData?.vacation.value || "0 / 0"}</span> days
-              remaining
-            </p>
-          </div>
-
-          <div className={styles.EMPLDleaveCard}>
-            <h4>Sick Leave</h4>
-            <p>
-              Total Earned This Month:{" "}
-              <span>{leaveCardData?.sick.earned || "0"}</span> days
-            </p>
-            <div className={styles.EMPLDprogressBar}>
-              <div
-                className={styles.EMPLDleaveProgress}
-                style={{ width: `${leaveCardData?.sick.progress || 0}%` }}
-              ></div>
-            </div>
-            <p>
-              <span>{leaveCardData?.sick.value || "0 / 0"}</span> days remaining
-            </p>
-          </div>
-
-          <div className={styles.EMPLDleaveCard}>
-            <h4>Emergency Leave</h4>
-            <p>
-              Total Earned This Month:{" "}
-              <span>{leaveCardData?.emergency.earned || "0"}</span> days
-            </p>
-            <div className={styles.EMPLDprogressBar}>
-              <div
-                className={styles.EMPLDleaveProgress}
-                style={{ width: `${leaveCardData?.emergency.progress || 0}%` }}
-              ></div>
-            </div>
-            <p>
-              <span>{leaveCardData?.emergency.value || "0 / 0"}</span> days
-              remaining
-            </p>
-          </div>
+        <div className={styles.EMPLDleaveSection}>
+          <LeaveMeter />
         </div>
 
         {/* Recent Leave Requests */}
@@ -959,6 +1210,159 @@ const EmployeeLeaveDashboard = () => {
             </div>
           </div>
         )}
+
+        {/* ===== NEW: INSUFFICIENT CREDITS WARNING MODAL ===== */}
+        {showInsufficientModal && insufficientModalData && (
+          <div className={`${styles.EMPLDmodal} ${styles.EMPLDmodalOpen}`}>
+            <div className={styles.EMPLDmodalContent}>
+              <span
+                className={styles.EMPLDclose}
+                onClick={() => {
+                  setShowInsufficientModal(false);
+                  setInsufficientModalData(null);
+                  setPendingEditData(null);
+                  setIsWithoutPay(false);
+                }}
+              >
+                &times;
+              </span>
+              <h2 style={{ color: "#d32f2f" }}>
+                ⚠️ Insufficient Leave Credits
+              </h2>
+
+              <div
+                style={{
+                  backgroundColor: "#fff8e1",
+                  padding: "15px",
+                  borderRadius: "8px",
+                  margin: "15px 0",
+                  border: "1px solid #ffd54f",
+                }}
+              >
+                <p>
+                  <strong>Leave Type:</strong> {insufficientModalData.leaveType}
+                </p>
+                <p>
+                  <strong>Requested Days:</strong>{" "}
+                  {insufficientModalData.requestedDays}
+                </p>
+                <p>
+                  <strong>Available Balance:</strong>{" "}
+                  {insufficientModalData.availableBalance.toFixed(2)} days
+                </p>
+                <p>
+                  <strong>Remaining After Request:</strong>{" "}
+                  {insufficientModalData.remainingAfter.toFixed(2)} days
+                </p>
+
+                {insufficientModalData.remainingAfter < 0 ? (
+                  <div
+                    style={{
+                      color: "#d32f2f",
+                      marginTop: "10px",
+                      padding: "10px",
+                      backgroundColor: "#ffebee",
+                      borderRadius: "5px",
+                    }}
+                  >
+                    <strong>⚠️ This will be leave without pay!</strong>
+                    <p style={{ marginTop: "5px", fontSize: "14px" }}>
+                      You don't have enough credits. This leave will be
+                      processed as leave without pay.
+                    </p>
+                  </div>
+                ) : insufficientModalData.remainingAfter < 1.25 ? (
+                  <div
+                    style={{
+                      color: "#f57c00",
+                      marginTop: "10px",
+                      padding: "10px",
+                      backgroundColor: "#fff3e0",
+                      borderRadius: "5px",
+                    }}
+                  >
+                    <strong>⚠️ Low Balance Warning!</strong>
+                    <p style={{ marginTop: "5px", fontSize: "14px" }}>
+                      After this request, you'll have less than 1.25 credits
+                      remaining. You can proceed, but you won't be able to take
+                      another full-day leave until next month's accrual.
+                    </p>
+                  </div>
+                ) : null}
+              </div>
+
+              {insufficientModalData.remainingAfter < 0 && (
+                <div
+                  style={{
+                    backgroundColor: "#f5f5f5",
+                    padding: "15px",
+                    borderRadius: "8px",
+                    margin: "15px 0",
+                  }}
+                >
+                  <label style={{ display: "flex", alignItems: "center" }}>
+                    <input
+                      type="checkbox"
+                      checked={isWithoutPay}
+                      onChange={(e) => setIsWithoutPay(e.target.checked)}
+                      style={{ marginRight: "10px" }}
+                    />
+                    <span style={{ fontWeight: "bold" }}>
+                      I understand this will be leave without pay
+                    </span>
+                  </label>
+                </div>
+              )}
+
+              <div className={styles.EMPLDmodalActions}>
+                <button
+                  className={styles.EMPLDmodalCancel}
+                  onClick={() => {
+                    setShowInsufficientModal(false);
+                    setInsufficientModalData(null);
+                    setPendingEditData(null);
+                    setIsWithoutPay(false);
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  className={styles.EMPLDmodalSubmit}
+                  style={{
+                    backgroundColor:
+                      insufficientModalData.remainingAfter < 0
+                        ? isWithoutPay
+                          ? "#d32f2f"
+                          : "#ccc"
+                        : "#3498db",
+                  }}
+                  disabled={
+                    insufficientModalData.remainingAfter < 0 && !isWithoutPay
+                  }
+                  onClick={() => {
+                    if (pendingEditData) {
+                      const isWithoutPayFinal =
+                        insufficientModalData.remainingAfter < 0;
+                      processLeaveEditUpdate(
+                        pendingEditData.formData,
+                        pendingEditData.oldLeaveType,
+                        pendingEditData.newLeaveType,
+                        pendingEditData.oldDays,
+                        pendingEditData.newDays,
+                        isWithoutPayFinal
+                      );
+                    }
+                  }}
+                >
+                  {insufficientModalData.remainingAfter < 0
+                    ? "Submit as Leave Without Pay"
+                    : "Proceed with Low Balance"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        {/* ===== END INSUFFICIENT CREDITS MODAL ===== */}
 
         {/* Delete Modal */}
         {deleteModalOpen && (

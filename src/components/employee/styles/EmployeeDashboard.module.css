@@ -715,50 +715,621 @@
   }
 }
 
-@media (max-width: 768px) {
-  .modernHeader {
-    padding: 20px;
-  }
-  
-  .headerContent h1 {
-    font-size: 2rem;
-  }
-  
-  .quickStats {
-    grid-template-columns: 1fr;
-  }
-  
-  .tabNavigation {
-    flex-direction: column;
-  }
-  
-  .modernTable {
-    font-size: 0.9rem;
-  }
-  
-  .modernTable th,
-  .modernTable td {
-    padding: 10px 15px;
-  }
-  
-  .equipmentList {
-    grid-template-columns: 1fr;
-  }
-}
 
-@media (max-width: 480px) {
-  .tabContent {
-    padding: 20px;
+/* Tablet Responsive Styles (768px - 1024px) */
+@media (max-width: 1024px) {
+  .dashboardGrid {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+  
+  /* 2 columns for tablet */
+  .quickStats {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 15px;
   }
   
   .statCard {
-    flex-direction: column;
-    text-align: center;
+    padding: 18px;
   }
   
+  .statIcon {
+    width: 48px;
+    height: 48px;
+    font-size: 1.3rem;
+  }
+  
+  .statInfo h3 {
+    font-size: 1.6rem;
+  }
+}
+
+/* Mobile Responsive Styles (480px - 768px) */
+@media (max-width: 768px) {
+  .modernMain {
+    padding: 12px;
+  }
+
+  .modernHeader {
+    padding: 12px;
+  }
+
+  .headerContent h1 {
+    font-size: 1.5rem;
+  }
+
+  /* REORGANIZED: Quick Stats - Current Rank above, Equipment & Clearance as 2 columns below */
+  .quickStats {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  
+  .rankStat {
+    order: -1; /* Move Current Rank to top */
+    margin-bottom: 8px;
+  }
+  
+  .equipmentStat,
+  .clearanceStat {
+    /* These will be in a 2-column grid within the main container */
+  }
+  
+  /* Create a 2-column grid for Equipment and Clearance */
+  .quickStats::after {
+    content: '';
+    display: none;
+  }
+  
+  /* New grid container for the bottom 2 cards */
+  .quickStats {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .bottomStats {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    margin-top: 8px;
+  }
+  
+  .statCard {
+    padding: 15px;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 12px;
+  }
+
+  .statIcon {
+    width: 45px;
+    height: 45px;
+    font-size: 1.2rem;
+  }
+
+  .statInfo h3 {
+    font-size: 1.5rem;
+  }
+  
+  .statInfo p {
+    font-size: 0.9rem;
+  }
+
+  /* Profile Details - 2 columns on mobile */
+  .detailGrid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+  
+  .detailColumn {
+    gap: 10px;
+  }
+
   .detailItem {
+    padding: 10px;
+    min-height: 65px;
+    flex-direction: column;
+    text-align: center;
+    gap: 8px;
+  }
+  
+  .detailItem i {
+    font-size: 1.2rem;
+    margin-bottom: 4px;
+  }
+  
+  .detailItem label {
+    font-size: 0.75rem;
+  }
+  
+  .detailItem span {
+    font-size: 0.9rem;
+  }
+
+  /* Tab Navigation - Still 3 columns but smaller */
+  .tabNavigation {
+    gap: 6px;
+    padding: 8px;
+  }
+
+  .tabButton {
+    padding: 12px 6px;
+    font-size: 0.85rem;
+    gap: 6px;
+  }
+
+  .tabLabel {
+    font-size: 0.8rem;
+  }
+
+  /* Profile Card adjustments */
+  .profileCard {
+    border-radius: 16px;
+  }
+
+  .avatarWrapper {
+    width: 85px;
+    height: 85px;
+  }
+  
+  .profileContent {
+    padding: 0 15px 15px;
+  }
+
+  /* Equipment List - 2 columns on mobile */
+  .equipmentList {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+  
+  .equipmentItem {
+    padding: 12px;
     flex-direction: column;
     text-align: center;
     gap: 10px;
   }
+  
+  .equipmentIcon {
+    width: 45px;
+    height: 45px;
+    font-size: 1.1rem;
+  }
+  
+  .equipmentInfo h4 {
+    font-size: 0.95rem;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+  }
+  
+  .equipmentInfo p {
+    font-size: 0.8rem;
+  }
+
+  /* Table adjustments */
+  .tabContent {
+    padding: 15px;
+  }
+
+  .modernTable th,
+  .modernTable td {
+    padding: 10px 12px;
+    font-size: 0.85rem;
+  }
+
+  .actionButtons {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .actionIcon {
+    padding: 6px;
+    font-size: 0.85rem;
+    margin: 2px;
+  }
+}
+
+/* Small Mobile Responsive Styles (below 480px) */
+@media (max-width: 480px) {
+  /* REORGANIZED: Quick Stats - Current Rank above, Equipment & Clearance as 2 columns below */
+  .quickStats {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  
+  .rankStat {
+    order: -1;
+    margin-bottom: 8px;
+  }
+  
+  .bottomStats {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+
+  .statCard {
+    padding: 12px;
+    gap: 8px;
+  }
+
+  .statIcon {
+    width: 40px;
+    height: 40px;
+    font-size: 1rem;
+  }
+
+  .statInfo h3 {
+    font-size: 1.3rem;
+  }
+
+  .statInfo p {
+    font-size: 0.85rem;
+  }
+
+  /* Profile Details - 2 columns with tighter spacing */
+  .detailGrid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+  
+  .detailColumn {
+    gap: 8px;
+  }
+
+  .detailItem {
+    padding: 8px;
+    min-height: 60px;
+    gap: 6px;
+  }
+  
+  .detailItem i {
+    font-size: 1.1rem;
+    margin-bottom: 2px;
+  }
+  
+  .detailItem label {
+    font-size: 0.7rem;
+  }
+  
+  .detailItem span {
+    font-size: 0.85rem;
+  }
+
+  /* Tab Navigation - 3 columns but very compact */
+  .tabNavigation {
+    gap: 4px;
+    padding: 6px;
+  }
+
+  .tabButton {
+    padding: 10px 4px;
+    font-size: 0.75rem;
+    gap: 4px;
+  }
+
+  .tabLabel {
+    font-size: 0.7rem;
+  }
+
+  /* Profile adjustments for very small screens */
+  .avatarWrapper {
+    width: 75px;
+    height: 75px;
+  }
+  
+  .profileContent {
+    padding: 0 12px 12px;
+  }
+
+  /* Equipment List - 1 column on very small screens */
+  .equipmentList {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  
+  .equipmentItem {
+    padding: 10px;
+    flex-direction: row;
+    text-align: left;
+    gap: 12px;
+  }
+  
+  .equipmentIcon {
+    width: 40px;
+    height: 40px;
+    font-size: 1rem;
+  }
+  
+  .equipmentInfo h4 {
+    font-size: 0.9rem;
+  }
+  
+  .equipmentInfo p {
+    font-size: 0.75rem;
+  }
+
+  /* For extremely small screens, switch to 1 column for bottom stats too */
+  @media (max-width: 360px) {
+    .quickStats {
+      grid-template-columns: 1fr;
+    }
+    
+    .bottomStats {
+      grid-template-columns: 1fr;
+    }
+    
+    .detailGrid {
+      grid-template-columns: 1fr;
+    }
+    
+    .equipmentList {
+      grid-template-columns: 1fr;
+    }
+  }
+}
+
+/* Mobile Cards Alternative (for very small screens) */
+.mobileCards {
+  display: none;
+}
+
+@media (max-width: 480px) {
+  .mobileCards {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .mobileCard {
+    background: white;
+    border-radius: 12px;
+    padding: 15px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  }
+
+  .mobileCardHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+
+  .mobileCardContent {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+
+  .mobileField {
+    margin-bottom: 8px;
+  }
+
+  .mobileField label {
+    display: block;
+    font-size: 0.8rem;
+    color: #718096;
+    margin-bottom: 2px;
+  }
+
+  .mobileField span {
+    font-weight: 600;
+    color: #1a202c;
+    font-size: 0.9rem;
+  }
+}
+
+/* Barcode Modal Mobile Adjustments */
+@media (max-width: 768px) {
+  .barcodeModal {
+    width: 95%;
+    max-width: 350px;
+  }
+
+  .barcodeModalContent {
+    padding: 15px;
+  }
+
+  #employee-barcode-canvas {
+    width: 250px !important;
+    height: 100px !important;
+  }
+
+  .barcodeModalActions {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .barcodeDownloadBtn,
+  .barcodeCloseBtn {
+    width: 100%;
+    padding: 12px;
+  }
+}
+
+/* Utility Classes for Mobile */
+.mobile-only {
+  display: none;
+}
+
+.desktop-only {
+  display: block;
+}
+
+@media (max-width: 768px) {
+  .mobile-only {
+    display: block;
+  }
+
+  .desktop-only {
+    display: none;
+  }
+}
+
+/* Loading States */
+.modernLoading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  color: #718096;
+}
+
+.loadingSpinner {
+  width: 50px;
+  height: 50px;
+  border: 3px solid #e2e8f0;
+  border-top: 3px solid #667eea;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 20px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.loadingContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+}
+
+.loadingSpinnerSmall {
+  width: 30px;
+  height: 30px;
+  border: 2px solid #e2e8f0;
+  border-top: 2px solid #667eea;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 15px;
+}
+
+/* Empty States */
+.emptyState {
+  text-align: center;
+  padding: 40px 20px;
+  color: #a0aec0;
+}
+
+.emptyState i {
+  font-size: 3rem;
+  margin-bottom: 15px;
+  opacity: 0.5;
+}
+
+.emptyState h4 {
+  margin: 0 0 10px 0;
+  font-size: 1.2rem;
+  color: #4a5568;
+}
+
+.emptyState p {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+/* Scrollbar Styling for Mobile */
+@media (max-width: 768px) {
+  .tableContainer::-webkit-scrollbar {
+    height: 4px;
+  }
+
+  .tableContainer::-webkit-scrollbar-track {
+    background: #f1f1f1;
+  }
+
+  .tableContainer::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 2px;
+  }
+
+  .tableContainer::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+  }
+}
+
+/* Touch-friendly buttons */
+@media (max-width: 768px) {
+  button,
+  .tabButton,
+  .actionIcon,
+  .barcodeBtn {
+    min-height: 44px; /* Minimum touch target size */
+  }
+
+  .actionIcon {
+    min-width: 44px;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
+/* Additional mobile optimization for touch targets */
+@media (max-width: 768px) {
+  .detailItem {
+    min-height: 60px;
+    cursor: pointer;
+  }
+  
+  .tabButton {
+    min-height: 50px;
+  }
+  
+  .statCard {
+    cursor: pointer;
+  }
+}
+
+/* Ensure content doesn't overflow on mobile */
+@media (max-width: 768px) {
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  .tabContent,
+  .profileContent,
+  .detailItem span {
+    word-break: break-word;
+    overflow-wrap: break-word;
+  }
+}
+/* Rank Image Styles */
+.rankImage {
+  width: 50px;
+  height: 50px;
+  object-fit: contain;
+  border-radius: 4px;
+  background: transparent;
+}
+
+.rankStat .statIcon {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+/* Adjust the stat icon container for images */
+.statIcon {
+  width: 70px;
+  height: 70px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 16px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.statIcon img {
+  max-width: 80%;
+  max-height: 80%;
+  object-fit: contain;
 }

@@ -565,7 +565,7 @@ const Placement = () => {
                 <tr>
                   <td colSpan="8" className={styles.PMTNoDataTable}>
                     <div style={{ fontSize: "48px", marginBottom: "16px" }}>
-                      👨‍🚒
+                      <span className={styles.animatedEmoji}>👨‍🚒</span>
                     </div>
                     <h3>No Active Personnel Records Found</h3>
                     <p>

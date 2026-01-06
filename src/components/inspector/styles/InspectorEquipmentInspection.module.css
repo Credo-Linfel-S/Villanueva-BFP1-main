@@ -3536,3 +3536,663 @@
 }
 
 
+/* ================================
+    RESPONSIVE STYLES FOR 768PX AND BELOW
+  ================================ */
+
+@media (max-width: 768px) {
+  /* Main content adjustments */
+  .main-content {
+    padding: 10px;
+    margin-left: 0;
+  }
+
+  h1 {
+    font-size: 1.5rem;
+    margin-bottom: 20px;
+  }
+
+  /* Section headers */
+  .IEISectionHeader {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 15px;
+    margin-bottom: 15px;
+  }
+
+  .IEISectionHeader h2 {
+    font-size: 1.2rem;
+  }
+
+  /* Pending Clearances Carousel */
+  .clearanceCarousel {
+    padding: 0 20px;
+  }
+
+  .clearanceGrid {
+    grid-template-columns: 1fr;
+    gap: 15px;
+  }
+
+  .carouselBtn {
+    width: 35px;
+    height: 35px;
+    font-size: 20px;
+  }
+
+  .prevBtn {
+    left: -10px;
+  }
+
+  .nextBtn {
+    right: -10px;
+  }
+
+  .carouselDots {
+    margin-top: 15px;
+  }
+
+  /* Schedule Card */
+  .scheduleCard {
+    width: 100%;
+    margin-left: 0;
+    padding: 15px;
+    padding-top: 80px;
+    margin-bottom: 25px;
+  }
+
+  .scheduleCard h2 {
+    position: relative;
+    top: 0;
+    left: 0;
+    margin-bottom: 20px;
+    margin-top: 0;
+  }
+
+  .scheduleShowFormBtn {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    left: auto;
+    width: auto;
+    padding: 8px 16px;
+  }
+
+  /* Schedule Form */
+  .scheduleFormRow {
+    flex-direction: column;
+    gap: 15px;
+  }
+
+  .scheduleFormGroup {
+    width: 100%;
+  }
+
+  .scheduleFormActions {
+    flex-direction: column;
+    gap: 10px;
+    margin-left: 0;
+  }
+
+  .scheduleFormActions button {
+    width: 100%;
+  }
+
+  /* Equipment Filters */
+  .equipmentFilters {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .searchInput,
+  .filterSelect {
+    width: 100%;
+  }
+
+  /* Equipment Table */
+  .equipmentTableContainer {
+    max-height: 300px;
+  }
+
+  .equipmentTable {
+    min-width: 1500px;
+    font-size: 12px;
+  }
+
+  .equipmentTable th,
+  .equipmentTable td {
+    padding: 8px 6px;
+    font-size: 11px;
+  }
+
+  /* Main Tables */
+  .tableBorder {
+    width: 100%;
+    margin-left: 0;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .IEITable {
+    min-width: 1800px;
+    font-size: 12px;
+  }
+
+  .IEITable th,
+  .IEITable td {
+    padding: 10px 8px;
+    font-size: 12px;
+  }
+
+  .IEITable th {
+    font-size: 11px;
+    padding: 10px 8px;
+  }
+
+  /* Action Buttons */
+  .actionButtons {
+    flex-direction: column;
+    gap: 5px;
+    align-items: center;
+  }
+
+  .IEIBtn {
+    width: 100%;
+    padding: 6px 10px;
+    font-size: 12px;
+    margin: 2px 0;
+  }
+
+  /* Status Badges */
+  .statusBadge,
+  .scheduleStatusBadge {
+    font-size: 11px;
+    padding: 4px 8px;
+  }
+
+  /* Pagination */
+  .IEITopPagination,
+  .IEIBottomPagination {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 5px;
+    margin: 10px 0;
+  }
+
+  .IEIPaginationBtn {
+    padding: 6px 10px;
+    font-size: 12px;
+    margin: 2px;
+  }
+
+  .IEIPaginationEllipsis {
+    padding: 6px 4px;
+  }
+
+  /* Recent Filters */
+  .recentFiltersContainer {
+    padding: 10px;
+  }
+
+  .recentFiltersHeader {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .recentFiltersGrid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .recentSearchInput {
+    padding-left: 35px;
+  }
+
+  .recentFiltersActions {
+    justify-content: center;
+  }
+
+  .recentFilterBtn {
+    width: 100%;
+  }
+
+  /* Modals */
+  .IEIModal {
+    margin-left: 0;
+    padding: 10px;
+  }
+
+  .IEIModalContent {
+    width: 95% !important;
+    max-width: 95% !important;
+    padding: 15px;
+    margin: 10px auto;
+  }
+
+  .IEIModalHeader {
+    padding: 15px;
+  }
+
+  .IEIModalHeader h3 {
+    font-size: 1.1rem;
+  }
+
+  .IEIModalClose {
+    width: 25px;
+    height: 25px;
+    font-size: 20px;
+  }
+
+  /* Inspection Modal */
+  .barcodeScannerSection {
+    padding: 10px;
+  }
+
+  .scannerContainer {
+    margin-top: 10px;
+  }
+
+  .scanBtn,
+  .stopScanBtn {
+    width: 100%;
+    padding: 10px;
+    margin: 5px 0;
+  }
+
+  /* Form elements in modals */
+  .formRow {
+    flex-direction: column;
+    gap: 15px;
+  }
+
+  .formGroup {
+    width: 100%;
+  }
+
+  .IEIModalButtons {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .IEIModalButtons button {
+    width: 100%;
+  }
+
+  /* Clearance Modal */
+  .clearanceModalOverlay {
+    padding: 10px;
+  }
+
+  .clearanceModal {
+    width: 95%;
+    max-height: 85vh;
+  }
+
+  /* View Details Modal */
+  .inspectionViewModalOverlay {
+    padding: 10px;
+    align-items: flex-start;
+  }
+
+  .inspectionViewModalContent {
+    max-height: 85vh;
+    margin-top: 10px;
+  }
+
+  .viewModalGrid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  /* Scrollbar adjustments for mobile */
+  .tableBorder::-webkit-scrollbar {
+    height: 6px;
+  }
+
+  /* Column adjustments for mobile */
+  .IEITable th:nth-child(1),
+  .IEITable td:nth-child(1) {
+    width: 100px; /* Item Code */
+    min-width: 100px;
+  }
+
+  .IEITable th:nth-child(2),
+  .IEITable td:nth-child(2) {
+    width: 120px; /* Equipment */
+    min-width: 120px;
+  }
+
+  .IEITable th:nth-child(3),
+  .IEITable td:nth-child(3) {
+    width: 100px; /* Category */
+    min-width: 100px;
+  }
+
+  .IEITable th:nth-child(4),
+  .IEITable td:nth-child(4) {
+    width: 110px; /* Equipment Status */
+    min-width: 110px;
+  }
+
+  .IEITable th:nth-child(5),
+  .IEITable td:nth-child(5) {
+    width: 100px; /* Assigned Date */
+    min-width: 100px;
+  }
+
+  .IEITable th:nth-child(6),
+  .IEITable td:nth-child(6) {
+    width: 100px; /* Last Checked */
+    min-width: 100px;
+  }
+
+  .IEITable th:nth-child(7),
+  .IEITable td:nth-child(7) {
+    width: 100px; /* Scheduled Date */
+    min-width: 100px;
+  }
+
+  .IEITable th:nth-child(8),
+  .IEITable td:nth-child(8) {
+    width: 100px; /* Schedule Status */
+    min-width: 100px;
+  }
+
+  .IEITable th:nth-child(9),
+  .IEITable td:nth-child(9) {
+    width: 120px; /* Assigned To */
+    min-width: 120px;
+  }
+
+  .IEITable th:nth-child(10),
+  .IEITable td:nth-child(10) {
+    width: 120px; /* Clearance Type */
+    min-width: 120px;
+  }
+
+  .IEITable th:nth-child(11),
+  .IEITable td:nth-child(11) {
+    width: 120px; /* Inspector */
+    min-width: 120px;
+  }
+
+  .IEITable th:nth-child(12),
+  .IEITable td:nth-child(12) {
+    width: 150px; /* Reschedule Info */
+    min-width: 150px;
+  }
+
+  .IEITable th:nth-child(13),
+  .IEITable td:nth-child(13) {
+    width: 140px; /* Actions */
+    min-width: 140px;
+  }
+
+  /* Equipment table column adjustments */
+  .equipmentTable th:nth-child(1),
+  .equipmentTable td:nth-child(1) {
+    width: 40px; /* Checkbox */
+    min-width: 40px;
+  }
+
+  .equipmentTable th:nth-child(2),
+  .equipmentTable td:nth-child(2) {
+    width: 120px; /* Equipment Name */
+    min-width: 120px;
+  }
+
+  .equipmentTable th:nth-child(3),
+  .equipmentTable td:nth-child(3) {
+    width: 100px; /* Barcode/Serial */
+    min-width: 100px;
+  }
+
+  .equipmentTable th:nth-child(4),
+  .equipmentTable td:nth-child(4) {
+    width: 90px; /* Category */
+    min-width: 90px;
+  }
+
+  .equipmentTable th:nth-child(5),
+  .equipmentTable td:nth-child(5) {
+    width: 90px; /* Status */
+    min-width: 90px;
+  }
+
+  .equipmentTable th:nth-child(6),
+  .equipmentTable td:nth-child(6) {
+    width: 100px; /* Assigned To */
+    min-width: 100px;
+  }
+
+  /* Ensure text doesn't overflow */
+  .personnelCell,
+  .clearanceBadge,
+  .rescheduleInfo {
+    max-width: 120px;
+    white-space: normal;
+    word-wrap: break-word;
+  }
+
+  /* Loading spinner adjustments */
+  .submissionSpinner {
+    width: 14px;
+    height: 14px;
+  }
+
+  /* Toast container adjustments */
+  .Toastify__toast-container {
+    width: 90% !important;
+    left: 5% !important;
+    right: 5% !important;
+  }
+
+  .Toastify__toast {
+    margin-bottom: 10px;
+  }
+
+  /* Empty state adjustments */
+  .noData,
+  .noClearances,
+  .noEquipment {
+    padding: 20px;
+    text-align: center;
+  }
+
+  .noData p,
+  .noClearances p,
+  .noEquipment p {
+    font-size: 14px;
+  }
+
+  /* Animated emoji adjustments */
+  .animatedEmoji {
+    font-size: 32px;
+  }
+
+  /* Table header adjustments */
+  .tableHeaderSection {
+    font-size: 14px;
+    padding-left: 8px;
+  }
+}
+
+/* Additional responsive adjustments for tablets (769px to 1024px) */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .clearanceGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .tableBorder {
+    width: 100%;
+  }
+
+  .IEITable {
+    min-width: 2200px;
+  }
+
+  .equipmentTable {
+    min-width: 1800px;
+  }
+
+  .scheduleCard {
+    width: 100%;
+  }
+}
+
+/* For very small screens (480px and below) */
+@media (max-width: 480px) {
+  .clearanceCarousel {
+    padding: 0 10px;
+  }
+
+  .carouselBtn {
+    width: 30px;
+    height: 30px;
+    font-size: 18px;
+  }
+
+  .carouselSlide {
+    padding: 10px;
+  }
+
+  .IEITable {
+    min-width: 2000px;
+    font-size: 11px;
+  }
+
+  .equipmentTable {
+    min-width: 1400px;
+    font-size: 11px;
+  }
+
+  .statusBadge {
+    font-size: 10px;
+    padding: 3px 6px;
+  }
+
+  .IEIPaginationBtn {
+    padding: 5px 8px;
+    font-size: 11px;
+  }
+
+  .recentFilterSelect {
+    font-size: 13px;
+  }
+
+  /* Hide less important columns on very small screens */
+  .equipmentTable th:nth-child(11),
+  .equipmentTable td:nth-child(11), /* Price */
+  .equipmentTable th:nth-child(12),
+  .equipmentTable td:nth-child(12), /* Purchase Date */
+  .equipmentTable th:nth-child(13),
+  .equipmentTable td:nth-child(13) { /* Last Checked */
+    display: none;
+  }
+}
+
+/* Ensure touch-friendly interactions */
+@media (max-width: 768px) {
+  button,
+  select,
+  input {
+    min-height: 44px; /* Minimum touch target size */
+  }
+
+  /* Prevent zoom on input focus for iOS */
+  input,
+  select,
+  textarea {
+    font-size: 16px; /* Prevents iOS zoom */
+  }
+
+  /* Better scrolling on mobile */
+  .tableBorder {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Adjust spacing for mobile */
+  .IEISection {
+    margin-bottom: 1.5rem;
+  }
+
+  /* Make floating labels work better on mobile */
+  .floatingLabel {
+    font-size: 12px;
+  }
+
+  .floatingInput:focus + .floatingLabel,
+  .floatingSelect:focus + .floatingLabel,
+  .floatingInput:not(:placeholder-shown) + .floatingLabel,
+  .floatingSelect:not(:invalid) + .floatingLabel {
+    font-size: 10px;
+  }
+}
+
+/* Fix for modal overlays on mobile */
+@media (max-width: 768px) {
+  .IEIModal {
+    align-items: flex-start;
+    padding-top: 20px;
+  }
+
+  .clearanceModalOverlay {
+    align-items: flex-start;
+    padding-top: 20px;
+  }
+
+  .inspectionViewModalOverlay {
+    padding-top: 20px;
+  }
+}
+
+/* Adjust QR scanner for mobile */
+@media (max-width: 768px) {
+  #qr-reader {
+    min-height: 200px;
+  }
+
+  .scannerContainer {
+    margin: 10px 0;
+  }
+}
+
+/* Loading state adjustments for mobile */
+@media (max-width: 768px) {
+  .loadingContainer {
+    padding: 20px;
+    text-align: center;
+  }
+
+  .loadingContainer h2 {
+    font-size: 1.2rem;
+  }
+}
+
+/* Fix for dropdown arrows on mobile */
+@media (max-width: 768px) {
+  .floatingSelect {
+    background-size: 10px;
+    background-position: right 8px center;
+    padding-right: 25px;
+  }
+
+  .recentFilterSelect {
+    background-size: 10px;
+    background-position: right 8px center;
+    padding-right: 25px;
+  }
+}
+
+/* Adjust carousel dots for mobile */
+@media (max-width: 768px) {
+  .carouselDots {
+    gap: 6px;
+  }
+
+  .carouselDot {
+    width: 10px;
+    height: 10px;
+  }
+}

@@ -29,7 +29,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { supabase } from "../../../lib/supabaseClient.js";
-import "../styles/RecruitmentDashboard.css";
+import "../styles/RD.css";
 
 const RecruitmentDashboard = () => {
   const { user, logout } = useAuth();
