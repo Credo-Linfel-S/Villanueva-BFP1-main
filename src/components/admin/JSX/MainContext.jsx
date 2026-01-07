@@ -1136,7 +1136,7 @@ const MainContent = ({ isCollapsed }) => {
   return (
     <div className={`main-content ${isCollapsed ? "collapsed" : ""}`}>
       {/* Add the floating notification bell */}
-      <FloatingNotificationBell userId={userId} />
+
 
       <div className="header">
         <h1>Admin Dashboard</h1>
