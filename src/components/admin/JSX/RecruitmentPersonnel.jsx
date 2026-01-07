@@ -1033,7 +1033,7 @@ const { userId, isAuthenticated, userRole } = useUserId();
       <div className={styles.container}>
         <Title>Recruitment Personnel | BFP Villanueva</Title>
         <Meta name="robots" content="noindex, nofollow" />
-        <FloatingNotificationBell userId={userId} />
+      
 
         <Hamburger />
         <Sidebar />

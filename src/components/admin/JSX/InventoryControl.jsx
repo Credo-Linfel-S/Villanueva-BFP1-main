@@ -1803,7 +1803,7 @@ const { userId, isAuthenticated, userRole } = useUserId();
     <div className={styles.inventoryAppContainer}>
       <Title>Inventory Control | BFP Villanueva</Title>
       <Meta name="robots" content="noindex, nofollow" />
-      <FloatingNotificationBell userId={userId} />
+   
       <Hamburger />
       <Sidebar />
 

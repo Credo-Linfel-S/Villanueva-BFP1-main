@@ -3204,7 +3204,7 @@ const LeaveRecords = () => {
     <div className={styles.leaveAppContainer}>
       <Title>Leave Records | BFP Villanueva</Title>
       <Meta name="robots" content="noindex, nofollow" />
-      <FloatingNotificationBell userId={userId} />
+  
 
       <Hamburger />
       <Sidebar />

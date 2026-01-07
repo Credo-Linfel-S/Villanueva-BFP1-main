@@ -618,7 +618,7 @@ const PhotoCell = ({ person }) => {
       <Title>Personnel Placement | BFP Villanueva</Title>
       <Meta name="robots" content="noindex, nofollow" />
 
-      <FloatingNotificationBell userId={userId} />
+    
 
       <Hamburger />
       <Sidebar />

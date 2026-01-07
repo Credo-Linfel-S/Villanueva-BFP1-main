@@ -3072,7 +3072,6 @@ const getPhotoUrl = (person) => {
         <Title>Personnel Register | BFP Villanueva</Title>
         <Meta name="robots" content="noindex, nofollow" />
 
-        <FloatingNotificationBell userId={userId} />
 
         <Hamburger />
         <Sidebar />
@@ -3993,6 +3992,7 @@ const StatusManagementModal = () => {
       <Title>Personnel Register | BFP Villanueva</Title>
       <Meta name="robots" content="noindex, nofollow" />
       <AdminGearIcon />
+      <FloatingNotificationBell userId={userId} />
       <Hamburger />
       <ToastContainer
         position="top-right"

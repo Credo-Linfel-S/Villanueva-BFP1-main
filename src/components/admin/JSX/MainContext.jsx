@@ -2,7 +2,10 @@ import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { supabase } from "../../../lib/supabaseClient.js";
 import { NotificationService } from "../../admin/JSX/services/notificationService.js";
 import BFPPreloader from "../../BFPPreloader.jsx";
-import "../styles/NotificationBell.css"
+import "../styles/NotificationBell.css";
+import FloatingNotificationBell from "../../FloatingNotificationBell.jsx";
+import { useUserId } from "../../hooks/useUserId.js";
+
 const MainContent = ({ isCollapsed }) => {
   // Add utility functions at the top (before state declarations)
   const convertToPHTime = (utcDate) => {
@@ -247,8 +250,8 @@ const MainContent = ({ isCollapsed }) => {
 
   // === STATE DECLARATIONS ===
 
-  // User ID state
-  const [userId, setUserId] = useState(null);
+  // Use the useUserId hook to get userId
+  const { userId } = useUserId();
 
   // Notification state from Supabase ONLY
   const [notifications, setNotifications] = useState([]);
@@ -313,7 +316,6 @@ const MainContent = ({ isCollapsed }) => {
 
   const fetchCurrentUser = async () => {
     const adminId = "00000000-0000-0000-0000-000000000001"; // ✅ CORRECT - This is a valid UUID
-    setUserId(adminId);
     return adminId;
   };
 
@@ -1133,116 +1135,16 @@ const MainContent = ({ isCollapsed }) => {
 
   return (
     <div className={`main-content ${isCollapsed ? "collapsed" : ""}`}>
+      {/* Add the floating notification bell */}
+      <FloatingNotificationBell userId={userId} />
+
       <div className="header">
         <h1>Admin Dashboard</h1>
         <div className="header-right">
           <p className="pp">Welcome, Admin User</p>
 
-          {/* Combined Notification Bell - SUPABASE ONLY */}
-          <div className="notification-container">
-            <div
-              className="notification-badge"
-              onClick={() =>
-                setShowNotificationDropdown(!showNotificationDropdown)
-              }
-            >
-              <span className="notification-icon">🔔</span>
-              {unreadCount > 0 && (
-                <span className="notification-count">
-                  {unreadCount > 99 ? "99+" : unreadCount}
-                </span>
-              )}
-            </div>
-
-            {showNotificationDropdown && (
-              <div className="notification-dropdown">
-                <div className="notification-header">
-                  <h3>Notifications</h3>
-                  <div className="notification-actions">
-                    <button
-                      className="notification-action-btn"
-                      onClick={markAllAsRead}
-                      title="Mark all as read"
-                      disabled={unreadCount === 0}
-                    >
-                      ✓
-                    </button>
-                    <button
-                      className="notification-action-btn"
-                      onClick={clearAllNotifications}
-                      title="Clear all"
-                      disabled={notifications.length === 0}
-                    >
-                      ✕
-                    </button>
-                  </div>
-                </div>
-
-                <div className="notification-list">
-                  {notificationLoading ? (
-                    <div className="notification-loading">
-                      Loading notifications...
-                    </div>
-                  ) : notifications.length > 0 ? (
-                    <>
-                      {/* Show Supabase notifications only */}
-                      {notifications.map((notification) => (
-                        <div
-                          key={notification.id}
-                          className={`notification-item ${
-                            notification.read ? "read" : "unread"
-                          }`}
-                          onClick={() =>
-                            !notification.read && markAsRead(notification.id)
-                          }
-                        >
-                          <div className="notification-content">
-                            <span
-                              className={`notification-type-icon ${notification.type}`}
-                            >
-                              {notification.type === "warning"
-                                ? "⚠️"
-                                : notification.type === "error"
-                                ? "❌"
-                                : notification.type === "success"
-                                ? "✅"
-                                : "ℹ️"}
-                            </span>
-                            <div className="notification-text">
-                              <p className="notification-title">
-                                {notification.title}
-                              </p>
-                              <p className="notification-message">
-                                {notification.message}
-                              </p>
-                              <p className="notification-time">
-                                {formatTimeAgo(
-                                  new Date(notification.created_at)
-                                )}
-                              </p>
-                            </div>
-                            {!notification.read && (
-                              <div className="notification-unread-dot"></div>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </>
-                  ) : (
-                    <div className="notification-empty">
-                      <p>No notifications</p>
-                    </div>
-                  )}
-                </div>
-
-                <div className="notification-footer">
-                  <span className="notification-count-text">
-                    {unreadCount} unread • {notifications.length} total
-                  </span>
-                </div>
-              </div>
-            )}
-          </div>
+          {/* REMOVED THE OLD NOTIFICATION BELL - Now using floating bell only */}
+          {/* You can keep the welcome message and other header content */}
         </div>
       </div>
 

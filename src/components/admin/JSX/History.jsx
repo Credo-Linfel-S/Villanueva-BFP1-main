@@ -436,7 +436,7 @@ const { userId, isAuthenticated, userRole } = useUserId();
     <div className={styles.container}>
       <Title>History | BFP Villanueva</Title>
       <Meta name="robots" content="noindex, nofollow" />
-      <FloatingNotificationBell userId={userId} />
+
       <Hamburger />
       <ToastContainer position="top-right" autoClose={3000} />
       <Sidebar />

@@ -38,6 +38,8 @@ import {
   filterActivePersonnel,
   isPersonnelActive,
 } from "../filterActivePersonnel.js";
+
+import { useUserId } from "../hooks/useUserId.js";
 const ClearanceSystem = () => {
   const { isSidebarCollapsed } = useSidebar();
   const [clearanceRequests, setClearanceRequests] = useState([]);
@@ -60,6 +62,7 @@ const ClearanceSystem = () => {
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [selectedRequestForAction, setSelectedRequestForAction] =
     useState(null);
+    const { userId, isAuthenticated, userRole } = useUserId();
   const [showOfficerModal, setShowOfficerModal] = useState(false);
   const [selectedRequestForPdf, setSelectedRequestForPdf] = useState(null);
   const [officerNames, setOfficerNames] = useState({});
@@ -3079,7 +3082,21 @@ const loadPersonnel = async () => {
       accountabilityRecordsSubscription.unsubscribe();
     };
   }, []);
-
+if (showPreloader) {
+  return (
+    <div className={styles.clearanceSystem}>
+      <Title>Clearance System | BFP Villanueva</Title>
+      <Meta name="robots" content="noindex, nofollow" />
+      <ToastContainer />
+      <BFPPreloader
+        loading={showPreloader}
+        progress={preloaderProgress}
+        moduleTitle="CLEARANCE SYSTEM • Loading Clearance Requests..."
+        onRetry={handleRetryPreloader}
+      />
+    </div>
+  );
+}
   return (
     <div className={styles.clearanceSystem}>
       <Title>Clearance System | BFP Villanueva</Title>
@@ -3097,12 +3114,6 @@ const loadPersonnel = async () => {
         theme="light"
       />
 
-      <BFPPreloader
-        loading={showPreloader}
-        progress={preloaderProgress}
-        moduleTitle="CLEARANCE SYSTEM • Loading Clearance Requests..."
-        onRetry={handleRetryPreloader}
-      />
 
       <Hamburger />
       <Sidebar />
@@ -3387,7 +3398,7 @@ const loadPersonnel = async () => {
                 <th>Equipment</th>
                 <th>Status</th>
                 <th>Inspection</th>
-                <th>Lost Equipment</th> 
+                <th>Lost Equipment</th>
                 <th>Actions</th>
                 <th>Download</th>
               </tr>
@@ -3860,7 +3871,6 @@ const loadPersonnel = async () => {
                       </thead>
                       <tbody>
                         {selectedEquipment.map((item) => {
-                     
                           const statusClass =
                             item.clearance_status?.toLowerCase() || "pending";
                           const hasAccountability =
@@ -3895,7 +3905,6 @@ const loadPersonnel = async () => {
                                 )}
                               </td>
                               <td>
-                              
                                 {item.clearance_status === "Cleared" && (
                                   <button
                                     className={styles.clearedBtn}

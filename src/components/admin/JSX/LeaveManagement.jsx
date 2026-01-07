@@ -1630,7 +1630,7 @@ const handleApproveWithOptions = async (
       <Meta name="robots" content="noindex, nofollow" />
       <Hamburger />
       <Sidebar />
-      <FloatingNotificationBell userId={userId} />
+    
       <ToastContainer
         position="top-right"
         autoClose={2500}

@@ -3711,12 +3711,8 @@ AND cr.archived_at IS NULL;
 
   return (
     <>
-      <BFPPreloader
-        loading={loading || generatingYearlyRecord}
-        moduleTitle="CLEARANCE RECORDS • Validating Documents..."
-        onRetry={loadClearanceData}
-      />
-      <FloatingNotificationBell userId={userId} />
+
+   
 
       <div className={styles.CRSappContainer}>
         <Title>Clearance Records | BFP Villanueva</Title>

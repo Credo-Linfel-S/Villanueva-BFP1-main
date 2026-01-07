@@ -905,7 +905,7 @@ const { userId, isAuthenticated, userRole } = useUserId();
     <div className={styles.TSAppContainer}>
       <Title>Training Management | BFP Villanueva</Title>
       <Meta name="robots" content="noindex, nofollow" />
-      <FloatingNotificationBell userId={userId} />
+    
       <Hamburger />
       <Sidebar />
       <div className={`main-content ${isSidebarCollapsed ? "collapsed" : ""}`}>

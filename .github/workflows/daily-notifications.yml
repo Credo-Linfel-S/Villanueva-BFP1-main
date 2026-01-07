@@ -2,7 +2,7 @@ name: Daily Notification Aggregator
 on:
   schedule:
     # Runs daily at 9 AM UTC (5 PM PH Time)
-    - cron: '0 9 * * *'
+    - cron: '0 21 * * *'
   workflow_dispatch:
 
 jobs:

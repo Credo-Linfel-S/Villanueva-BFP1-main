@@ -1526,7 +1526,7 @@ const { userId, isAuthenticated, userRole } = useUserId();
     <div className="app-container">
       <Title>Recent Activities | BFP Villanueva</Title>
       <Meta name="robots" content="noindex, nofollow" />
-      <FloatingNotificationBell userId={userId} />
+     
       <ToastContainer />
       <Hamburger />
       <Sidebar />

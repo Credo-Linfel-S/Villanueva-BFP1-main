@@ -50,6 +50,7 @@
   border-radius: 50%;
   display: flex;
   align-items: center;
+margin-bottom: 10px;
   justify-content: center;
   font-weight: bold;
   font-size: 12px;
@@ -294,6 +295,7 @@
   padding: 40px 20px;
   text-align: center;
   color: #999;
+ 
 
 }
 
@@ -561,8 +563,8 @@
 
 /* Floating bell styling */
 .floatingBell {
-  width: 60px !important;
-  height: 60px !important;
+  width: 50px !important;
+  height: 50px !important;
   border-radius: 50% !important;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
   display: flex !important;
@@ -613,7 +615,7 @@
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2) !important;
   overflow: hidden !important;
   animation: floatingSlideDown 0.3s ease;
-  z-index: 999999 !important;
+  z-index: 999 !important;
 }
 
 /* Different animations for different directions */
@@ -857,7 +859,7 @@
 .floating-notification-bell,
 .floating-notification-dropdown,
 [class*="floatingContainer"] {
-  z-index: 999999 !important;
+  z-index: 99 !important;
 }
 
 /* Push content down */

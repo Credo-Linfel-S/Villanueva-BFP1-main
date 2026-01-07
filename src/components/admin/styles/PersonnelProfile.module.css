@@ -6,6 +6,10 @@
   margin-bottom: 15px;
   position: relative;
 }
+.floatingnotif{
+  top: 100px!important;
+  position: relative;
+}
 /* Profile Photo Styles */
 .profilePhotoContainer {
   width: 60px;

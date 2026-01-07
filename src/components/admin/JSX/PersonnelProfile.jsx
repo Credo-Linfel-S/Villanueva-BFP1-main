@@ -729,7 +729,7 @@ const { userId, isAuthenticated, userRole } = useUserId();
       <Meta name="robots" content="noindex, nofollow" />
       <Hamburger />
       <Sidebar />
-      <FloatingNotificationBell userId={userId} />
+     
       <ToastContainer
         position="top-right"
         autoClose={5000}

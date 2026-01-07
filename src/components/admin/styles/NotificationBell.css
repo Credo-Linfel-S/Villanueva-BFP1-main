@@ -3,12 +3,6 @@
    (Extracted from admindashboard.css)
 ================================ */
 
-/* Header right alignment */
-.header-right {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-}
 
 /* Notification Container */
 .notification-container {

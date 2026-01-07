@@ -495,7 +495,7 @@ const { userId, isAuthenticated, userRole } = useUserId();
 
       <Hamburger />
       <Sidebar />
-      <FloatingNotificationBell userId={userId} />
+    
       <ToastContainer
         position="top-right"
         autoClose={3000}

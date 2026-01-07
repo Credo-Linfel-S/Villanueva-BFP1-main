@@ -336,7 +336,7 @@ const FloatingNotificationBell = () => {
           top: position.top,
           right: position.right,
         }}
-        onMouseDown={handleMouseDown}
+     
       >
         <div
           className={styles.bellWrapper}
