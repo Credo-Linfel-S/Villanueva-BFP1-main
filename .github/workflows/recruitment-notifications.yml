@@ -1,7 +1,6 @@
 name: Recruitment Applicant Notifications
 on:
   schedule:
-    # Runs every 2 hours
     - cron: '0 */2 * * *'
   workflow_dispatch:
 
@@ -22,10 +21,18 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
       
-      - name: Install dependencies
-        run: npm ci
+      - name: Debug Environment Variables
+        run: |
+          echo "SUPABASE_URL length: ${#SUPABASE_URL}"
+          echo "SUPABASE_SERVICE_ROLE_KEY length: ${#SUPABASE_SERVICE_ROLE_KEY}"
+          echo "SUPABASE_URL first 10 chars: ${SUPABASE_URL:0:10}"
+          echo "SUPABASE_SERVICE_ROLE_KEY first 10 chars: ${SUPABASE_SERVICE_ROLE_KEY:0:10}"
+          echo ""
+          echo "SUPABASE_SERVICE_ROLE_KEY starts with 'eyJ'? $(echo $SUPABASE_SERVICE_ROLE_KEY | head -c 3)"
+      
+      - name: Install @supabase/supabase-js
+        run: npm install @supabase/supabase-js
       
       - name: Run recruitment notification checker
         run: node server/cron/check-applicant-updates.js
