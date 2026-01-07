@@ -1,11 +1,6 @@
-// .github/scripts/quick-recruitment-check.js
-const { createClient } = require("@supabase/supabase-js");
+const { supabase } = require("../lib/supabaseClient");
 
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const adminUserId = process.env.ADMIN_USER_ID;
 
-const supabase = createClient(supabaseUrl, supabaseKey);
 
 async function checkUrgentRecruitmentUpdates() {
   try {

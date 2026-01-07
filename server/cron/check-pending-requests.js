@@ -1,17 +1,7 @@
 // .github/scripts/check-pending-requests.js
-const { createClient } = require("@supabase/supabase-js");
+const { supabase } = require("../lib/supabaseClient");
 
-// Get environment variables
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const adminUserId = process.env.ADMIN_USER_ID;
 
-if (!supabaseUrl || !supabaseKey || !adminUserId) {
-  console.error("Missing environment variables");
-  process.exit(1);
-}
-
-const supabase = createClient(supabaseUrl, supabaseKey);
 
 async function checkPendingLeaveRequests() {
   try {

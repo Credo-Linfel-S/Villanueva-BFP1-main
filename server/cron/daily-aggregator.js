@@ -1,10 +1,4 @@
-v
-
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const adminUserId = process.env.ADMIN_USER_ID;
-
-const supabase = createClient(supabaseUrl, supabaseKey);
+const { supabase } = require("../lib/supabaseClient");
 
 async function createDailySummary() {
   try {
