@@ -14,6 +14,13 @@
   },
   "scripts": {
     "cleanup:inventory-audit": "node scripts/cleanup-inventory-audit.js",
-    "cleanup:inventory-audit:dry-run": "node scripts/cleanup-inventory-audit.js --dry-run"
+    "cleanup:inventory-audit:dry-run": "node scripts/cleanup-inventory-audit.js --dry-run",
+    "create-workflow-scripts": "node scripts/create-workflow-scripts.js",
+    "check-pending-requests": "node ..\\.github\\workflows\\scripts\\check-pending-requests.js",
+    "check-upcoming-inspections": "node ..\\.github\\workflows\\scripts\\check-upcoming-inspections.js",
+    "check-new-applicants": "node ..\\.github\\workflows\\scripts\\check-new-applicants.js",
+    "check-applicant-updates": "node ..\\.github\\workflows\\scripts\\check-applicant-updates.js",
+    "setup-workflows": "npm run create-workflow-scripts",
+    "daily-aggregator": "node ..\\.github\\workflows\\scripts\\daily-aggregator.js"
   }
 }
