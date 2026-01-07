@@ -61,7 +61,7 @@ jobs:
           cd server
           echo "🚀 RUNNING MONTHLY LEAVE ACCRUAL"
           echo "Date: $(date)"
-          node ./cron/monthly-accrual.js
+          node server/cron/monthly-accrual.js
       
       - name: Cleanup
         run: rm -f server/.env

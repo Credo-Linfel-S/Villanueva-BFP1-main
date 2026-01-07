@@ -60,7 +60,7 @@ jobs:
           echo "SUPABASE_SERVICE_ROLE_KEY length: ${#SUPABASE_SERVICE_ROLE_KEY}"
           
           if [ "${{ inputs.dry-run }}" = "true" ]; then
-            node ./cron/cleanup-inventory-audit.js --dry-run
+            node server/cron/cleanup-inventory-audit.js --dry-run
           else
-            node ./cron/cleanup-inventory-audit.js
+            node server/cron/cleanup-inventory-audit.js
           fi

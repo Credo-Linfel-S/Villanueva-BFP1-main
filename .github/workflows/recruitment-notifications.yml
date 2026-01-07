@@ -28,4 +28,4 @@ jobs:
         run: npm ci
       
       - name: Run recruitment notification checker
-        run: node ./cron/check-applicant-updates.js
+        run: node server/cron/check-applicant-updates.js
