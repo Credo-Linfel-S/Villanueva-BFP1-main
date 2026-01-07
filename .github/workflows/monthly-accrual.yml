@@ -21,16 +21,28 @@ jobs:
         with:
           node-version: '20'
       
+      - name: Debug GitHub Secrets
+        run: |
+          echo "=== CHECKING GITHUB SECRETS ==="
+          echo "SUPABASE_URL secret exists: ${{ secrets.SUPABASE_URL != '' }}"
+          echo "SUPABASE_SERVICE_ROLE_KEY secret exists: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY != '' }}"
+      
       - name: Install dependencies
         run: |
           cd server
-          npm install
+          npm ci
       
-      - name: Create environment file
+      - name: Create environment file with CORRECT variable name
         run: |
           echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" > server/.env
-          echo "SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_KEY }}" >> server/.env
+          echo "SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" >> server/.env  # FIXED THIS LINE
           echo "NODE_ENV=production" >> server/.env
+          
+          # Verify the file was created correctly
+          echo "=== .env FILE CONTENTS ==="
+          cat server/.env
+          echo ""
+          echo "SUPABASE_SERVICE_ROLE_KEY length in .env: $(cat server/.env | grep SUPABASE_SERVICE_ROLE_KEY | cut -d'=' -f2 | wc -c)"
       
       - name: Check if it's January 1st
         id: check_date
@@ -54,14 +66,14 @@ jobs:
           cd server
           echo "🔄 RUNNING ANNUAL EMERGENCY LEAVE RESET"
           echo "Date: $(date)"
-          node ./cron/annual-reset.js
+          node cron/annual-reset.js
       
       - name: Run Monthly Accrual (All months including January)
         run: |
           cd server
           echo "🚀 RUNNING MONTHLY LEAVE ACCRUAL"
           echo "Date: $(date)"
-          node ./cron/monthly-accrual.js
+          node cron/monthly-accrual.js
       
       - name: Cleanup
         run: rm -f server/.env
