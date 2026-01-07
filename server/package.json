@@ -16,9 +16,8 @@
     "cleanup:inventory-audit": "node scripts/cleanup-inventory-audit.js",
     "cleanup:inventory-audit:dry-run": "node scripts/cleanup-inventory-audit.js --dry-run",
     "create-workflow-scripts": "node scripts/create-workflow-scripts.js",
-    
-
     "monthly-accrual": "node server/cron/monthly-accrual.js",
+    "cleanup-inventory-audit": "node server/cron/cleanup-inventory-audit.js",
     "annual-reset": "node server/cron/annual-reset.js",
     "check-pending-requests": "node server/cron/check-pending-requests.js",
     "check-upcoming-inspections": "node server/cron/check-upcoming-inspections.js",
@@ -26,8 +25,6 @@
     "check-applicant-updates": "node server/cron/check-applicant-updates.js",
     "daily-aggregator": "node server/cron/daily-aggregator.js",
     "quick-recruitment-check": "node server/cron/quick-recruitment-check.js",
-   
-    
     "setup-workflows": "npm run create-workflow-scripts"
   }
 }
