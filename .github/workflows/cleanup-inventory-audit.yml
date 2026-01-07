@@ -13,7 +13,6 @@ on:
 jobs:
   cleanup-audit:
     runs-on: ubuntu-latest
-    environment: production
     
     steps:
       - name: Checkout repository
@@ -24,43 +23,32 @@ jobs:
         with:
           node-version: '20'
       
-      - name: Debug - List ALL secrets (masked)
+      - name: Create .env file for server
         run: |
-          echo "=== Checking Secret Names ==="
-          echo "SUPABASE_URL exists: ${{ secrets.SUPABASE_URL != '' && 'YES' || 'NO' }}"
-          echo "SUPABASE_SERVICE_ROLE_KEY exists: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY != '' && 'YES' || 'NO' }}"
+          echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" > server/.env
+          echo "SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY || secrets.SUPABASE_SERVICE_KEY }}" >> server/.env
+          echo "NODE_ENV=production" >> server/.env
           
-          echo ""
-          echo "=== Common Variations (check these) ==="
-          echo "supabase_url (lowercase): ${{ secrets.supabase_url != '' && 'YES' || 'NO' }}"
-          echo "supabase_service_role_key (lowercase): ${{ secrets.supabase_service_role_key != '' && 'YES' || 'NO' }}"
-          echo "SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY != '' && 'YES' || 'NO' }}"
-          echo "SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY != '' && 'YES' || 'NO' }}"
-          echo "DATABASE_URL: ${{ secrets.DATABASE_URL != '' && 'YES' || 'NO' }}"
-          
-          echo ""
-          echo "=== Action Environment ==="
-          echo "Environment name: ${{ github.event_name }}"
-          echo "Job environment: ${{ job.environment }}"
+          # Debug: Show what was written
+          echo "=== .env file created ==="
+          echo "SUPABASE_URL length: $(echo ${{ secrets.SUPABASE_URL }} | wc -c)"
+          echo "SUPABASE_SERVICE_ROLE_KEY length: $(echo ${{ secrets.SUPABASE_SERVICE_ROLE_KEY || secrets.SUPABASE_SERVICE_KEY }} | wc -c)"
       
-      - name: Install only required packages
-        run: |
-          cd server
-          npm install @supabase/supabase-js dotenv --no-save
+      - name: Install dependencies in server folder
+        working-directory: ./server
+        run: npm ci
       
       - name: Run cleanup script
-        env:
-          # Try different variations of your secret names
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL || secrets.supabase_url || secrets.DATABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY || secrets.supabase_service_role_key || secrets.SUPABASE_SERVICE_KEY || secrets.SUPABASE_ANON_KEY }}
+        working-directory: ./server
         run: |
-          cd server
-          echo "Testing environment variables..."
-          echo "SUPABASE_URL length: ${#SUPABASE_URL}"
-          echo "SUPABASE_SERVICE_ROLE_KEY length: ${#SUPABASE_SERVICE_ROLE_KEY}"
+          echo "Running cleanup script..."
+          echo "Dry run mode: ${{ inputs.dry-run }}"
           
           if [ "${{ inputs.dry-run }}" = "true" ]; then
-            node server/cron/cleanup-inventory-audit.js --dry-run
+            node cron/cleanup-inventory-audit.js --dry-run
           else
-            node server/cron/cleanup-inventory-audit.js
+            node cron/cleanup-inventory-audit.js
           fi
+      
+      - name: Cleanup .env file
+        run: rm -f server/.env

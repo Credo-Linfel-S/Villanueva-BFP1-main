@@ -1,6 +1,6 @@
-const { supabase } = require("../lib/supabaseClient");
-require("dotenv").config();
-const { program } = require("commander"); // Add commander for CLI options
+const { supabase } = require("../lib/supabaseClient"); // Use shared client
+require("dotenv").config({ path: "../.env" });
+const { program } = require("commander");
 
 // Initialize commander
 program
@@ -15,27 +15,8 @@ async function cleanupOldInventoryAudit() {
     `Mode: ${options.dryRun ? "DRY RUN (no deletions)" : "LIVE (will delete)"}`
   );
 
-  // Get environment variables
-  const supabaseUrl = process.env.SUPABASE_URL;
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!supabaseUrl || !supabaseServiceKey) {
-    console.error("❌ Missing Supabase environment variables");
-    console.error(
-      "   Make sure SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are set"
-    );
-    process.exit(1);
-  }
-
-  console.log("✅ Supabase credentials loaded");
-
-  // Create Supabase client with service role key
-  const supabase = createClient(supabaseUrl, supabaseServiceKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  });
+  // No need to create client - already imported from lib/supabaseClient
+  // The supabaseClient.js will handle environment variable loading
 
   try {
     // Calculate date 1 year ago in Philippine Time
@@ -200,10 +181,6 @@ async function cleanupOldInventoryAudit() {
     console.log("\n🎉 Cleanup process completed");
   } catch (error) {
     console.error("\n❌ Cleanup failed:", error.message);
-
-    // Send notification (optional - add your notification service here)
-    // Example: Slack, Discord, Email
-
     process.exit(1);
   }
 }
