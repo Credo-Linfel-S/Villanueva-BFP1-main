@@ -28,4 +28,4 @@ jobs:
         run: npm ci
       
       - name: Run daily notification aggregator
-        run: node .github/scripts/daily-aggregator.js
+        run: node .github/workflows/scripts/daily-aggregator.js

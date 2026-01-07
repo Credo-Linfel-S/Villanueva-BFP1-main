@@ -29,4 +29,4 @@ jobs:
         run: npm ci
       
       - name: Run notification checker
-        run: node .github/scripts/check-pending-requests.js
+        run: node .github/workflows/scripts/check-pending-requests.js

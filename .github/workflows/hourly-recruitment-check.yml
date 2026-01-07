@@ -29,4 +29,4 @@ jobs:
         run: npm ci
       
       - name: Run quick recruitment check
-        run: node .github/scripts/quick-recruitment-check.js
+        run: node .github/workflows/scripts/quick-recruitment-check.js
