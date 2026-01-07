@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { useLocation, Link } from "react-router-dom"; // Import Link
 import { useSidebar } from "./SidebarContext";
-
+import logo from "../assets/background.png";
 const EmployeeSidebar = () => {
   const { isSidebarCollapsed, expandSidebar, currentTheme, toggleTheme } =
     useSidebar();
@@ -38,7 +38,7 @@ const EmployeeSidebar = () => {
           onClick={(e) => handleTabClick(e, "/")}
         >
           <img
-            src="/src/assets/logo-bfp.jpg"
+             src={logo}
             alt="Logo"
             style={{
               height: "30px",

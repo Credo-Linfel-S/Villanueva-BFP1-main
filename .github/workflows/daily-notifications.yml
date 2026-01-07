@@ -1,0 +1,31 @@
+name: Daily Notification Aggregator
+on:
+  schedule:
+    # Runs daily at 9 AM UTC (5 PM PH Time)
+    - cron: '0 9 * * *'
+  workflow_dispatch:
+
+jobs:
+  daily-notifications:
+    runs-on: ubuntu-latest
+    
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      ADMIN_USER_ID: '00000000-0000-0000-0000-000000000001'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run daily notification aggregator
+        run: node .github/scripts/daily-aggregator.js

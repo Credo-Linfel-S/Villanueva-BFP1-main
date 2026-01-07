@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { supabase } from "../../../lib/supabaseClient.js";
+import { NotificationService } from "../../admin/JSX/services/notificationService.js";
 import BFPPreloader from "../../BFPPreloader.jsx";
-
+import "../styles/NotificationBell.css"
 const MainContent = ({ isCollapsed }) => {
   // Add utility functions at the top (before state declarations)
   const convertToPHTime = (utcDate) => {
@@ -244,6 +245,18 @@ const MainContent = ({ isCollapsed }) => {
     return buttons;
   };
 
+  // === STATE DECLARATIONS ===
+
+  // User ID state
+  const [userId, setUserId] = useState(null);
+
+  // Notification state from Supabase ONLY
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [showNotificationDropdown, setShowNotificationDropdown] =
+    useState(false);
+  const [notificationLoading, setNotificationLoading] = useState(false);
+
   // State for personnel
   const [totalPersonnel, setTotalPersonnel] = useState(0);
   const [personnelLoading, setPersonnelLoading] = useState(true);
@@ -275,14 +288,10 @@ const MainContent = ({ isCollapsed }) => {
   const [clearanceLoading, setClearanceLoading] = useState(true);
   const [clearanceError, setClearanceError] = useState(null);
 
-  // NEW: State for recruitment applicants
+  // State for recruitment applicants
   const [totalRecruitedApplicants, setTotalRecruitedApplicants] = useState(0);
   const [recruitmentLoading, setRecruitmentLoading] = useState(true);
   const [recruitmentError, setRecruitmentError] = useState(null);
-  const [newApplicantNotifications, setNewApplicantNotifications] = useState(
-    []
-  );
-  const [lastNotificationCheck, setLastNotificationCheck] = useState(null);
 
   // Overall loading state
   const [overallLoading, setOverallLoading] = useState(true);
@@ -293,19 +302,87 @@ const MainContent = ({ isCollapsed }) => {
 
   // Pagination state for recent activities
   const [activityCurrentPage, setActivityCurrentPage] = useState(1);
-  const activityRowsPerPage = 5; // 5 items per page like leave management
+  const activityRowsPerPage = 5;
 
   // Calculate current activities for the current page
   const currentActivities = useMemo(() => {
     return paginate(recentActivities, activityCurrentPage, activityRowsPerPage);
   }, [recentActivities, activityCurrentPage, activityRowsPerPage]);
 
-  // NEW: Calculate unread notifications
-  const unreadNotifications = useMemo(() => {
-    return newApplicantNotifications.filter(
-      (notification) => !notification.read
-    );
-  }, [newApplicantNotifications]);
+  // === USER MANAGEMENT FUNCTIONS ===
+
+  const fetchCurrentUser = async () => {
+    const adminId = "00000000-0000-0000-0000-000000000001"; // ✅ CORRECT - This is a valid UUID
+    setUserId(adminId);
+    return adminId;
+  };
+
+  // === NOTIFICATION FUNCTIONS - SUPABASE ONLY ===
+
+  // Fetch notifications from Supabase
+  const fetchNotifications = useCallback(async () => {
+    if (!userId) return;
+    setNotificationLoading(true);
+    try {
+      const userNotifications = await NotificationService.getNotifications(
+        userId
+      );
+      setNotifications(userNotifications);
+      const count = await NotificationService.getUnreadCount(userId);
+      setUnreadCount(count);
+    } catch (error) {
+      console.error("Error fetching notifications:", error);
+    } finally {
+      setNotificationLoading(false);
+    }
+  }, [userId]);
+
+  // Mark notification as read
+  const markAsRead = async (notificationId) => {
+    try {
+      await NotificationService.markAsRead(notificationId);
+      setNotifications((prev) =>
+        prev.map((notif) =>
+          notif.id === notificationId
+            ? { ...notif, read: true, read_at: new Date().toISOString() }
+            : notif
+        )
+      );
+      setUnreadCount((prev) => Math.max(0, prev - 1));
+    } catch (error) {
+      console.error("Error marking as read:", error);
+    }
+  };
+
+  // Mark all as read
+  const markAllAsRead = async () => {
+    if (!userId) return;
+    try {
+      await NotificationService.markAllAsRead(userId);
+      setNotifications((prev) =>
+        prev.map((notif) => ({
+          ...notif,
+          read: true,
+          read_at: new Date().toISOString(),
+        }))
+      );
+      setUnreadCount(0);
+    } catch (error) {
+      console.error("Error marking all as read:", error);
+    }
+  };
+
+  // Clear all notifications
+  const clearAllNotifications = async () => {
+    if (!userId) return;
+    try {
+      await NotificationService.clearAll(userId);
+      setNotifications([]);
+      setUnreadCount(0);
+    } catch (error) {
+      console.error("Error clearing notifications:", error);
+    }
+  };
 
   // Function to fetch total personnel count
   const fetchTotalPersonnel = async () => {
@@ -379,7 +456,7 @@ const MainContent = ({ isCollapsed }) => {
     }
   };
 
-  // NEW: Function to fetch total recruited applicants count
+  // Function to fetch total recruited applicants count
   const fetchTotalRecruitedApplicants = async () => {
     try {
       // Count all active recruitment personnel
@@ -668,7 +745,7 @@ const MainContent = ({ isCollapsed }) => {
         });
       }
 
-      // NEW: Process recruitment activities
+      // Process recruitment activities
       if (recruitmentActivities.data) {
         recruitmentActivities.data.forEach((applicant) => {
           const phTime = convertToPHTime(applicant.created_at);
@@ -784,126 +861,6 @@ const MainContent = ({ isCollapsed }) => {
     }
   };
 
-  // NEW: Function to check for new applicant notifications
-  const checkNewApplicantNotifications = async () => {
-    try {
-      // Get the last checked timestamp
-      const lastChecked = lastNotificationCheck || new Date(0);
-      const now = new Date();
-
-      // Fetch new applicants since last check
-      const { data, error } = await supabase
-        .from("recruitment_personnel")
-        .select(
-          `
-          id,
-          candidate,
-          full_name,
-          position,
-          stage,
-          status,
-          application_date,
-          interview_date,
-          resume_url,
-          created_at,
-          updated_at
-        `
-        )
-        .gte("created_at", lastChecked.toISOString()) // Only new since last check
-        .order("created_at", { ascending: false }); // Most recent first
-
-      if (error) throw error;
-
-      if (data && data.length > 0) {
-        const newNotifications = data.map((applicant) => {
-          const phTime = convertToPHTime(applicant.created_at);
-          const applicantName =
-            applicant.full_name || applicant.candidate || "New applicant";
-
-          let notificationText = `New applicant: ${applicantName}`;
-          let notificationType = "new_applicant";
-
-          if (applicant.resume_url) {
-            notificationText = `${applicantName} uploaded resume`;
-            notificationType = "resume_uploaded";
-          } else if (applicant.application_date) {
-            notificationText = `${applicantName} submitted application`;
-            notificationType = "application_submitted";
-          } else if (applicant.interview_date) {
-            notificationText = `${applicantName} scheduled interview`;
-            notificationType = "interview_scheduled";
-          }
-
-          return {
-            id: `notification-${applicant.id}-${Date.now()}`,
-            text: notificationText,
-            type: notificationType,
-            timestamp: formatPHTimestamp(applicant.created_at),
-            phTime: phTime,
-            applicantName: applicantName,
-            stage: applicant.stage,
-            status: applicant.status,
-            read: false,
-            createdAt: new Date(),
-            rawTime: phTime.getTime(),
-          };
-        });
-
-        // Sort new notifications by time (most recent first)
-        newNotifications.sort((a, b) => b.rawTime - a.rawTime);
-
-        // Add new notifications to the beginning of the array (top position)
-        setNewApplicantNotifications((prev) => {
-          const combined = [...newNotifications, ...prev];
-          // Keep only the last 50 notifications to prevent memory issues
-          return combined.slice(0, 50);
-        });
-
-        // Show browser notification if there are new notifications
-        if (
-          newNotifications.length > 0 &&
-          "Notification" in window &&
-          Notification.permission === "granted"
-        ) {
-          newNotifications.forEach((notification) => {
-            new Notification("New Recruitment Activity", {
-              body: notification.text,
-              icon: "/firefighter-icon.png", // Add your icon path here
-            });
-          });
-        }
-      }
-
-      // Update last check timestamp
-      setLastNotificationCheck(now);
-    } catch (error) {
-      console.error("Error checking new applicant notifications:", error);
-    }
-  };
-
-  // NEW: Function to mark notification as read
-  const markNotificationAsRead = (notificationId) => {
-    setNewApplicantNotifications((prev) =>
-      prev.map((notification) =>
-        notification.id === notificationId
-          ? { ...notification, read: true }
-          : notification
-      )
-    );
-  };
-
-  // NEW: Function to mark all notifications as read
-  const markAllNotificationsAsRead = () => {
-    setNewApplicantNotifications((prev) =>
-      prev.map((notification) => ({ ...notification, read: true }))
-    );
-  };
-
-  // NEW: Function to clear all notifications
-  const clearAllNotifications = () => {
-    setNewApplicantNotifications([]);
-  };
-
   // Function to fetch all dashboard data
   const fetchDashboardData = async () => {
     setOverallLoading(true);
@@ -924,16 +881,13 @@ const MainContent = ({ isCollapsed }) => {
       await fetchPendingClearanceRequests();
 
       setPreloaderProgress(75);
-      await fetchTotalRecruitedApplicants(); // NEW: Fetch recruited applicants
+      await fetchTotalRecruitedApplicants();
 
       setPreloaderProgress(85);
       await fetchUpcomingInspections();
 
       setPreloaderProgress(95);
       await fetchRecentActivities();
-
-      // NEW: Check for new applicant notifications
-      await checkNewApplicantNotifications();
 
       setPreloaderProgress(100);
     } catch (error) {
@@ -946,24 +900,18 @@ const MainContent = ({ isCollapsed }) => {
     }
   };
 
-  // NEW: Function to request notification permission
-  const requestNotificationPermission = () => {
-    if ("Notification" in window) {
-      if (Notification.permission === "default") {
-        Notification.requestPermission().then((permission) => {
-          if (permission === "granted") {
-            console.log("Notification permission granted");
-          }
-        });
-      }
-    }
-  };
-
-  // NEW: Function to add a notification manually (for testing)
+  // === USE EFFECT HOOKS ===
 
   useEffect(() => {
-    // Request notification permission on component mount
-    requestNotificationPermission();
+    // Initialize user
+    const initUser = async () => {
+      const id = await fetchCurrentUser();
+      if (id) {
+        await fetchNotifications();
+      }
+    };
+
+    initUser();
 
     // Live timestamp interval
     const timeIntervalId = setInterval(() => {
@@ -1049,7 +997,7 @@ const MainContent = ({ isCollapsed }) => {
         )
         .subscribe();
 
-      // NEW: Subscribe to recruitment personnel changes
+      // Subscribe to recruitment personnel changes
       const recruitmentChannel = supabase
         .channel("recruitment-changes")
         .on(
@@ -1059,7 +1007,6 @@ const MainContent = ({ isCollapsed }) => {
             console.log("New recruitment applicant:", payload.new);
             fetchTotalRecruitedApplicants();
             fetchRecentActivities();
-            checkNewApplicantNotifications();
           }
         )
         .on(
@@ -1069,25 +1016,68 @@ const MainContent = ({ isCollapsed }) => {
             console.log("Updated recruitment applicant:", payload.new);
             fetchTotalRecruitedApplicants();
             fetchRecentActivities();
+          }
+        )
+        .subscribe();
 
-            // Check if resume was uploaded
-            if (
-              payload.new.resume_url &&
-              (!payload.old.resume_url ||
-                payload.old.resume_url !== payload.new.resume_url)
-            ) {
-              checkNewApplicantNotifications();
+      // Subscribe to notification changes
+      const notificationChannel = supabase
+        .channel(`notifications:user:${userId}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "notifications",
+            filter: `user_id=eq.${userId}`,
+          },
+          (payload) => {
+            console.log("New notification:", payload.new);
+            // Add new notification to the beginning
+            setNotifications((prev) => [payload.new, ...prev]);
+            if (!payload.new.read) {
+              setUnreadCount((prev) => prev + 1);
             }
-            // Check if stage changed
-            if (payload.new.stage && payload.old.stage !== payload.new.stage) {
-              checkNewApplicantNotifications();
+          }
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "UPDATE",
+            schema: "public",
+            table: "notifications",
+            filter: `user_id=eq.${userId}`,
+          },
+          (payload) => {
+            console.log("Updated notification:", payload.new);
+            // Update existing notification
+            setNotifications((prev) =>
+              prev.map((notif) =>
+                notif.id === payload.new.id ? payload.new : notif
+              )
+            );
+            // Recalculate unread count
+            if (payload.new.read) {
+              setUnreadCount((prev) => Math.max(0, prev - 1));
             }
-            // Check if status changed
-            if (
-              payload.new.status &&
-              payload.old.status !== payload.new.status
-            ) {
-              checkNewApplicantNotifications();
+          }
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "DELETE",
+            schema: "public",
+            table: "notifications",
+            filter: `user_id=eq.${userId}`,
+          },
+          (payload) => {
+            console.log("Deleted notification:", payload.old);
+            // Remove deleted notification
+            setNotifications((prev) =>
+              prev.filter((notif) => notif.id !== payload.old.id)
+            );
+            if (!payload.old.read) {
+              setUnreadCount((prev) => Math.max(0, prev - 1));
             }
           }
         )
@@ -1100,23 +1090,34 @@ const MainContent = ({ isCollapsed }) => {
         clearanceChannel.unsubscribe();
         inspectionChannel.unsubscribe();
         recruitmentChannel.unsubscribe();
+        notificationChannel.unsubscribe();
       };
     };
 
     // Enable real-time updates
     const cleanup = setupRealtimeSubscriptions();
 
-    // Set interval to check for new applicants every 2 minutes
-    const notificationInterval = setInterval(() => {
-      checkNewApplicantNotifications();
-    }, 2 * 60 * 1000); // 2 minutes
-
     return () => {
       cleanup();
       clearInterval(timeIntervalId);
-      clearInterval(notificationInterval);
     };
-  }, []);
+  }, [userId]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        showNotificationDropdown &&
+        !event.target.closest(".notification-container") &&
+        !event.target.closest(".notification-badge")
+      ) {
+        setShowNotificationDropdown(false);
+      }
+    };
+
+    document.addEventListener("click", handleClickOutside);
+    return () => document.removeEventListener("click", handleClickOutside);
+  }, [showNotificationDropdown]);
 
   // Show BFP Preloader while loading
   if (overallLoading) {
@@ -1137,34 +1138,32 @@ const MainContent = ({ isCollapsed }) => {
         <div className="header-right">
           <p className="pp">Welcome, Admin User</p>
 
-          {/* NEW: Notification badge with dropdown */}
-          {newApplicantNotifications.length > 0 && (
-            <div className="notification-container">
-              <div
-                className="notification-badge"
-                onClick={() =>
-                  document
-                    .querySelector(".notification-dropdown")
-                    .classList.toggle("show")
-                }
-              >
-                <span className="notification-icon">🔔</span>
+          {/* Combined Notification Bell - SUPABASE ONLY */}
+          <div className="notification-container">
+            <div
+              className="notification-badge"
+              onClick={() =>
+                setShowNotificationDropdown(!showNotificationDropdown)
+              }
+            >
+              <span className="notification-icon">🔔</span>
+              {unreadCount > 0 && (
                 <span className="notification-count">
-                  {unreadNotifications.length > 99
-                    ? "99+"
-                    : unreadNotifications.length}
+                  {unreadCount > 99 ? "99+" : unreadCount}
                 </span>
-              </div>
+              )}
+            </div>
 
-              {/* Notification Dropdown */}
+            {showNotificationDropdown && (
               <div className="notification-dropdown">
                 <div className="notification-header">
-                  <h3>Recent Recruitment Activities</h3>
+                  <h3>Notifications</h3>
                   <div className="notification-actions">
                     <button
                       className="notification-action-btn"
-                      onClick={markAllNotificationsAsRead}
+                      onClick={markAllAsRead}
                       title="Mark all as read"
+                      disabled={unreadCount === 0}
                     >
                       ✓
                     </button>
@@ -1172,69 +1171,78 @@ const MainContent = ({ isCollapsed }) => {
                       className="notification-action-btn"
                       onClick={clearAllNotifications}
                       title="Clear all"
+                      disabled={notifications.length === 0}
                     >
                       ✕
                     </button>
-                    {/* Test button - remove in production */}
-             
                   </div>
                 </div>
 
                 <div className="notification-list">
-                  {newApplicantNotifications.length > 0 ? (
-                    newApplicantNotifications.map((notification) => (
-                      <div
-                        key={notification.id}
-                        className={`notification-item ${
-                          notification.read ? "read" : "unread"
-                        }`}
-                        onClick={() => markNotificationAsRead(notification.id)}
-                      >
-                        <div className="notification-content">
-                          <span className="notification-icon-small">
-                            {notification.type === "resume_uploaded"
-                              ? "📄"
-                              : notification.type === "application_submitted"
-                              ? "📅"
-                              : notification.type === "interview_scheduled"
-                              ? "🎯"
-                              : "👤"}
-                          </span>
-                          <div className="notification-text">
-                            <p className="notification-message">
-                              {notification.text}
-                            </p>
-                            <p className="notification-timestamp">
-                              {notification.timestamp}
-                            </p>
-                            {notification.stage && (
-                              <p className="notification-stage">
-                                Stage: {notification.stage}
+                  {notificationLoading ? (
+                    <div className="notification-loading">
+                      Loading notifications...
+                    </div>
+                  ) : notifications.length > 0 ? (
+                    <>
+                      {/* Show Supabase notifications only */}
+                      {notifications.map((notification) => (
+                        <div
+                          key={notification.id}
+                          className={`notification-item ${
+                            notification.read ? "read" : "unread"
+                          }`}
+                          onClick={() =>
+                            !notification.read && markAsRead(notification.id)
+                          }
+                        >
+                          <div className="notification-content">
+                            <span
+                              className={`notification-type-icon ${notification.type}`}
+                            >
+                              {notification.type === "warning"
+                                ? "⚠️"
+                                : notification.type === "error"
+                                ? "❌"
+                                : notification.type === "success"
+                                ? "✅"
+                                : "ℹ️"}
+                            </span>
+                            <div className="notification-text">
+                              <p className="notification-title">
+                                {notification.title}
                               </p>
+                              <p className="notification-message">
+                                {notification.message}
+                              </p>
+                              <p className="notification-time">
+                                {formatTimeAgo(
+                                  new Date(notification.created_at)
+                                )}
+                              </p>
+                            </div>
+                            {!notification.read && (
+                              <div className="notification-unread-dot"></div>
                             )}
                           </div>
-                          {!notification.read && (
-                            <div className="notification-unread-dot"></div>
-                          )}
                         </div>
-                      </div>
-                    ))
+                      ))}
+                    </>
                   ) : (
                     <div className="notification-empty">
-                      <p>No recent notifications</p>
+                      <p>No notifications</p>
                     </div>
                   )}
                 </div>
 
                 <div className="notification-footer">
                   <span className="notification-count-text">
-                    {unreadNotifications.length} unread •{" "}
-                    {newApplicantNotifications.length} total
+                    {unreadCount} unread • {notifications.length} total
                   </span>
                 </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
 
@@ -1362,7 +1370,7 @@ const MainContent = ({ isCollapsed }) => {
               )}
           </div>
 
-          {/* NEW: Total Recruited Applicants Card */}
+          {/* Total Recruited Applicants Card */}
           <div className="stat-card">
             <div className="stat-icon recruitment-icon">🤝</div>
             <div className="stat-content">
@@ -1432,7 +1440,7 @@ const MainContent = ({ isCollapsed }) => {
             )}
           </div>
 
-          {/* NEW: Recruitment Stats */}
+          {/* Recruitment Stats */}
           <div className="stat-detail">
             <h4>Recruitment Overview</h4>
             {recruitmentLoading ? (
@@ -1447,14 +1455,6 @@ const MainContent = ({ isCollapsed }) => {
                     {totalRecruitedApplicants}
                   </span>
                 </div>
-                {newApplicantNotifications.length > 0 && (
-                  <div className="breakdown-item">
-                    <span className="breakdown-label">Recent Activities:</span>
-                    <span className="breakdown-value notification-value">
-                      {newApplicantNotifications.length} new
-                    </span>
-                  </div>
-                )}
               </div>
             )}
           </div>
@@ -1487,8 +1487,6 @@ const MainContent = ({ isCollapsed }) => {
               </span>
             </div>
           </div>
-
-          {/* Top Pagination (optional - can be removed if you only want bottom pagination) */}
 
           {activitiesLoading ? (
             <div className="activity-loading">

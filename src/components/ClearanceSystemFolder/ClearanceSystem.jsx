@@ -3387,7 +3387,7 @@ const loadPersonnel = async () => {
                 <th>Equipment</th>
                 <th>Status</th>
                 <th>Inspection</th>
-                <th>Lost Equipment</th> {/* NEW COLUMN */}
+                <th>Lost Equipment</th> 
                 <th>Actions</th>
                 <th>Download</th>
               </tr>
@@ -3545,7 +3545,7 @@ const loadPersonnel = async () => {
                                 : styles.lostEquipmentSettled
                             }`}
                           >
-                            {req.lost_equipment_count}{" "}
+                            {req.lost_equipment_count}
                             {req.lost_equipment_status.includes("Unsettled")
                               ? "⚠️"
                               : "✅"}
@@ -3801,7 +3801,7 @@ const loadPersonnel = async () => {
                   </div>
                   <div className={styles.lostEquipmentSummary}>
                     <p>
-                      <strong>Total Lost Items:</strong>{" "}
+                      <strong>Total Lost Items:</strong>
                       {selectedRequest.lost_equipment_count}
                     </p>
                     <p>
@@ -3860,7 +3860,7 @@ const loadPersonnel = async () => {
                       </thead>
                       <tbody>
                         {selectedEquipment.map((item) => {
-                          // Determine badge class based on effective status
+                     
                           const statusClass =
                             item.clearance_status?.toLowerCase() || "pending";
                           const hasAccountability =
@@ -3887,7 +3887,7 @@ const loadPersonnel = async () => {
                                   <div
                                     className={styles.accountabilityIndicator}
                                   >
-                                    ⚖️ Accountability{" "}
+                                    ⚖️ Accountability
                                     {item.accountability_info[0]?.is_settled
                                       ? "Settled"
                                       : "Pending"}
@@ -3895,7 +3895,7 @@ const loadPersonnel = async () => {
                                 )}
                               </td>
                               <td>
-                                {/* Actions based on status */}
+                              
                                 {item.clearance_status === "Cleared" && (
                                   <button
                                     className={styles.clearedBtn}

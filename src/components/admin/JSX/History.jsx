@@ -9,7 +9,8 @@ import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import BFPPreloader from "../../BFPPreloader.jsx";
 import { reactivatePersonnel } from "./Utility/personnelStatusUtils.js"; // Import the utility function
-
+import FloatingNotificationBell from "../../FloatingNotificationBell.jsx";
+import { useUserId } from "../../hooks/useUserId.js";
 const History = () => {
   const { isSidebarCollapsed } = useSidebar();
   const [historyRecords, setHistoryRecords] = useState([]);
@@ -21,10 +22,72 @@ const History = () => {
   const [filterStatus, setFilterStatus] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const rowsPerPage = 10;
-
+const { userId, isAuthenticated, userRole } = useUserId();
   const [showPreloader, setShowPreloader] = useState(true);
   const [loadingProgress, setLoadingProgress] = useState(0);
+  // Rank options for rank images
+  const rankOptions = [
+    {
+      rank: "FO1",
+      name: "Fire Officer 1",
+      image: `${
+        import.meta.env.VITE_SUPABASE_URL
+      }/storage/v1/object/public/rank_images/FO1.png`,
+    },
+    {
+      rank: "FO2",
+      name: "Fire Officer 2",
+      image: `${
+        import.meta.env.VITE_SUPABASE_URL
+      }/storage/v1/object/public/rank_images/FO2.png`,
+    },
+    {
+      rank: "FO3",
+      name: "Fire Officer 3",
+      image: `${
+        import.meta.env.VITE_SUPABASE_URL
+      }/storage/v1/object/public/rank_images/FO3.png`,
+    },
+    {
+      rank: "SFO1",
+      name: "Senior Fire Officer 1",
+      image: `${
+        import.meta.env.VITE_SUPABASE_URL
+      }/storage/v1/object/public/rank_images/SFO1.png`,
+    },
+    {
+      rank: "SFO2",
+      name: "Senior Fire Officer 2",
+      image: `${
+        import.meta.env.VITE_SUPABASE_URL
+      }/storage/v1/object/public/rank_images/SFO2.png`,
+    },
+    {
+      rank: "SFO3",
+      name: "Senior Fire Officer 3",
+      image: `${
+        import.meta.env.VITE_SUPABASE_URL
+      }/storage/v1/object/public/rank_images/SFO3.png`,
+    },
+    {
+      rank: "SFO4",
+      name: "Senior Fire Officer 4",
+      image: `${
+        import.meta.env.VITE_SUPABASE_URL
+      }/storage/v1/object/public/rank_images/SFO4.png`,
+    },
+  ];
+  // Helper function to get rank image
+  const getRankImage = (rank) => {
+    const rankOption = rankOptions.find((option) => option.rank === rank);
+    return rankOption ? rankOption.image : null;
+  };
 
+  // Helper function to get rank name
+  const getRankName = (rank) => {
+    const rankOption = rankOptions.find((option) => option.rank === rank);
+    return rankOption ? rankOption.name : rank || "N/A";
+  };
   const updateLoadingProgress = (progress) => {
     setLoadingProgress(progress);
   };
@@ -373,7 +436,7 @@ const History = () => {
     <div className={styles.container}>
       <Title>History | BFP Villanueva</Title>
       <Meta name="robots" content="noindex, nofollow" />
-
+      <FloatingNotificationBell userId={userId} />
       <Hamburger />
       <ToastContainer position="top-right" autoClose={3000} />
       <Sidebar />
@@ -620,7 +683,63 @@ const History = () => {
                             </div>
                           </td>
                           <td>{record.badge_number || "N/A"}</td>
-                          <td>{record.rank || "N/A"}</td>
+                          <td>
+                            <div className={styles.rankDisplay}>
+                              <div
+                                className={`${styles.rankImageContainer} ${
+                                  record.rank
+                                    ? styles[`rank${record.rank}`]
+                                    : ""
+                                }`}
+                              >
+                                {record.rank && getRankImage(record.rank) ? (
+                                  <img
+                                    src={getRankImage(record.rank)}
+                                    alt={record.rank || "Rank"}
+                                    className={styles.rankImage}
+                                    onError={(e) => {
+                                      const target = e.target;
+                                      if (!target) return;
+
+                                      target.onerror = null;
+                                      target.style.display = "none";
+
+                                      // Get parent and find placeholder
+                                      const parent = target.parentElement;
+                                      if (parent) {
+                                        const placeholder =
+                                          parent.querySelector(
+                                            `.${styles.rankPlaceholder}`
+                                          );
+                                        if (placeholder) {
+                                          placeholder.style.display = "flex";
+                                        }
+                                      }
+                                    }}
+                                  />
+                                ) : null}
+                                <div
+                                  className={styles.rankPlaceholder}
+                                  style={{
+                                    display:
+                                      record.rank && getRankImage(record.rank)
+                                        ? "none"
+                                        : "flex",
+                                  }}
+                                >
+                                  {record.rank ? record.rank.charAt(0) : "R"}
+                                </div>
+                              </div>
+                              <div className={styles.rankInfo}>
+                                <div className={styles.rankAbbreviation}>
+                                  {record.rank || "N/A"}
+                                </div>
+                                <div className={styles.rankFullName}>
+                                  {getRankName(record.rank)}
+                                </div>
+                              </div>
+                            </div>
+                          </td>
                           <td>{record.station || "N/A"}</td>
                           <td>
                             <span className={styles.yearsBadge}>

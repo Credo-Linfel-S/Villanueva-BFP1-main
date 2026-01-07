@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from "react";
+// Complete code with all sections properly filled in
+import React, { useState, useEffect, useRef } from "react";
+
 import styles from "../styles/PersonnelRecentActivity.module.css";
 import { supabase } from "../../../lib/supabaseClient.js";
 import { useAuth } from "../../AuthContext.jsx";
@@ -8,26 +10,301 @@ import { useSidebar } from "../../SidebarContext.jsx";
 import { Title, Meta } from "react-head";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import FloatingNotificationBell from "../../FloatingNotificationBell.jsx";
+import { useUserId } from "../../hooks/useUserId.js";
 const PersonnelRecentActivity = () => {
   const [recentActivities, setRecentActivities] = useState([]);
+  const [filteredActivities, setFilteredActivities] = useState([]);
+  const [paginatedActivities, setPaginatedActivities] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [isAdmin, setIsAdmin] = useState(false);
   const [activityFilter, setActivityFilter] = useState("all");
+const { userId, isAuthenticated, userRole } = useUserId();
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const [activitiesPerPage, setActivitiesPerPage] = useState(10);
+  const [totalPages, setTotalPages] = useState(1);
+
   const { user } = useAuth();
   const { isSidebarCollapsed } = useSidebar();
+
+  const rankOptions = [
+    {
+      rank: "FO1",
+      name: "Fire Officer 1",
+      image: `${
+        import.meta.env.VITE_SUPABASE_URL
+      }/storage/v1/object/public/rank_images/FO1.png`,
+    },
+    {
+      rank: "FO2",
+      name: "Fire Officer 2",
+      image: `${
+        import.meta.env.VITE_SUPABASE_URL
+      }/storage/v1/object/public/rank_images/FO2.png`,
+    },
+    {
+      rank: "FO3",
+      name: "Fire Officer 3",
+      image: `${
+        import.meta.env.VITE_SUPABASE_URL
+      }/storage/v1/object/public/rank_images/FO3.png`,
+    },
+    {
+      rank: "SFO1",
+      name: "Senior Fire Officer 1",
+      image: `${
+        import.meta.env.VITE_SUPABASE_URL
+      }/storage/v1/object/public/rank_images/SFO1.png`,
+    },
+    {
+      rank: "SFO2",
+      name: "Senior Fire Officer 2",
+      image: `${
+        import.meta.env.VITE_SUPABASE_URL
+      }/storage/v1/object/public/rank_images/SFO2.png`,
+    },
+    {
+      rank: "SFO3",
+      name: "Senior Fire Officer 3",
+      image: `${
+        import.meta.env.VITE_SUPABASE_URL
+      }/storage/v1/object/public/rank_images/SFO3.png`,
+    },
+    {
+      rank: "SFO4",
+      name: "Senior Fire Officer 4",
+      image: `${
+        import.meta.env.VITE_SUPABASE_URL
+      }/storage/v1/object/public/rank_images/SFO4.png`,
+    },
+  ];
+
+  // Helper function to get rank image
+  const getRankImage = (rank) => {
+    if (!rank) return null;
+    const rankOption = rankOptions.find((r) => r.rank === rank);
+    return rankOption ? rankOption.image : null;
+  };
+
+  // ========== ACTIVITY EXPIRATION FUNCTION ==========
+  const filterExpiredActivities = (activities) => {
+    if (!activities || !Array.isArray(activities)) return [];
+
+    const oneMonthAgo = new Date();
+    oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+
+    return activities.filter((activity) => {
+      if (!activity.timestamp) return false;
+      try {
+        const activityDate = new Date(activity.timestamp);
+        return activityDate >= oneMonthAgo;
+      } catch (err) {
+        console.error("Error parsing activity date:", err);
+        return false;
+      }
+    });
+  };
+
+  // ========== PAGINATION FUNCTIONS ==========
+  const updatePagination = (activities) => {
+    if (!activities || !Array.isArray(activities)) {
+      setPaginatedActivities([]);
+      setTotalPages(1);
+      return;
+    }
+
+    const total = Math.ceil(activities.length / activitiesPerPage);
+    setTotalPages(total > 0 ? total : 1);
+
+    if (currentPage > total) {
+      setCurrentPage(total > 0 ? total : 1);
+    }
+
+    const startIndex = (currentPage - 1) * activitiesPerPage;
+    const endIndex = startIndex + activitiesPerPage;
+    const pageActivities = activities.slice(startIndex, endIndex);
+
+    setPaginatedActivities(pageActivities);
+  };
+
+  const handlePageChange = (pageNumber) => {
+    if (pageNumber < 1 || pageNumber > totalPages) return;
+    setCurrentPage(pageNumber);
+  };
+
+  const renderPaginationButtons = () => {
+    if (totalPages <= 1) return null;
+
+    const buttons = [];
+    const maxVisiblePages = 5;
+    let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+    let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+
+    if (endPage - startPage + 1 < maxVisiblePages) {
+      startPage = Math.max(1, endPage - maxVisiblePages + 1);
+    }
+
+    // Previous button
+    buttons.push(
+      <button
+        key="prev"
+        className={`${styles.paginationBtn} ${
+          currentPage === 1 ? styles.disabled : ""
+        }`}
+        onClick={() => handlePageChange(currentPage - 1)}
+        disabled={currentPage === 1}
+      >
+        Previous
+      </button>
+    );
+
+    // First page button
+    if (startPage > 1) {
+      buttons.push(
+        <button
+          key={1}
+          className={`${styles.paginationBtn} ${
+            1 === currentPage ? styles.active : ""
+          }`}
+          onClick={() => handlePageChange(1)}
+        >
+          1
+        </button>
+      );
+
+      if (startPage > 2) {
+        buttons.push(
+          <span key="ellipsis1" className={styles.paginationEllipsis}>
+            ...
+          </span>
+        );
+      }
+    }
+
+    // Page number buttons
+    for (let i = startPage; i <= endPage; i++) {
+      buttons.push(
+        <button
+          key={i}
+          className={`${styles.paginationBtn} ${
+            i === currentPage ? styles.active : ""
+          }`}
+          onClick={() => handlePageChange(i)}
+        >
+          {i}
+        </button>
+      );
+    }
+
+    // Last page button
+    if (endPage < totalPages) {
+      if (endPage < totalPages - 1) {
+        buttons.push(
+          <span key="ellipsis2" className={styles.paginationEllipsis}>
+            ...
+          </span>
+        );
+      }
+
+      buttons.push(
+        <button
+          key={totalPages}
+          className={`${styles.paginationBtn} ${
+            totalPages === currentPage ? styles.active : ""
+          }`}
+          onClick={() => handlePageChange(totalPages)}
+        >
+          {totalPages}
+        </button>
+      );
+    }
+
+    // Next button
+    buttons.push(
+      <button
+        key="next"
+        className={`${styles.paginationBtn} ${
+          currentPage === totalPages ? styles.disabled : ""
+        }`}
+        onClick={() => handlePageChange(currentPage + 1)}
+        disabled={currentPage === totalPages}
+      >
+        Next
+      </button>
+    );
+
+    return (
+      <div className={styles.paginationContainer}>
+        <div className={styles.paginationInfo}>
+          Showing {paginatedActivities.length} of {filteredActivities.length}{" "}
+          activities
+          {filteredActivities.length !== recentActivities.length &&
+            ` (${
+              recentActivities.length - filteredActivities.length
+            } older than 1 month hidden)`}
+        </div>
+        <div className={styles.paginationButtons}>{buttons}</div>
+        <div className={styles.itemsPerPageSelector}>
+          <label>Items per page: </label>
+          <select
+            value={activitiesPerPage}
+            onChange={(e) => {
+              setActivitiesPerPage(parseInt(e.target.value));
+              setCurrentPage(1);
+            }}
+            className={styles.itemsPerPageSelect}
+          >
+            <option value="5">5</option>
+            <option value="10">10</option>
+            <option value="20">20</option>
+            <option value="50">50</option>
+          </select>
+        </div>
+      </div>
+    );
+  };
+
+  // ========== ACTIVITY FILTERING ==========
+  useEffect(() => {
+    if (!recentActivities || !Array.isArray(recentActivities)) {
+      setFilteredActivities([]);
+      return;
+    }
+
+    const nonExpiredActivities = filterExpiredActivities(recentActivities);
+
+    const filtered = nonExpiredActivities.filter((activity) => {
+      if (activityFilter === "all") return true;
+      if (activityFilter === "leave")
+        return activity.activityType === "leave_request";
+      if (activityFilter === "clearance")
+        return activity.activityType === "clearance_request";
+      if (activityFilter === "admin_actions")
+        return activity.activityType === "admin_action";
+      if (activityFilter === "inventory")
+        return activity.details?.requestType === "inventory";
+      if (activityFilter === "equipment")
+        return activity.details?.requestType === "equipment";
+      if (activityFilter === "recruitment")
+        return activity.details?.requestType === "recruitment";
+      return false;
+    });
+
+    setFilteredActivities(filtered);
+    setCurrentPage(1);
+  }, [recentActivities, activityFilter]);
+
+  useEffect(() => {
+    updatePagination(filteredActivities);
+  }, [filteredActivities, currentPage, activitiesPerPage]);
 
   // Helper function to format names properly
   const formatName = (name) => {
     if (!name || typeof name !== "string") return name || "Unknown";
-
-    // Convert "admin" to "Admin"
     if (name.toLowerCase() === "admin") return "Admin";
-
-    // Convert "inspector" to "Inspector"
     if (name.toLowerCase() === "inspector") return "Inspector";
-
-    // Handle names with spaces (like "john doe" to "John Doe")
     return name
       .split(" ")
       .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
@@ -37,7 +314,6 @@ const PersonnelRecentActivity = () => {
   // Format leave type for display
   const formatLeaveType = (leaveType) => {
     if (!leaveType) return "Leave";
-
     const typeMap = {
       vacation: "Vacation",
       sick: "Sick",
@@ -48,14 +324,12 @@ const PersonnelRecentActivity = () => {
       bereavement: "Bereavement",
       special: "Special",
     };
-
     return typeMap[leaveType.toLowerCase()] || leaveType;
   };
 
   // Format clearance type for display
   const formatClearanceType = (clearanceType) => {
     if (!clearanceType) return "Clearance";
-
     const typeMap = {
       resignation: "Resignation",
       retirement: "Retirement",
@@ -65,7 +339,6 @@ const PersonnelRecentActivity = () => {
       administrative: "Administrative",
       others: "Others",
     };
-
     return typeMap[clearanceType.toLowerCase()] || clearanceType;
   };
 
@@ -73,7 +346,6 @@ const PersonnelRecentActivity = () => {
   const getAdminDetails = async (adminIdentifier) => {
     try {
       if (!adminIdentifier) return null;
-
       let query = supabase.from("admin_users").select(`
           id,
           username,
@@ -86,41 +358,31 @@ const PersonnelRecentActivity = () => {
             station
           )
         `);
-
-      // Check if it's a UUID (personnel_id)
       const uuidRegex =
         /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
       if (uuidRegex.test(adminIdentifier)) {
-        // If it's a UUID, search by personnel_id
         const { data: personnelData, error: personnelError } = await supabase
           .from("personnel")
           .select("id")
           .eq("id", adminIdentifier)
           .single();
-
         if (!personnelError && personnelData) {
           query = query.eq("personnel_id", personnelData.id);
         } else {
-          // If not found in personnel, try as admin username
           query = query.eq("username", adminIdentifier);
         }
       } else {
-        // If it's not a UUID, search by username
         query = query.eq("username", adminIdentifier);
       }
-
       const { data: adminData, error: adminError } = await query
         .limit(1)
         .single();
-
       if (!adminError && adminData) {
         const personnel = adminData.personnel || {};
         const adminName =
           personnel.first_name && personnel.last_name
             ? `${personnel.first_name} ${personnel.last_name}`
             : adminData.username;
-
         return {
           adminId: adminData.id,
           username: adminData.username,
@@ -204,14 +466,12 @@ const PersonnelRecentActivity = () => {
   // Check if user is admin
   const checkAdminStatus = () => {
     if (!user) return false;
-
     const adminCheck =
       user.username === "admin" ||
       user.username === "inspector" ||
       user.role === "admin" ||
       (user.personnelData && user.personnelData.is_admin === true) ||
       localStorage.getItem("isAdmin") === "true";
-
     setIsAdmin(adminCheck);
     return adminCheck;
   };
@@ -219,11 +479,9 @@ const PersonnelRecentActivity = () => {
   // Get admin details for leave approval/rejection
   const getLeaveAdminDetails = async (request) => {
     let adminDetails = null;
-
     if (request.approved_by_id) {
       adminDetails = await getAdminDetails(request.approved_by_id);
       if (!adminDetails) {
-        // Fallback to approved_by field
         adminDetails = {
           username: request.approved_by,
           name: formatName(request.approved_by),
@@ -233,7 +491,6 @@ const PersonnelRecentActivity = () => {
     } else if (request.rejected_by_id) {
       adminDetails = await getAdminDetails(request.rejected_by_id);
       if (!adminDetails) {
-        // Fallback to rejected_by field
         adminDetails = {
           username: request.rejected_by,
           name: formatName(request.rejected_by),
@@ -250,14 +507,12 @@ const PersonnelRecentActivity = () => {
         };
       }
     }
-
     return adminDetails;
   };
 
   // Get admin details for clearance approval
   const getClearanceAdminDetails = async (request) => {
     let adminDetails = null;
-
     if (request.approved_by_id) {
       adminDetails = await getAdminDetails(request.approved_by_id);
       if (!adminDetails && request.approved_by) {
@@ -277,48 +532,60 @@ const PersonnelRecentActivity = () => {
         };
       }
     }
-
     return adminDetails;
   };
 
-  // Fetch inventory activity from audit table (added/updated/deleted)
+  // Update the fetchInventoryActivity function to get rank properly
   const fetchInventoryActivity = async () => {
     try {
       const inventoryActivities = [];
 
-      // Fetch inventory audit logs (last 24 hours)
-      const twentyFourHoursAgo = new Date();
-      twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 24);
+      // Fetch inventory audit logs
+      const twoMonthsAgo = new Date();
+      twoMonthsAgo.setMonth(twoMonthsAgo.getMonth() - 2);
 
       const { data: inventoryAuditLogs, error: auditError } = await supabase
         .from("inventory_audit")
         .select(
           `
-          *,
-          admin:performed_by (
+        *,
+        admin:performed_by (
+          id,
+          username,
+          role,
+          personnel:personnel_id (
             id,
-            username,
-            role,
-            personnel:personnel_id (
-              id,
-              first_name,
-              last_name,
-              rank
-            )
+            first_name,
+            last_name,
+            rank,
+            station
           )
-        `
         )
-        .gte("performed_at", twentyFourHoursAgo.toISOString())
+      `
+        )
+        .gte("performed_at", twoMonthsAgo.toISOString())
         .order("performed_at", { ascending: false })
         .limit(15);
 
       if (!auditError && inventoryAuditLogs) {
+        console.log("Inventory audit logs fetched:", inventoryAuditLogs.length);
+
         for (const audit of inventoryAuditLogs) {
           let adminDetails = null;
+
+          // DEBUG: Log what we're getting
+          console.log("Audit item:", {
+            id: audit.id,
+            item_name: audit.item_name,
+            performed_by: audit.performed_by,
+            admin: audit.admin,
+          });
 
           // Get admin details if available
           if (audit.admin) {
             const personnel = audit.admin.personnel || {};
+            console.log("Personnel data:", personnel);
+
             adminDetails = {
               adminId: audit.admin.id,
               username: audit.admin.username,
@@ -328,7 +595,13 @@ const PersonnelRecentActivity = () => {
                   ? formatName(`${personnel.first_name} ${personnel.last_name}`)
                   : formatName(audit.admin.username),
               rank: personnel.rank,
+              fullName:
+                personnel.first_name && personnel.last_name
+                  ? `${personnel.first_name} ${personnel.last_name}`
+                  : audit.admin.username,
             };
+
+            console.log("Admin details extracted:", adminDetails);
           } else if (audit.performed_by_username) {
             adminDetails = {
               username: audit.performed_by_username,
@@ -337,7 +610,7 @@ const PersonnelRecentActivity = () => {
             };
           }
 
-          // Extract item data from old_data or new_data
+          // Extract item data
           const itemData = audit.old_data || audit.new_data || {};
           const itemName =
             audit.item_name || itemData.item_name || "Unknown Item";
@@ -346,7 +619,8 @@ const PersonnelRecentActivity = () => {
           const serialNumber = itemData.serial_number;
           const price = itemData.price;
 
-          inventoryActivities.push({
+          // Create activity with rank info
+          const activity = {
             id: `inventory-${audit.id}`,
             type: "Inventory",
             activityType: "admin_action",
@@ -370,15 +644,24 @@ const PersonnelRecentActivity = () => {
               adminUsername: adminDetails?.username,
               adminId: adminDetails?.adminId,
               adminRole: adminDetails?.role,
-              adminRank: adminDetails?.rank,
+              adminRank: adminDetails?.rank, // This should have the rank
               oldData: audit.old_data,
               newData: audit.new_data,
             },
             actionBy: adminDetails?.name || "Admin",
             actionType: audit.action,
             adminId: adminDetails?.adminId,
-          });
+            adminRank: adminDetails?.rank, // Store rank at activity level too
+          };
+
+          console.log(
+            "Created activity with rank:",
+            activity.details.adminRank
+          );
+          inventoryActivities.push(activity);
         }
+      } else if (auditError) {
+        console.error("Error fetching inventory audit:", auditError);
       }
 
       return inventoryActivities;
@@ -391,7 +674,6 @@ const PersonnelRecentActivity = () => {
   // Fetch equipment activity (admin actions)
   const fetchEquipmentActivity = async () => {
     try {
-      // Fetch equipment items added by admin with admin details
       const { data: equipmentData, error: equipmentError } = await supabase
         .from("equipment_items")
         .select(
@@ -408,19 +690,14 @@ const PersonnelRecentActivity = () => {
         )
         .order("created_at", { ascending: false })
         .limit(10);
-
       if (!equipmentError && equipmentData) {
         const equipmentActivities = [];
-
         for (const equipment of equipmentData) {
           const personnel = equipment.personnel || {};
           let adminDetails = null;
-
-          // Try to get admin details
           if (personnel.id) {
             adminDetails = await getAdminDetails(personnel.id);
           }
-
           const adminName = adminDetails
             ? adminDetails.name
             : formatName(
@@ -430,9 +707,7 @@ const PersonnelRecentActivity = () => {
                   }`.trim() ||
                   "Admin"
               );
-
           const adminId = adminDetails ? adminDetails.adminId : null;
-
           equipmentActivities.push({
             id: `equipment-${equipment.id}`,
             type: "Equipment",
@@ -486,6 +761,11 @@ const PersonnelRecentActivity = () => {
       // Check admin status
       const userIsAdmin = checkAdminStatus();
 
+      // Calculate date range: last 2 months (to be safe)
+      const twoMonthsAgo = new Date();
+      twoMonthsAgo.setMonth(twoMonthsAgo.getMonth() - 2);
+      const twoMonthsAgoISO = twoMonthsAgo.toISOString();
+
       // We'll fetch multiple types of activities
       const activities = [];
 
@@ -505,8 +785,9 @@ const PersonnelRecentActivity = () => {
           )
         `
         )
+        .gte("created_at", twoMonthsAgoISO)
         .order("created_at", { ascending: false })
-        .limit(15);
+        .limit(100);
 
       // If not admin, filter by user's personnel record
       if (!userIsAdmin) {
@@ -541,7 +822,10 @@ const PersonnelRecentActivity = () => {
 
           // Format leave type
           const formattedLeaveType = formatLeaveType(request.leave_type);
-
+    let personnelRank = personnel.rank;
+    if (!personnelRank && request.personnel_id) {
+      personnelRank = await getPersonnelRank(request.personnel_id);
+    }
           // Create activity entry for the leave request submission
           activities.push({
             id: `leave-${request.id}`,
@@ -669,8 +953,9 @@ const PersonnelRecentActivity = () => {
           )
         `
         )
+        .gte("created_at", twoMonthsAgoISO)
         .order("created_at", { ascending: false })
-        .limit(15);
+        .limit(100);
 
       // If not admin, filter by user's personnel record
       if (!userIsAdmin) {
@@ -702,7 +987,10 @@ const PersonnelRecentActivity = () => {
 
           const employeeName = formatName(rawEmployeeName);
           const formattedClearanceType = formatClearanceType(request.type);
-
+    let personnelRank = personnel.rank;
+    if (!personnelRank && request.personnel_id) {
+      personnelRank = await getPersonnelRank(request.personnel_id);
+    }
           // Create activity entry for clearance request
           activities.push({
             id: `clearance-${request.id}`,
@@ -719,6 +1007,7 @@ const PersonnelRecentActivity = () => {
               formattedClearanceType: formattedClearanceType,
               reason: request.reason,
               status: request.status,
+              personnelRank: personnelRank,
               approvedBy: request.approved_by,
               rejectionReason: request.rejection_reason,
               currentDepartment: request.current_department,
@@ -819,7 +1108,6 @@ const PersonnelRecentActivity = () => {
 
       // Prioritize clearance and leave requests at the top
       const prioritizedActivities = activities.sort((a, b) => {
-        // Priority: 1. Clearance, 2. Leave, 3. Others
         const priority = {
           clearance_request: 1,
           leave_request: 2,
@@ -836,15 +1124,25 @@ const PersonnelRecentActivity = () => {
           return priorityA - priorityB;
         }
 
-        // If same priority, sort by timestamp
         return new Date(b.timestamp) - new Date(a.timestamp);
       });
 
-      // Limit to 15 most recent activities
-      const recentActivities = prioritizedActivities.slice(0, 15);
+      // Remove expired activities (older than 1 month) immediately
+      const nonExpiredActivities = filterExpiredActivities(
+        prioritizedActivities
+      );
 
-      console.log("All activities with inventory deletions:", recentActivities);
-      setRecentActivities(recentActivities);
+      console.log("Total activities fetched:", activities.length);
+      console.log(
+        "Activities after expiration filter:",
+        nonExpiredActivities.length
+      );
+      console.log(
+        "Activities removed (older than 1 month):",
+        activities.length - nonExpiredActivities.length
+      );
+
+      setRecentActivities(nonExpiredActivities);
     } catch (err) {
       console.error("Fetch error:", err);
       setError(`Error loading activities: ${err.message}`);
@@ -903,24 +1201,6 @@ const PersonnelRecentActivity = () => {
       setError("Please log in to view activities");
     }
   }, [user]);
-
-  // Filter activities based on selected filter
-  const filteredActivities = recentActivities.filter((activity) => {
-    if (activityFilter === "all") return true;
-    if (activityFilter === "leave")
-      return activity.activityType === "leave_request";
-    if (activityFilter === "clearance")
-      return activity.activityType === "clearance_request";
-    if (activityFilter === "admin_actions")
-      return activity.activityType === "admin_action";
-    if (activityFilter === "inventory")
-      return activity.details?.requestType === "inventory";
-    if (activityFilter === "equipment")
-      return activity.details?.requestType === "equipment";
-    if (activityFilter === "recruitment")
-      return activity.details?.requestType === "recruitment";
-    return false;
-  });
 
   // Format functions
   const formatDate = (dateString) => {
@@ -1005,7 +1285,27 @@ const PersonnelRecentActivity = () => {
         return "📝";
     }
   };
+  // Add this function after your existing helper functions like formatName, formatLeaveType, etc.
+  const getPersonnelRank = async (personnelId) => {
+    if (!personnelId) return null;
 
+    try {
+      const { data, error } = await supabase
+        .from("personnel")
+        .select("rank")
+        .eq("id", personnelId)
+        .single();
+
+      if (!error && data) {
+        console.log(`Fetched rank for personnel ${personnelId}:`, data.rank);
+        return data.rank;
+      }
+      return null;
+    } catch (err) {
+      console.error("Error fetching personnel rank:", err);
+      return null;
+    }
+  };
   const getActionColor = (actionType) => {
     switch (actionType) {
       case "submitted":
@@ -1033,11 +1333,11 @@ const PersonnelRecentActivity = () => {
 
   const handleRefresh = () => {
     fetchAllRecentActivities();
+    setCurrentPage(1);
   };
 
   const handleViewDetails = (activity) => {
     let details = "";
-
     switch (activity.activityType) {
       case "leave_request":
         details =
@@ -1054,7 +1354,6 @@ const PersonnelRecentActivity = () => {
             : "") +
           (activity.details.reason ? `Reason: ${activity.details.reason}` : "");
         break;
-
       case "clearance_request":
         details =
           `Clearance Request Details:\n` +
@@ -1079,7 +1378,6 @@ const PersonnelRecentActivity = () => {
             ? `Missing Amount: ₱${activity.details.missingAmount}`
             : "");
         break;
-
       case "admin_action":
         if (activity.details.requestType === "inventory") {
           const actionText =
@@ -1092,14 +1390,10 @@ const PersonnelRecentActivity = () => {
             `Item: ${activity.details.itemName}\n` +
             `Item Code: ${activity.details.itemCode}\n` +
             `Category: ${activity.details.category}\n`;
-
-          if (activity.details.serialNumber) {
+          if (activity.details.serialNumber)
             details += `Serial Number: ${activity.details.serialNumber}\n`;
-          }
-          if (activity.details.price) {
+          if (activity.details.price)
             details += `Price: ₱${activity.details.price}\n`;
-          }
-
           if (
             activity.details.action === "deleted" &&
             activity.details.oldData
@@ -1127,8 +1421,6 @@ const PersonnelRecentActivity = () => {
         } else if (activity.details.requestType === "equipment") {
           details += `Equipment: ${activity.details.equipmentName}\n`;
         }
-
-        // Add admin details if available
         if (activity.details.adminId) {
           details +=
             `\nAdmin Details:\n` +
@@ -1139,41 +1431,64 @@ const PersonnelRecentActivity = () => {
               ? `Rank: ${activity.details.adminRank}\n`
               : "");
         }
-
-        if (activity.details.remarks) {
+        if (activity.details.remarks)
           details += `Remarks: ${activity.details.remarks}\n`;
-        }
-        if (activity.details.rejectionReason) {
+        if (activity.details.rejectionReason)
           details += `Rejection Reason: ${activity.details.rejectionReason}`;
-        }
         break;
     }
     toast.info(details);
   };
 
-  // Add admin badge to actionBy cell
+  // Replace the renderActionByCell function with this:
   const renderActionByCell = (activity) => {
-    const hasAdminInfo =
-      activity.details?.adminId || activity.details?.adminRole;
+    // Get rank from personnel details, NOT admin details
+    const rank = activity.details?.personnelRank;
+    const rankImage = getRankImage(rank);
+
+
 
     return (
       <div className={styles.actionByCell}>
-        <strong>{activity.actionBy}</strong>
-        {hasAdminInfo && (
-          <div className={styles.adminInfo}>
-            <small className={styles.adminRoleBadge}>
-              {activity.details.adminRole || "Admin"}
-            </small>
-            {activity.details.adminRank && (
-              <small className={styles.adminRank}>
-                {activity.details.adminRank}
-              </small>
+        <div className={styles.actionByContent}>
+          {/* Rank Image Display */}
+          {rankImage && (
+            <div className={styles.rankImageContainer}>
+              <img
+                src={rankImage}
+                alt={rank || "Rank"}
+                className={styles.rankImage}
+                onError={(e) => {
+                  e.target.onerror = null;
+                  e.target.style.display = "none";
+                }}
+              />
+            </div>
+          )}
+
+          <div className={styles.personnelInfo}>
+            <strong className={styles.personnelName}>
+              {activity.actionBy}
+            </strong>
+
+            {/* Display personnel rank */}
+            {rank && <small className={styles.personnelRank}>{rank}</small>}
+
+            {/* Only show admin badge if it's an admin action */}
+            {activity.details?.adminRole && (
+              <div className={styles.adminInfo}>
+                <small className={styles.adminRoleBadge}>
+                  {activity.details.adminRole}
+                </small>
+                {activity.details.adminRank && (
+                  <small className={styles.adminRank}>
+                    {activity.details.adminRank}
+                  </small>
+                )}
+              </div>
             )}
           </div>
-        )}
-        {!hasAdminInfo && activity.details?.personnelRank && (
-          <small>{activity.details.personnelRank}</small>
-        )}
+        </div>
       </div>
     );
   };
@@ -1211,6 +1526,8 @@ const PersonnelRecentActivity = () => {
     <div className="app-container">
       <Title>Recent Activities | BFP Villanueva</Title>
       <Meta name="robots" content="noindex, nofollow" />
+      <FloatingNotificationBell userId={userId} />
+      <ToastContainer />
       <Hamburger />
       <Sidebar />
       <div className={`main-content ${isSidebarCollapsed ? "collapsed" : ""}`}>
@@ -1250,11 +1567,12 @@ const PersonnelRecentActivity = () => {
             </div>
           )}
 
-          {/* Priority Notice */}
+          {/* Priority Notice with Date Filter Info */}
           <div className={styles.priorityNotice}>
             <span className={styles.priorityIcon}>⚠️</span>
             <span>
-              Showing prioritized activities: Clearance → Leave → Admin Actions
+              Showing activities from the last month only • Showing prioritized
+              activities: Clearance → Leave → Admin Actions
             </span>
           </div>
 
@@ -1283,20 +1601,45 @@ const PersonnelRecentActivity = () => {
               </select>
             </div>
             <div className={styles.activitiesCount}>
-              Showing <strong>{filteredActivities.length}</strong> of{" "}
-              {recentActivities.length} activities
+              Showing <strong>{paginatedActivities.length}</strong> of{" "}
+              {filteredActivities.length} activities
+              {filteredActivities.length !== recentActivities.length &&
+                ` (${
+                  recentActivities.length - filteredActivities.length
+                } older than 1 month hidden)`}
+              {filteredActivities.length > 0 &&
+                ` • Page ${currentPage} of ${totalPages}`}
             </div>
           </div>
 
-          {filteredActivities.length === 0 ? (
+          {/* Top Pagination */}
+          {totalPages > 1 && (
+            <div className={styles.topPagination}>
+              {renderPaginationButtons()}
+            </div>
+          )}
+
+          {paginatedActivities.length === 0 ? (
             <div className={styles.noActivities}>
               <div className={styles.noActivitiesIcon}>📭</div>
-              <h3>No Activities Found</h3>
+              <h3>No Recent Activities Found</h3>
               <p>
                 {activityFilter === "all"
-                  ? "No activities have been recorded yet."
-                  : `No ${activityFilter.replace("_", " ")} activities found.`}
+                  ? "No activities have been recorded in the last month."
+                  : `No ${activityFilter.replace(
+                      "_",
+                      " "
+                    )} activities found in the last month.`}
               </p>
+              {recentActivities.length > 0 &&
+                filteredActivities.length === 0 && (
+                  <p className={styles.expiredNotice}>
+                    <small>
+                      Note: There are {recentActivities.length} activities that
+                      are older than 1 month and are not being displayed.
+                    </small>
+                  </p>
+                )}
             </div>
           ) : (
             <>
@@ -1310,11 +1653,10 @@ const PersonnelRecentActivity = () => {
                       <th>Action By</th>
                       <th>Status</th>
                       <th>Date & Time</th>
-                      {/* Removed the Actions column header */}
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredActivities.map((activity) => (
+                    {paginatedActivities.map((activity) => (
                       <tr key={activity.id} className={styles.tableRow}>
                         <td>
                           <div className={styles.activityTypeCell}>
@@ -1388,7 +1730,6 @@ const PersonnelRecentActivity = () => {
                             </small>
                           </div>
                         </td>
-                        {/* Removed the Actions column cell */}
                       </tr>
                     ))}
                   </tbody>
@@ -1397,7 +1738,7 @@ const PersonnelRecentActivity = () => {
 
               {/* CARD VIEW (for mobile) */}
               <div className={styles.activitiesList}>
-                {filteredActivities.map((activity) => (
+                {paginatedActivities.map((activity) => (
                   <div
                     key={activity.id}
                     className={styles.activityCard}
@@ -1459,49 +1800,64 @@ const PersonnelRecentActivity = () => {
                         {getStatusText(formatStatus(activity))}
                       </span>
                     </div>
-
                     <div className={styles.activityBody}>
                       <h4 className={styles.activityTitle}>
                         {formatDescription(activity)}
                       </h4>
-
                       <div className={styles.activityMeta}>
+                        {/* In the card view section */}
                         <div className={styles.metaItem}>
                           <span className={styles.metaLabel}>By:</span>
                           <span className={styles.metaValue}>
-                            {activity.actionBy}
-                            {(activity.details?.adminRole ||
-                              activity.details?.personnelRank) && (
-                              <div className={styles.adminInfoInline}>
-                                {activity.details.adminRole && (
-                                  <small className={styles.adminRoleBadge}>
-                                    {activity.details.adminRole}
+                            <div className={styles.actionByContent}>
+                              {/* Add rank image for cards - FROM PERSONNEL */}
+                              {activity.details?.personnelRank && (
+                                <div className={styles.rankImageContainerSmall}>
+                                  <img
+                                    src={getRankImage(
+                                      activity.details.personnelRank
+                                    )}
+                                    alt="Rank"
+                                    className={styles.rankImageSmall}
+                                    onError={(e) => {
+                                      e.target.onerror = null;
+                                      e.target.style.display = "none";
+                                    }}
+                                  />
+                                </div>
+                              )}
+
+                              <div className={styles.personnelInfoInline}>
+                                <span>{activity.actionBy}</span>
+                                {/* Show personnel rank */}
+                                {activity.details?.personnelRank && (
+                                  <small className={styles.personnelRankBadge}>
+                                    {activity.details.personnelRank}
                                   </small>
                                 )}
-                                {activity.details.adminRank && (
-                                  <small className={styles.adminRank}>
-                                    ({activity.details.adminRank})
-                                  </small>
-                                )}
-                                {!activity.details.adminRole &&
-                                  activity.details.personnelRank && (
-                                    <small>
-                                      {" "}
-                                      ({activity.details.personnelRank})
+                                {/* Only show admin info for admin actions */}
+                                {activity.details?.adminRole && (
+                                  <div className={styles.adminInfoInline}>
+                                    <small className={styles.adminRoleBadge}>
+                                      {activity.details.adminRole}
                                     </small>
-                                  )}
+                                    {activity.details.adminRank && (
+                                      <small className={styles.adminRank}>
+                                        ({activity.details.adminRank})
+                                      </small>
+                                    )}
+                                  </div>
+                                )}
                               </div>
-                            )}
+                            </div>
                           </span>
                         </div>
-
                         <div className={styles.metaItem}>
                           <span className={styles.metaLabel}>Date:</span>
                           <span className={styles.metaValue}>
                             {formatDateTime(activity.timestamp)}
                           </span>
                         </div>
-
                         {activity.activityType === "leave_request" && (
                           <>
                             <div className={styles.metaItem}>
@@ -1569,7 +1925,6 @@ const PersonnelRecentActivity = () => {
                           </>
                         )}
                       </div>
-
                       {activity.details?.location && (
                         <div className={styles.activityLocation}>
                           <span className={styles.metaLabel}>Location:</span>
@@ -1577,11 +1932,16 @@ const PersonnelRecentActivity = () => {
                         </div>
                       )}
                     </div>
-
-                    {/* Removed the activity footer with view details button */}
                   </div>
                 ))}
               </div>
+
+              {/* Bottom Pagination */}
+              {totalPages > 1 && (
+                <div className={styles.bottomPagination}>
+                  {renderPaginationButtons()}
+                </div>
+              )}
 
               {/* VIEW ALL ACTIVITIES BUTTON */}
               <div className={styles.viewMoreContainer}>
@@ -1589,18 +1949,10 @@ const PersonnelRecentActivity = () => {
                   className={styles.viewMoreBtn}
                   onClick={() => {
                     if (activityFilter !== "all") {
-                      // Switch to "all" filter
                       setActivityFilter("all");
                       toast.info("Now showing all activities");
                     } else {
-                      // If already on "all", you could:
-                      // 1. Load more activities
-                      // 2. Navigate to a detailed activities page
-                      // 3. Show a message
                       toast.info("Already viewing all activities");
-
-                      // Example: Load more activities
-                      // fetchMoreActivities();
                     }
                   }}
                   title={

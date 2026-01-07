@@ -23,11 +23,14 @@ import {
   calculateCalendarDays,
   LeaveCalculator 
 } from "../../utils/holidayCalendar.js";
+import FloatingNotificationBell from "../../FloatingNotificationBell.jsx";
+
+import { useUserId } from "../../hooks/useUserId.js";
 
 const LeaveManagement = () => {
   const { isSidebarCollapsed } = useSidebar();
   const { user: authUser, hasSupabaseAuth } = useAuth();
-
+const { userId, isAuthenticated, userRole } = useUserId();
   // UNCOMMENT AND ACTIVATE THESE PRELOADER STATES
   const [isInitializing, setIsInitializing] = useState(true);
   const [loadingProgress, setLoadingProgress] = useState(0);
@@ -1627,7 +1630,7 @@ const handleApproveWithOptions = async (
       <Meta name="robots" content="noindex, nofollow" />
       <Hamburger />
       <Sidebar />
-
+      <FloatingNotificationBell userId={userId} />
       <ToastContainer
         position="top-right"
         autoClose={2500}
@@ -1799,12 +1802,9 @@ const handleApproveWithOptions = async (
                                   >
                                     View
                                   </button>
-
                                 </div>
-                                
                               ) : !isPending ? (
                                 <div className={styles.statusInfo}>
-                            
                                   <button
                                     className={styles.viewBtn}
                                     onClick={() => setModalData(req)}
@@ -1820,7 +1820,6 @@ const handleApproveWithOptions = async (
                                   >
                                     View
                                   </button>
-                                  
                                 </div>
                               )}
                             </td>
@@ -2022,7 +2021,7 @@ const handleApproveWithOptions = async (
                             >
                               {isProcessing ? "Processing..." : "Reject"}
                             </button>
-                
+
                             <button
                               className={styles.viewBtn}
                               onClick={() => setModalData(req)}

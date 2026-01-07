@@ -6,7 +6,106 @@
   margin-bottom: 15px;
   position: relative;
 }
+/* Profile Photo Styles */
+.profilePhotoContainer {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 2px solid #e0e0e0;
+  background-color: #f5f5f5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 
+.profilePhoto {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.defaultPhoto {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #f0f0f0;
+}
+
+.defaultPhotoImg {
+  width: 80%;
+  height: 80%;
+  object-fit: contain;
+  opacity: 0.7;
+}
+
+/* Card Header Styles */
+.preCardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 15px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.headerLeft {
+  display: flex;
+  gap: 15px;
+  align-items: center;
+}
+
+.headerText h3 {
+  margin: 0 0 5px 0;
+  font-size: 18px;
+  color: #333;
+}
+
+.headerText small {
+  display: block;
+  color: #666;
+  font-size: 12px;
+  margin-bottom: 2px;
+}
+
+/* Rank Image Styles */
+.rankImageContainer {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rankImage {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.rankPlaceholder {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background-color: #e0e0e0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #666;
+  font-weight: bold;
+  font-size: 14px;
+}
+
+.rankPlaceholder.hidden {
+  display: none;
+}
+
+.rankPlaceholder.show {
+  display: flex;
+}
 .headerLeft {
   display: flex;
   align-items: flex-start;

@@ -12,7 +12,10 @@ import BFPPreloader from "../../BFPPreloader.jsx";
 import { FaEye, FaEyeSlash, FaCopy, FaCheck } from "react-icons/fa";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import FloatingNotificationBell from "../../FloatingNotificationBell.jsx";
+import { useUserId } from "../../hooks/useUserId.js";
 const RecruitmentPersonnel = () => {
+       
   // FORM DATA STATES - Separate for add and edit
   const [addFormData, setAddFormData] = useState({
     candidate: "",
@@ -33,7 +36,7 @@ const RecruitmentPersonnel = () => {
     photoUrl: "",
     resumeUrl: "",
   });
-
+const { userId, isAuthenticated, userRole } = useUserId();
   const [addUsername, setAddUsername] = useState("");
   const [addPassword, setAddPassword] = useState("");
   const [editUsername, setEditUsername] = useState("");
@@ -1030,6 +1033,7 @@ const RecruitmentPersonnel = () => {
       <div className={styles.container}>
         <Title>Recruitment Personnel | BFP Villanueva</Title>
         <Meta name="robots" content="noindex, nofollow" />
+        <FloatingNotificationBell userId={userId} />
 
         <Hamburger />
         <Sidebar />

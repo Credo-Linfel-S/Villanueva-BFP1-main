@@ -17,12 +17,14 @@ import {
   filterActivePersonnel,
   isPersonnelActive,
 } from "../../filterActivePersonnel.js";
+import FloatingNotificationBell from "../../FloatingNotificationBell.jsx";
+import { useUserId } from "../../hooks/useUserId.js";
 export default function InventoryControl() {
   // ========== PRELOADER STATES ==========
   const [isInitializing, setIsInitializing] = useState(true);
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [showContent, setShowContent] = useState(false);
-
+const { userId, isAuthenticated, userRole } = useUserId();
   // ========== NEW: Update loading phases to include clearance requests ==========
   const loadingPhasesRef = useRef([
     { name: "Checking Authentication", progress: 20, completed: false },
@@ -1801,7 +1803,7 @@ export default function InventoryControl() {
     <div className={styles.inventoryAppContainer}>
       <Title>Inventory Control | BFP Villanueva</Title>
       <Meta name="robots" content="noindex, nofollow" />
-
+      <FloatingNotificationBell userId={userId} />
       <Hamburger />
       <Sidebar />
 

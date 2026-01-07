@@ -34,8 +34,11 @@ import {
   markPersonnelAsResigned,
   reactivatePersonnel,
 } from "./Utility/personnelStatusUtils.js";
-
+import FloatingNotificationBell from "../../FloatingNotificationBell.jsx";
+import { useUserId } from "../../hooks/useUserId.js";
+import logo from "../../../assets/Firefighter.png";
 const PersonnelRegister = () => {
+  const { userId, isAuthenticated, userRole } = useUserId();
   const { isSidebarCollapsed } = useSidebar();
   const [isPhotoRemoved, setIsPhotoRemoved] = useState(false);
   const [personnel, setPersonnel] = useState([]);
@@ -2402,107 +2405,122 @@ const PersonnelRegister = () => {
     return "-";
   };
 
-  const PhotoCell = ({ person }) => {
-    const [isLoading, setIsLoading] = useState(true);
-    const [imageSrc, setImageSrc] = useState("/bfp.jpg");
+ const PhotoCell = ({ person }) => {
+   const [isLoading, setIsLoading] = useState(true);
+   const [imageSrc, setImageSrc] = useState(logo); // Use your imported default image
 
-    useEffect(() => {
-      const loadPhoto = async () => {
-        setIsLoading(true);
+   useEffect(() => {
+     const loadPhoto = async () => {
+       setIsLoading(true);
 
-        try {
-          let url = "/bfp.jpg"; // Default fallback
+       try {
+         let url = logo; // Default to your imported image
 
-          // Check in order of priority
-          if (person.photo_url && person.photo_url.startsWith("http")) {
-            // Test if the photo_url is accessible
-            const isValid = await testImage(person.photo_url);
-            if (isValid) {
-              url = person.photo_url;
-            } else {
-              // Try photo_path as fallback
-              if (person.photo_path) {
-                const { data: urlData } = supabase.storage
-                  .from("personnel-documents")
-                  .getPublicUrl(person.photo_path);
-                url = urlData?.publicUrl || "/bfp.jpg";
-              }
-            }
-          } else if (person.photo_path) {
-            // Use photo_path if photo_url is not available
-            const { data: urlData } = supabase.storage
-              .from("personnel-documents")
-              .getPublicUrl(person.photo_path);
-            url = urlData?.publicUrl || "/bfp.jpg";
-          }
+         // Check in order of priority
+         if (person.photo_url && person.photo_url.startsWith("http")) {
+           // Test if the photo_url is accessible
+           const isValid = await testImage(person.photo_url);
+           if (isValid) {
+             url = person.photo_url;
+           } else {
+             // Try photo_path as fallback
+             if (person.photo_path) {
+               const { data: urlData } = supabase.storage
+                 .from("personnel-documents")
+                 .getPublicUrl(person.photo_path);
+               const pathUrl = urlData?.publicUrl;
+               // Check if the path URL is valid
+               if (pathUrl && (await testImage(pathUrl))) {
+                 url = pathUrl;
+               } else {
+                 url = logo; // Fallback to default
+               }
+             }
+           }
+         } else if (person.photo_path) {
+           // Use photo_path if photo_url is not available
+           const { data: urlData } = supabase.storage
+             .from("personnel-documents")
+             .getPublicUrl(person.photo_path);
+           const pathUrl = urlData?.publicUrl;
+           // Check if the path URL is valid
+           if (pathUrl && (await testImage(pathUrl))) {
+             url = pathUrl;
+           } else {
+             url = logo; // Fallback to default
+           }
+         }
 
-          setImageSrc(url);
-        } catch (error) {
-          console.error("Error loading photo:", error);
-          setImageSrc("/bfp.jpg");
-        } finally {
-          // Small delay to prevent flash
-          setTimeout(() => setIsLoading(false), 100);
-        }
-      };
+         setImageSrc(url);
+       } catch (error) {
+         console.error("Error loading photo:", error);
+         setImageSrc(logo); // Fallback to default image on error
+       } finally {
+         // Small delay to prevent flash
+         setTimeout(() => setIsLoading(false), 100);
+       }
+     };
 
-      loadPhoto();
-    }, [person]);
+     loadPhoto();
+   }, [person]);
 
-    // Test if image URL is accessible
-    const testImage = (url) => {
-      return new Promise((resolve) => {
-        const img = new Image();
-        img.onload = () => resolve(true);
-        img.onerror = () => resolve(false);
-        img.src = url;
-      });
-    };
+   // Test if image URL is accessible
+   const testImage = (url) => {
+     return new Promise((resolve) => {
+       const img = new Image();
+       img.onload = () => resolve(true);
+       img.onerror = () => resolve(false);
+       img.src = url;
 
-    return (
-      <td className={styles.prPhotoCell}>
-        <div className={styles.prPhotoContainer}>
-          {isLoading ? (
-            <div className={styles.prPhotoLoading}>
-              <div className={styles.prPhotoSpinner}></div>
-              <small>Loading...</small>
-            </div>
-          ) : (
-            <img
-              src={imageSrc}
-              alt={`${person.first_name || ""} ${person.last_name || ""}`}
-              className={styles.prPhotoThumb}
-              onError={(e) => {
-                e.target.onerror = null;
-                e.target.src = "/bfp.jpg";
-              }}
-              loading="lazy"
-            />
-          )}
-        </div>
-      </td>
-    );
-  };
+       // Timeout to prevent hanging
+       setTimeout(() => resolve(false), 3000);
+     });
+   };
 
-  const getPhotoUrl = (person) => {
-    if (!person) return "/bfp.jpg";
+   return (
+     <td className={styles.prPhotoCell}>
+       <div className={styles.prPhotoContainer}>
+         {isLoading ? (
+           <div className={styles.prPhotoLoading}>
+             <div className={styles.prPhotoSpinner}></div>
+             <small>Loading...</small>
+           </div>
+         ) : (
+           <img
+             src={imageSrc}
+             alt={`${person.first_name || ""} ${person.last_name || ""}`}
+             className={styles.prPhotoThumb}
+             onError={(e) => {
+               e.target.onerror = null;
+               e.target.src = logo; // Fallback to default image on load error
+             }}
+             loading="lazy"
+           />
+         )}
+       </div>
+     </td>
+   );
+ };
 
-    // If we have a photo_url, use it
-    if (person.photo_url) {
-      return person.photo_url;
-    }
+const getPhotoUrl = (person) => {
+  if (!person) return logo; // Use imported default image
 
-    // If we have a photo_path, construct URL
-    if (person.photo_path) {
-      const { data: urlData } = supabase.storage
-        .from("personnel-documents")
-        .getPublicUrl(person.photo_path);
-      return urlData?.publicUrl || "/bfp.jpg";
-    }
+  // If we have a valid photo_url, use it
+  if (person.photo_url && person.photo_url.startsWith("http")) {
+    return person.photo_url;
+  }
 
-    // Fallback to default image
-    return "/bfp.jpg";
-  };
+  // If we have a photo_path, construct URL
+  if (person.photo_path) {
+    const { data: urlData } = supabase.storage
+      .from("personnel-documents")
+      .getPublicUrl(person.photo_path);
+    return urlData?.publicUrl || logo; // Fallback to default
+  }
+
+  // Fallback to default image
+  return logo;
+};
 
   const findPhotoByName = async (person) => {
     if (!person.first_name || !person.last_name || !person.rank) {
@@ -3053,6 +3071,8 @@ const PersonnelRegister = () => {
       <div className={styles.prContainer}>
         <Title>Personnel Register | BFP Villanueva</Title>
         <Meta name="robots" content="noindex, nofollow" />
+
+        <FloatingNotificationBell userId={userId} />
 
         <Hamburger />
         <Sidebar />
@@ -3647,42 +3667,67 @@ const PersonnelRegister = () => {
     );
   };
 
-  const StatusManagementModal = () => {
-    if (!showStatusModal || !statusModalPersonnel) return null;
+const StatusManagementModal = () => {
+  if (!showStatusModal || !statusModalPersonnel) return null;
 
-    const personName = `${statusModalPersonnel.first_name} ${statusModalPersonnel.last_name}`;
-    const actionText =
-      statusAction === "retire"
-        ? "Retirement"
-        : statusAction === "resign"
-        ? "Resignation"
-        : "Reactivation";
+  const personName = `${statusModalPersonnel.first_name} ${statusModalPersonnel.last_name}`;
+  const actionText =
+    statusAction === "retire"
+      ? "Retirement"
+      : statusAction === "resign"
+      ? "Resignation"
+      : "Reactivation";
 
-    return (
-      <div className={styles.statusModalOverlay}>
-        <div className={styles.statusModalContent}>
-          <div className={styles.statusModalHeader}>
-            <h3 className={styles.statusModalTitle}>
-              {actionText} - {personName}
-            </h3>
-            <button
-              className={styles.statusModalClose}
-              onClick={closeStatusModal}
-              disabled={isUpdatingStatus}
-            >
-              &times;
-            </button>
-          </div>
+  // Handle textarea change separately to prevent re-renders
+  const handleReasonChange = (e) => {
+    setStatusData((prev) => ({
+      ...prev,
+      reason: e.target.value,
+    }));
+  };
 
+  // Handle date change
+  const handleDateChange = (e) => {
+    setStatusData((prev) => ({
+      ...prev,
+      date: e.target.value,
+    }));
+  };
+
+  // Handle form submission
+  const handleFormSubmit = (e) => {
+    e.preventDefault();
+    handleUpdateStatus();
+  };
+
+  return (
+    <div className={styles.statusModalOverlay}>
+      <div className={styles.statusModalContent}>
+        <div className={styles.statusModalHeader}>
+          <h3 className={styles.statusModalTitle}>
+            {actionText} - {personName}
+          </h3>
+          <button
+            className={styles.statusModalClose}
+            onClick={closeStatusModal}
+            disabled={isUpdatingStatus}
+          >
+            &times;
+          </button>
+        </div>
+
+        {statusAction === "reactivate" ? (
           <div className={styles.statusModalBody}>
-            {statusAction === "reactivate" ? (
-              <div className={styles.reactivateConfirmation}>
-                <p>Are you sure you want to reactivate {personName}?</p>
-                <p className={styles.reactivateNote}>
-                  This will restore their account and make them active again.
-                </p>
-              </div>
-            ) : (
+            <div className={styles.reactivateConfirmation}>
+              <p>Are you sure you want to reactivate {personName}?</p>
+              <p className={styles.reactivateNote}>
+                This will restore their account and make them active again.
+              </p>
+            </div>
+          </div>
+        ) : (
+          <form onSubmit={handleFormSubmit}>
+            <div className={styles.statusModalBody}>
               <div className={styles.statusForm}>
                 <div className={styles.statusFormGroup}>
                   <label htmlFor="statusDate">
@@ -3695,12 +3740,7 @@ const PersonnelRegister = () => {
                     type="date"
                     id="statusDate"
                     value={statusData.date}
-                    onChange={(e) =>
-                      setStatusData((prev) => ({
-                        ...prev,
-                        date: e.target.value,
-                      }))
-                    }
+                    onChange={handleDateChange}
                     max={new Date().toISOString().split("T")[0]}
                     required
                   />
@@ -3713,16 +3753,15 @@ const PersonnelRegister = () => {
                   <textarea
                     id="statusReason"
                     value={statusData.reason}
-                    onChange={(e) =>
-                      setStatusData((prev) => ({
-                        ...prev,
-                        reason: e.target.value,
-                      }))
-                    }
+                    onChange={handleReasonChange}
                     placeholder={`Enter ${
                       statusAction === "retire" ? "retirement" : "resignation"
                     } reason...`}
                     required={statusAction === "resign"}
+                    rows={4}
+                    className={styles.statusReasonTextarea}
+                    // Add autoFocus for better UX
+                    autoFocus={statusAction !== "reactivate"}
                   />
                 </div>
 
@@ -3742,39 +3781,41 @@ const PersonnelRegister = () => {
                   </ul>
                 </div>
               </div>
-            )}
-          </div>
+            </div>
 
-          <div className={styles.statusModalFooter}>
-            <button
-              className={styles.statusCancelBtn}
-              onClick={closeStatusModal}
-              disabled={isUpdatingStatus}
-            >
-              Cancel
-            </button>
-            <button
-              className={styles.statusConfirmBtn}
-              onClick={handleUpdateStatus}
-              disabled={
-                isUpdatingStatus ||
-                (statusAction === "resign" && !statusData.reason.trim())
-              }
-            >
-              {isUpdatingStatus ? (
-                <>
-                  <span className={styles.statusSpinner}></span>
-                  Processing...
-                </>
-              ) : (
-                `Confirm ${actionText}`
-              )}
-            </button>
-          </div>
-        </div>
+            <div className={styles.statusModalFooter}>
+              <button
+                type="button"
+                className={styles.statusCancelBtn}
+                onClick={closeStatusModal}
+                disabled={isUpdatingStatus}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className={styles.statusConfirmBtn}
+                disabled={
+                  isUpdatingStatus ||
+                  (statusAction === "resign" && !statusData.reason.trim())
+                }
+              >
+                {isUpdatingStatus ? (
+                  <>
+                    <span className={styles.statusSpinner}></span>
+                    Processing...
+                  </>
+                ) : (
+                  `Confirm ${actionText}`
+                )}
+              </button>
+            </div>
+          </form>
+        )}
       </div>
-    );
-  };
+    </div>
+  );
+};
 
   const renderFilterPanel = () => {
     // Get truly active personnel count
@@ -3998,8 +4039,17 @@ const PersonnelRegister = () => {
                   <img src={photoPreview} alt="Photo Preview" />
                 ) : (
                   <div className={styles.prNoPhotoPreview}>
-                    <span className={styles.prNoPhotoIcon}>📷</span>
-                    <span>Photo Preview</span>
+                    <img
+                      src={logo}
+                      alt="Default Profile"
+                      style={{
+                        width: "100px",
+                        height: "100px",
+                        objectFit: "cover",
+                        borderRadius: "50%",
+                      }}
+                    />
+                    <span>Default Photo</span>
                   </div>
                 )}
               </div>
@@ -4668,6 +4718,7 @@ const PersonnelRegister = () => {
               <div className={styles.prEditModalLayout}>
                 {/* Photo Section */}
                 <div className={styles.prEditModalPhotoSection}>
+                  {/* In the edit modal */}
                   <div className={styles.prEditModalPhotoPreview}>
                     {editPhotoPreview ? (
                       <img src={editPhotoPreview} alt="Preview" />
@@ -4675,8 +4726,17 @@ const PersonnelRegister = () => {
                       <img src={editingPerson.photo_url} alt="Current" />
                     ) : (
                       <div className={styles.prNoPhotoPreview}>
-                        <span className={styles.prNoPhotoIcon}>📷</span>
-                        <span>No Photo</span>
+                        <img
+                          src={logo}
+                          alt="Default Profile"
+                          style={{
+                            width: "100px",
+                            height: "100px",
+                            objectFit: "cover",
+                            borderRadius: "50%",
+                          }}
+                        />
+                        <span>Default Photo</span>
                       </div>
                     )}
                   </div>

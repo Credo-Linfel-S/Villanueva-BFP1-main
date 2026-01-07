@@ -923,6 +923,10 @@ const InspectionHistory = () => {
         <Title>Inspection History | BFP Villanueva</Title>
         <Meta name="robots" content="noindex, nofollow" />
         <InspectorSidebar />
+        <Meta
+          name="viewport"
+          content="width=device-width, initial-scale=1, maximum-scale=1"
+        />
         <Hamburger />
         <div
           className={`main-content ${isSidebarCollapsed ? "collapsed" : ""}`}

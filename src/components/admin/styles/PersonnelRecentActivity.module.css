@@ -732,3 +732,280 @@
   background-color: #cccccc;
   cursor: not-allowed;
 }
+
+/* Rank Image Styles */
+.actionByContent {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rankImageContainer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 50px;
+  height: 50px;
+  flex-shrink: 0;
+}
+
+.rankImage {
+  width: 50px;
+  height: 50px;
+  object-fit: contain;
+  border-radius: 4px;
+  border: 1px solid #e0e0e0;
+  background: white;
+}
+
+.rankImageContainerSmall {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 50px;
+  height: 50px;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+.rankImageSmall {
+  width: 50px;
+  height: 50px;
+  object-fit: contain;
+  border-radius: 3px;
+  border: 1px solid #ddd;
+  background: white;
+}
+
+.personnelInfo {
+  flex: 1;
+  min-width: 0; /* For text truncation */
+}
+
+.personnelName {
+  display: block;
+  margin-bottom: 2px;
+}
+
+.personnelRank {
+  color: #666;
+  font-size: 11px;
+  display: block;
+  margin-top: 1px;
+}
+
+.adminInfo {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.adminRoleBadge {
+  background: #ff9500;
+  color: white;
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.adminRank {
+  color: #666;
+  font-size: 10px;
+}
+
+.personnelInfoInline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Ensure table cells align properly */
+.actionByCell {
+  padding: 8px 4px;
+}
+
+/* Activity card styles */
+.activityCard .metaValue {
+  display: flex;
+  align-items: center;
+}
+/* ========== PAGINATION STYLES ========== */
+.paginationContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  margin: 20px 0;
+  padding: 15px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+}
+
+.paginationInfo {
+  font-size: 14px;
+  color: #666;
+  text-align: center;
+}
+
+.paginationButtons {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.paginationBtn {
+  padding: 6px 12px;
+  border: 1px solid #ddd;
+  background: white;
+  color: #333;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+  min-width: 40px;
+}
+
+.paginationBtn:hover:not(.disabled):not(.active) {
+  background: #f0f0f0;
+  border-color: #ccc;
+}
+
+.paginationBtn.active {
+  background: #ff9500;
+  color: white;
+  border-color: #ff9500;
+  font-weight: 600;
+}
+
+.paginationBtn.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: #f5f5f5;
+}
+
+.paginationEllipsis {
+  padding: 6px 8px;
+  color: #999;
+  font-size: 14px;
+  user-select: none;
+}
+
+.itemsPerPageSelector {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #666;
+}
+
+.itemsPerPageSelect {
+  padding: 4px 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: white;
+  font-size: 14px;
+}
+
+.topPagination {
+  margin-bottom: 20px;
+}
+
+.bottomPagination {
+  margin-top: 20px;
+}
+
+/* ========== EXPIRATION NOTICE STYLES ========== */
+.expiredNotice {
+  margin-top: 10px;
+  padding: 10px;
+  background: #fff3e0;
+  border-radius: 6px;
+  color: #e65100;
+  font-size: 14px;
+}
+
+/* ========== ACTIVITY COUNT STYLES ========== */
+.activitiesCount {
+  font-size: 14px;
+  color: #666;
+  text-align: center;
+  padding: 8px;
+  background: #f8f9fa;
+  border-radius: 6px;
+  border: 1px solid #e9ecef;
+}
+
+/* ========== RESPONSIVE PAGINATION ========== */
+@media (max-width: 768px) {
+  .paginationContainer {
+    padding: 10px;
+  }
+  
+  .paginationButtons {
+    gap: 4px;
+  }
+  
+  .paginationBtn {
+    padding: 4px 8px;
+    font-size: 13px;
+    min-width: 36px;
+  }
+  
+  .paginationInfo {
+    font-size: 13px;
+  }
+  
+  .itemsPerPageSelector {
+    font-size: 13px;
+  }
+  
+  .itemsPerPageSelect {
+    font-size: 13px;
+    padding: 3px 6px;
+  }
+}
+
+/* ========== UPDATE EXISTING STYLES ========== */
+.priorityNotice {
+  margin: 15px 0;
+  padding: 10px 15px;
+  background: #e3f2fd;
+  border-radius: 6px;
+  font-size: 14px;
+  color: #1976d2;
+  border-left: 4px solid #1976d2;
+}
+
+.filterControls {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  margin: 20px 0;
+  padding: 15px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+}/* Personnel rank badge style */
+.personnelRankBadge {
+  background: #4CAF50;
+  color: white;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  margin-left: 6px;
+  display: inline-block;
+}
+
+/* Different colors for different ranks */
+.personnelRankBadge[data-rank="FO1"] { background: #2196F3; }
+.personnelRankBadge[data-rank="FO2"] { background: #2196F3; }
+.personnelRankBadge[data-rank="FO3"] { background: #2196F3; }
+.personnelRankBadge[data-rank="SFO1"] { background: #FF9800; }
+.personnelRankBadge[data-rank="SFO2"] { background: #FF9800; }
+.personnelRankBadge[data-rank="SFO3"] { background: #FF9800; }
+.personnelRankBadge[data-rank="SFO4"] { background: #FF5722; }

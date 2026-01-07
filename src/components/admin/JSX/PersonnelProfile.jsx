@@ -10,7 +10,9 @@ import { supabase } from "../../../lib/supabaseClient.js";
 // Import the BFP preloader component and its styles
 import BFPPreloader from "../../BFPPreloader.jsx"; // Adjust path as needed
  // Make sure this path is correct
-
+import logo from "../../../assets/Firefighter.png";
+import FloatingNotificationBell from "../../FloatingNotificationBell.jsx";
+import { useUserId } from "../../hooks/useUserId.js";
 const PersonnelProfile = () => {
   const { isSidebarCollapsed } = useSidebar();
   const [personnelList, setPersonnelList] = useState([]);
@@ -28,7 +30,7 @@ const PersonnelProfile = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [documentToDelete, setDocumentToDelete] = useState(null);
   const [uploading, setUploading] = useState(false);
-
+const { userId, isAuthenticated, userRole } = useUserId();
   // Preloader state
   const [showPreloader, setShowPreloader] = useState(true);
   const [loadingProgress, setLoadingProgress] = useState(0);
@@ -727,7 +729,7 @@ const PersonnelProfile = () => {
       <Meta name="robots" content="noindex, nofollow" />
       <Hamburger />
       <Sidebar />
-
+      <FloatingNotificationBell userId={userId} />
       <ToastContainer
         position="top-right"
         autoClose={5000}
@@ -1214,7 +1216,11 @@ const PersonnelCard = ({
   formatTimestamp,
 }) => {
   const [selectedCategory, setSelectedCategory] = useState("Medical Record");
-
+  const handleImageError = (e) => {
+    console.log("Image failed to load, using default logo");
+    e.target.src = logo; // Use the imported logo as default
+    e.target.onerror = null; // Prevent infinite loop
+  };
   // Get rank image URL (you need to fetch this from your database)
   // Add this to your loadPersonnel function to include rank_image in the data
   const rankImage = personnel.rank_image || "";
@@ -1255,13 +1261,25 @@ const PersonnelCard = ({
       {/* Card Header with Rank Image */}
       <div className={styles.preCardHeader}>
         <div className={styles.headerLeft}>
-          <img
-            src={personnel.photo_url || "/bfp.jpg"}
-            alt={`${personnel.first_name} ${personnel.last_name}`}
-            onError={(e) => {
-              e.target.src = "/bfp.jpg";
-            }}
-          />
+          {/* Profile Photo with default fallback */}
+          <div className={styles.profilePhotoContainer}>
+            {personnel.photo_url ? (
+              <img
+                src={personnel.photo_url}
+                alt={`${personnel.first_name} ${personnel.last_name}`}
+                className={styles.profilePhoto}
+                onError={handleImageError}
+              />
+            ) : (
+              <div className={styles.defaultPhoto}>
+                <img
+                  src={logo}
+                  alt="Default BFP Logo"
+                  className={styles.defaultPhotoImg}
+                />
+              </div>
+            )}
+          </div>
           <div className={styles.headerText}>
             <h3
               dangerouslySetInnerHTML={{ __html: `${firstName} ${lastName}` }}

@@ -15,7 +15,9 @@ import {
   getAssignablePersonnel,
   isPersonnelActive,
 } from "../../filterActivePersonnel.js"; // Adjust path as needed
-
+import logo from "../../../assets/Firefighter.png";
+import FloatingNotificationBell from "../../FloatingNotificationBell.jsx";
+import { useUserId } from "../../hooks/useUserId.js";
 const Placement = () => {
   const [personnel, setPersonnel] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -24,7 +26,7 @@ const Placement = () => {
   // Preloader state
   const [showPreloader, setShowPreloader] = useState(true);
   const [loadingProgress, setLoadingProgress] = useState(0);
-
+const { userId, isAuthenticated, userRole } = useUserId();
   // State variables for table functionality
   const [currentPage, setCurrentPage] = useState(1);
   const rowsPerPage = 5;
@@ -49,12 +51,162 @@ const Placement = () => {
   useEffect(() => {
     loadPersonnelData();
   }, []);
+  // Add this before or after your imports
+  const rankOptions = [
+    {
+      rank: "FO1",
+      name: "Fire Officer 1",
+      image: `${
+        import.meta.env.VITE_SUPABASE_URL
+      }/storage/v1/object/public/rank_images/FO1.png`,
+    },
+    {
+      rank: "FO2",
+      name: "Fire Officer 2",
+      image: `${
+        import.meta.env.VITE_SUPABASE_URL
+      }/storage/v1/object/public/rank_images/FO2.png`,
+    },
+    {
+      rank: "FO3",
+      name: "Fire Officer 3",
+      image: `${
+        import.meta.env.VITE_SUPABASE_URL
+      }/storage/v1/object/public/rank_images/FO3.png`,
+    },
+    {
+      rank: "SFO1",
+      name: "Senior Fire Officer 1",
+      image: `${
+        import.meta.env.VITE_SUPABASE_URL
+      }/storage/v1/object/public/rank_images/SFO1.png`,
+    },
+    {
+      rank: "SFO2",
+      name: "Senior Fire Officer 2",
+      image: `${
+        import.meta.env.VITE_SUPABASE_URL
+      }/storage/v1/object/public/rank_images/SFO2.png`,
+    },
+    {
+      rank: "SFO3",
+      name: "Senior Fire Officer 3",
+      image: `${
+        import.meta.env.VITE_SUPABASE_URL
+      }/storage/v1/object/public/rank_images/SFO3.png`,
+    },
+    {
+      rank: "SFO4",
+      name: "Senior Fire Officer 4",
+      image: `${
+        import.meta.env.VITE_SUPABASE_URL
+      }/storage/v1/object/public/rank_images/SFO4.png`,
+    },
+  ];
+  // Helper function to get rank image
+  const getRankImage = (rank) => {
+    const rankOption = rankOptions.find((option) => option.rank === rank);
+    return rankOption ? rankOption.image : null;
+  };
 
+  // Helper function to get rank name
+  const getRankName = (rank) => {
+    const rankOption = rankOptions.find((option) => option.rank === rank);
+    return rankOption ? rankOption.name : rank || "N/A";
+  };
   // Update loading progress
   const updateLoadingProgress = (progress) => {
     setLoadingProgress(progress);
   };
+const PhotoCell = ({ person }) => {
+  const [isLoading, setIsLoading] = useState(true);
+  const [imageSrc, setImageSrc] = useState(logo);
 
+  useEffect(() => {
+    const loadPhoto = async () => {
+      setIsLoading(true);
+
+      try {
+        let url = logo;
+
+        // Check if personnel has a photo_url from Supabase
+        if (person.photo_url && person.photo_url.startsWith("http")) {
+          // Test if the photo_url is accessible
+          const isValid = await testImage(person.photo_url);
+          if (isValid) {
+            url = person.photo_url;
+          } else {
+            // Try photo_path as fallback
+            if (person.photo_path) {
+              const { data: urlData } = supabase.storage
+                .from("personnel-documents")
+                .getPublicUrl(person.photo_path);
+              const pathUrl = urlData?.publicUrl;
+              if (pathUrl && (await testImage(pathUrl))) {
+                url = pathUrl;
+              } else {
+                url = logo;
+              }
+            }
+          }
+        } else if (person.photo_path) {
+          // Use photo_path if photo_url is not available
+          const { data: urlData } = supabase.storage
+            .from("personnel-documents")
+            .getPublicUrl(person.photo_path);
+          const pathUrl = urlData?.publicUrl;
+          if (pathUrl && (await testImage(pathUrl))) {
+            url = pathUrl;
+          } else {
+            url = logo;
+          }
+        }
+
+        setImageSrc(url);
+      } catch (error) {
+        console.error("Error loading photo:", error);
+        setImageSrc(logo);
+      } finally {
+        setTimeout(() => setIsLoading(false), 100);
+      }
+    };
+
+    loadPhoto();
+  }, [person]);
+
+  // Test if image URL is accessible
+  const testImage = (url) => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => resolve(true);
+      img.onerror = () => resolve(false);
+      img.src = url;
+      setTimeout(() => resolve(false), 2000);
+    });
+  };
+
+  return (
+    <div className={styles.PMTPhotoContainer}>
+      {isLoading ? (
+        <div className={styles.PMTPhotoLoading}>
+          <div className={styles.PMTPhotoSpinner}></div>
+          <small>Loading...</small>
+        </div>
+      ) : (
+        <img
+          src={imageSrc}
+          alt={`${person.first_name || ""} ${person.last_name || ""}`}
+          className={styles.PMTPhotoThumb}
+          onError={(e) => {
+            e.target.onerror = null;
+            e.target.src = logo;
+          }}
+          loading="lazy"
+        />
+      )}
+    </div>
+  );
+};
   // Handle retry from preloader
   const handleRetryFromPreloader = () => {
     setShowPreloader(true);
@@ -466,6 +618,8 @@ const Placement = () => {
       <Title>Personnel Placement | BFP Villanueva</Title>
       <Meta name="robots" content="noindex, nofollow" />
 
+      <FloatingNotificationBell userId={userId} />
+
       <Hamburger />
       <Sidebar />
       <div className={`main-content ${isSidebarCollapsed ? "collapsed" : ""}`}>
@@ -550,6 +704,7 @@ const Placement = () => {
           <table className={styles.PMTTable}>
             <thead>
               <tr>
+                <th>Photo</th>
                 <th>Employee</th>
                 <th>Rank</th>
                 <th>Current Designation</th>
@@ -563,7 +718,7 @@ const Placement = () => {
             <tbody>
               {paginated.length === 0 ? (
                 <tr>
-                  <td colSpan="8" className={styles.PMTNoDataTable}>
+                  <td colSpan="9" className={styles.PMTNoDataTable}>
                     <div style={{ fontSize: "48px", marginBottom: "16px" }}>
                       <span className={styles.animatedEmoji}>👨‍🚒</span>
                     </div>
@@ -583,8 +738,40 @@ const Placement = () => {
 
                   return (
                     <tr key={person.id} className={styles.PMTRow}>
+                      <td className={styles.PMTPhotoCell}>
+                        <PhotoCell person={person} />
+                      </td>
                       <td>{getFullName(person)}</td>
-                      <td>{person.rank || "N/A"}</td>
+                      <td>
+                        <div className={styles.rankDisplay}>
+                          <div className={styles.rankImageContainer}>
+                            {getRankImage(person.rank) ? (
+                              <img
+                                src={getRankImage(person.rank)}
+                                alt={person.rank || "Rank"}
+                                className={styles.rankImage}
+                                onError={(e) => {
+                                  e.target.onerror = null;
+                                  e.target.src =
+                                    "https://via.placeholder.com/40x40/cccccc/ffffff?text=Rank";
+                                }}
+                              />
+                            ) : (
+                              <div className={styles.rankPlaceholder}>
+                                {person.rank?.charAt(0) || "R"}
+                              </div>
+                            )}
+                          </div>
+                          <div className={styles.rankInfo}>
+                            <div className={styles.rankAbbreviation}>
+                              {person.rank || "N/A"}
+                            </div>
+                            <div className={styles.rankFullName}>
+                              {getRankName(person.rank)}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
                       <td>
                         {isEditing ? (
                           <input
@@ -649,7 +836,7 @@ const Placement = () => {
                             className={`${styles.PMTBtn} ${styles.PMTEditBtn}`}
                             onClick={() => handleEdit(index)}
                           >
-                            ✏️ Edit
+                            Manage
                           </button>
                         )}
                       </td>

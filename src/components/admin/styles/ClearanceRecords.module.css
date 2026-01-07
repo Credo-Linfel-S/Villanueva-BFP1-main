@@ -627,12 +627,28 @@ font-weight: 600;
 }
 
 .CRSstatus.in_progress {
-  background: #ff9800;
+  background: #0062ff!important;
   color: white;
 }
+/* Rank Cell Styles */
+.rankCell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 
-.CRSstatus.cleared {
-  background: #4caf50;
+.rankImage {
+  width: 50px;
+  height: 50px;
+  object-fit: contain;
+  border-radius: 3px;
+}
+
+.rankText {
+  font-weight: 500;
+}
+.CRSstatus.CRScompleted {
+  background: #4caf50!important;
   color: white;
 }
 

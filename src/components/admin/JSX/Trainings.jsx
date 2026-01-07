@@ -6,9 +6,14 @@ import { useSidebar } from "../../SidebarContext.jsx";
 import { Title, Meta } from "react-head";
 import { supabase } from "../../../lib/supabaseClient.js";
 import BFPPreloader from "../../BFPPreloader.jsx";
-import { filterActivePersonnel } from "../../filterActivePersonnel.js"; // Import the utility
+import { filterActivePersonnel } from "../../filterActivePersonnel.js";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import FloatingNotificationBell from "../../FloatingNotificationBell.jsx";
+import { useUserId } from "../../hooks/useUserId.js";
+// Import the default logo image
+import logo from "../../../assets/Firefighter.png"; // Adjust the path as needed
+
 const Trainings = () => {
   const [trainings, setTrainings] = useState([]);
   const [personnel, setPersonnel] = useState([]);
@@ -18,7 +23,7 @@ const Trainings = () => {
   // Preloader state
   const [showPreloader, setShowPreloader] = useState(true);
   const [loadingProgress, setLoadingProgress] = useState(0);
-
+const { userId, isAuthenticated, userRole } = useUserId();
   // State variables for table functionality
   const [currentPage, setCurrentPage] = useState(1);
   const rowsPerPage = 5;
@@ -44,6 +49,44 @@ const Trainings = () => {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadError, setUploadError] = useState("");
 
+  // Define rank images (simplified version)
+  const rankImages = {
+    FO1: "FO1.png",
+    FO2: "FO2.png",
+    FO3: "FO3.png",
+    SFO1: "SFO1.png",
+    SFO2: "SFO2.png",
+    SFO3: "SFO3.png",
+    SFO4: "SFO4.png",
+    CINSP: "CINSP.png",
+    SINSP: "SINSP.png",
+    INSP: "INSP.png",
+    SUPT: "SUPT.png",
+  };
+
+  // Helper function to get rank image URL
+  const getRankImageUrl = (rank) => {
+    if (!rank) return null;
+
+    const normalizedRank = rank.toUpperCase();
+    const imageName = rankImages[normalizedRank];
+
+    if (!imageName) return null;
+
+    // Get the base URL from your supabase client or use a relative path
+    try {
+      // Try to get from environment variable
+      const supabaseUrl =
+        import.meta.env?.VITE_SUPABASE_URL ||
+        "https://wqjzbyblmcrxafcbljij.supabase.co";
+
+      return `${supabaseUrl}/storage/v1/object/public/rank_images/${imageName}`;
+    } catch (error) {
+      console.warn("Could not construct image URL:", error);
+      return null;
+    }
+  };
+
   useEffect(() => {
     loadPersonnel();
     loadTrainings();
@@ -54,7 +97,7 @@ const Trainings = () => {
     setLoadingProgress(progress);
   };
 
-  // Load personnel from Supabase - UPDATED
+  // Load personnel from Supabase
   const loadPersonnel = async () => {
     try {
       updateLoadingProgress(10);
@@ -69,13 +112,9 @@ const Trainings = () => {
         return;
       }
 
-      // Filter out retired/resigned personnel using utility function
       const activePersonnel = filterActivePersonnel(data || []);
-
       console.log(
-        `Trainings System: Loaded ${
-          activePersonnel.length
-        } active personnel out of ${data?.length || 0} total`
+        `Trainings System: Loaded ${activePersonnel.length} active personnel`
       );
 
       setPersonnel(activePersonnel);
@@ -84,13 +123,12 @@ const Trainings = () => {
     }
   };
 
-  // Load trainings from Supabase with personnel data
+  // Load trainings from Supabase with personnel data - UPDATED to include personnel photo
   const loadTrainings = async () => {
     try {
       setLoading(true);
       updateLoadingProgress(20);
 
-      // First, get all trainings
       const { data: trainingsData, error: trainingsError } = await supabase
         .from("trainings")
         .select("*")
@@ -99,7 +137,6 @@ const Trainings = () => {
       if (trainingsError) {
         console.error("Error loading trainings:", trainingsError);
 
-        // Check if table doesn't exist
         if (trainingsError.message.includes("does not exist")) {
           updateLoadingProgress(30);
           await createTrainingsTable();
@@ -112,17 +149,14 @@ const Trainings = () => {
           }, 500);
           return;
         }
-
         return;
       }
 
       updateLoadingProgress(40);
 
-      // Get personnel data for each training - ONLY active personnel
       const trainingsWithPersonnel = await Promise.all(
         (trainingsData || []).map(async (training) => {
           try {
-            // Get personnel info
             const { data: personnelData, error: personnelError } =
               await supabase
                 .from("personnel")
@@ -145,12 +179,12 @@ const Trainings = () => {
                 personnelId: training.personnel_id,
                 certificateUrl: training.certificate_url || "",
                 created_at: training.created_at,
-                isActive: false, // Mark as inactive since we couldn't load personnel
+                isActive: false,
               };
             }
 
-            // Check if personnel is active
             const isActive = filterActivePersonnel([personnelData]).length > 0;
+            const rankImageUrl = getRankImageUrl(personnelData.rank);
 
             const fullName = `${personnelData.first_name} ${
               personnelData.middle_name || ""
@@ -160,13 +194,17 @@ const Trainings = () => {
               id: training.id,
               name: fullName,
               rank: personnelData.rank || "Unknown",
+              rankImage: rankImageUrl,
               date: training.training_date || "",
               days: training.duration_days || "",
               status: training.status || "Pending",
               personnelId: training.personnel_id,
               certificateUrl: training.certificate_url || "",
               created_at: training.created_at,
-              isActive: isActive, // Add active status for filtering
+              isActive: isActive,
+              // Add personnel photo data
+              personnelPhotoUrl: personnelData.photo_url || null,
+              personnelPhotoPath: personnelData.photo_path || null,
             };
           } catch (error) {
             console.error("Error processing training:", error);
@@ -174,6 +212,7 @@ const Trainings = () => {
               id: training.id,
               name: "Error Loading",
               rank: "Error",
+              rankImage: null,
               date: training.training_date || "",
               days: training.duration_days || "",
               status: training.status || "Pending",
@@ -181,6 +220,8 @@ const Trainings = () => {
               certificateUrl: training.certificate_url || "",
               created_at: training.created_at,
               isActive: false,
+              personnelPhotoUrl: null,
+              personnelPhotoPath: null,
             };
           }
         })
@@ -188,23 +229,18 @@ const Trainings = () => {
 
       updateLoadingProgress(80);
 
-      // Filter to show only trainings with active personnel (or all if needed)
       const activeTrainings = trainingsWithPersonnel.filter(
         (training) => training.isActive
       );
 
-      console.log(
-        `Trainings: ${activeTrainings.length} active trainings out of ${trainingsWithPersonnel.length} total`
-      );
+      console.log(`Trainings: ${activeTrainings.length} active trainings`);
 
       setTrainings(activeTrainings);
       setLoading(false);
       updateLoadingProgress(90);
 
-      // Small delay to show completion
       setTimeout(() => {
         updateLoadingProgress(100);
-        // Hide preloader after a short delay to show completion
         setTimeout(() => {
           setShowPreloader(false);
         }, 500);
@@ -228,57 +264,117 @@ const Trainings = () => {
   const createTrainingsTable = async () => {
     try {
       console.log("Creating trainings table...");
-
-      // Run SQL to create table via REST API
-      const response = await fetch(
-        `https://wqjzbyblmcrxafcbljij.supabase.co/rest/v1/`,
-        {
-          method: "POST",
-          headers: {
-            apikey: process.env.REACT_APP_SUPABASE_ANON_KEY,
-            Authorization: `Bearer ${process.env.REACT_APP_SUPABASE_ANON_KEY}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            query: `
-            CREATE TABLE IF NOT EXISTS trainings (
-              id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-              personnel_id UUID NOT NULL REFERENCES personnel(id) ON DELETE CASCADE,
-              training_date DATE NOT NULL,
-              duration_days INTEGER NOT NULL CHECK (duration_days > 0 AND duration_days <= 365),
-              status VARCHAR(50) NOT NULL DEFAULT 'Pending' CHECK (status IN ('Pending', 'Ongoing', 'Completed', 'Cancelled')),
-              certificate_url VARCHAR(500),
-              created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-              updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-              notes TEXT,
-              training_name VARCHAR(255),
-              training_type VARCHAR(100),
-              organizer VARCHAR(255),
-              location VARCHAR(255)
-            );
-            
-            -- Enable RLS
-            ALTER TABLE trainings ENABLE ROW LEVEL SECURITY;
-            
-            -- Create policy for all operations
-            CREATE POLICY "Enable all operations for anon users" ON trainings
-              FOR ALL USING (true) WITH CHECK (true);
-          `,
-          }),
-        }
-      );
-
-      console.log("Table creation response:", response);
+      // ... keep your existing createTrainingsTable code ...
     } catch (error) {
       console.error("Error creating table:", error);
     }
+  };
+
+  // Test if image URL is accessible
+  const testImage = (url) => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => resolve(true);
+      img.onerror = () => resolve(false);
+      img.src = url;
+
+      // Timeout to prevent hanging
+      setTimeout(() => resolve(false), 3000);
+    });
+  };
+
+  // Component to display personnel photo with loading state
+  const PersonnelPhotoCell = ({ training }) => {
+    const [isLoading, setIsLoading] = useState(true);
+    const [imageSrc, setImageSrc] = useState(logo); // Use imported default image
+
+    useEffect(() => {
+      const loadPhoto = async () => {
+        setIsLoading(true);
+
+        try {
+          let url = logo; // Default to your imported image
+
+          // Check in order of priority
+          if (
+            training.personnelPhotoUrl &&
+            training.personnelPhotoUrl.startsWith("http")
+          ) {
+            // Test if the photo_url is accessible
+            const isValid = await testImage(training.personnelPhotoUrl);
+            if (isValid) {
+              url = training.personnelPhotoUrl;
+            } else {
+              // Try photo_path as fallback
+              if (training.personnelPhotoPath) {
+                const { data: urlData } = supabase.storage
+                  .from("personnel-documents")
+                  .getPublicUrl(training.personnelPhotoPath);
+                const pathUrl = urlData?.publicUrl;
+                // Check if the path URL is valid
+                if (pathUrl && (await testImage(pathUrl))) {
+                  url = pathUrl;
+                } else {
+                  url = logo; // Fallback to default
+                }
+              }
+            }
+          } else if (training.personnelPhotoPath) {
+            // Use photo_path if photo_url is not available
+            const { data: urlData } = supabase.storage
+              .from("personnel-documents")
+              .getPublicUrl(training.personnelPhotoPath);
+            const pathUrl = urlData?.publicUrl;
+            // Check if the path URL is valid
+            if (pathUrl && (await testImage(pathUrl))) {
+              url = pathUrl;
+            } else {
+              url = logo; // Fallback to default
+            }
+          }
+
+          setImageSrc(url);
+        } catch (error) {
+          console.error("Error loading photo:", error);
+          setImageSrc(logo); // Fallback to default image on error
+        } finally {
+          // Small delay to prevent flash
+          setTimeout(() => setIsLoading(false), 100);
+        }
+      };
+
+      loadPhoto();
+    }, [training]);
+
+    return (
+      <div className={styles.personnelPhotoCell}>
+        <div className={styles.personnelPhotoContainer}>
+          {isLoading ? (
+            <div className={styles.personnelPhotoLoading}>
+              <div className={styles.personnelPhotoSpinner}></div>
+              <small>Loading...</small>
+            </div>
+          ) : (
+            <img
+              src={imageSrc}
+              alt={training.name}
+              className={styles.personnelPhotoThumb}
+              onError={(e) => {
+                e.target.onerror = null;
+                e.target.src = logo; // Fallback to default image on load error
+              }}
+              loading="lazy"
+            />
+          )}
+        </div>
+      </div>
+    );
   };
 
   // Handle file selection for certificate
   const handleCertificateChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      // Validate file type
       const allowedTypes = [
         "application/pdf",
         "image/jpeg",
@@ -300,7 +396,6 @@ const Trainings = () => {
         return;
       }
 
-      // Validate file size (max 10MB)
       if (file.size > 10 * 1024 * 1024) {
         alert("Certificate file size should be less than 10MB");
         return;
@@ -312,21 +407,16 @@ const Trainings = () => {
     }
   };
 
-  // Upload file to Supabase Storage - FIXED VERSION
+  // Upload file to Supabase Storage
   const uploadFile = async (file, folderName) => {
     try {
       setUploadError("");
-
-      // Create unique filename
       const fileExt = file.name.split(".").pop();
       const uniqueFileName = `${Date.now()}_${Math.random()
         .toString(36)
         .substr(2, 9)}.${fileExt}`;
       const filePath = `${folderName}/${uniqueFileName}`;
 
-      console.log("Uploading file:", file.name, "to:", filePath);
-
-      // Try to upload file
       const { data, error } = await supabase.storage
         .from("training-files")
         .upload(filePath, file, {
@@ -336,34 +426,23 @@ const Trainings = () => {
 
       if (error) {
         console.error("Upload error details:", error);
-
-        // If RLS error, try to fix storage policy
         if (error.message.includes("row-level security policy")) {
-          setUploadError(
-            "Storage RLS policy is blocking uploads. Certificate upload disabled."
-          );
-
-          // Create a data URL as fallback
+          setUploadError("Storage RLS policy is blocking uploads.");
           return new Promise((resolve) => {
             const reader = new FileReader();
             reader.onloadend = () => {
-              resolve(reader.result); // Data URL
+              resolve(reader.result);
             };
             reader.readAsDataURL(file);
           });
         }
-
         throw error;
       }
 
-      console.log("File uploaded successfully:", data);
-
-      // Get public URL
       const {
         data: { publicUrl },
       } = supabase.storage.from("training-files").getPublicUrl(filePath);
 
-      console.log("Public URL generated:", publicUrl);
       return publicUrl;
     } catch (error) {
       console.error("Error in uploadFile:", error);
@@ -377,13 +456,11 @@ const Trainings = () => {
     if (!url) return;
 
     try {
-      // Check if it's a data URL (starts with data:)
       if (url.startsWith("data:")) {
         console.log("Skipping deletion of data URL");
         return;
       }
 
-      // Extract the file path from the URL
       const urlParts = url.split("/");
       const bucketIndex = urlParts.indexOf("training-files");
 
@@ -393,17 +470,12 @@ const Trainings = () => {
       }
 
       const filePath = urlParts.slice(bucketIndex + 1).join("/");
-
-      console.log("Deleting file from path:", filePath);
-
       const { error } = await supabase.storage
         .from("training-files")
         .remove([filePath]);
 
       if (error) {
         console.error("Error deleting file:", error);
-      } else {
-        console.log("File deleted successfully");
       }
     } catch (error) {
       console.error("Error in deleteFile:", error);
@@ -445,19 +517,13 @@ const Trainings = () => {
 
       let certificateUrl = formData.certificateUrl;
 
-      // Upload certificate if selected
       if (certificateFile) {
         try {
           setUploadProgress(30);
           certificateUrl = await uploadFile(certificateFile, "certificates");
           setUploadProgress(80);
-
-          if (uploadError && uploadError.includes("RLS")) {
-            console.log("Using data URL due to RLS restrictions");
-          }
         } catch (uploadError) {
           console.error("Certificate upload failed:", uploadError);
-          // Continue without certificate
         }
       }
 
@@ -470,10 +536,7 @@ const Trainings = () => {
         updated_at: new Date().toISOString(),
       };
 
-      console.log("Saving training data:", trainingData);
-
       if (editingTraining !== null) {
-        // Update training
         const { error } = await supabase
           .from("trainings")
           .update(trainingData)
@@ -481,54 +544,33 @@ const Trainings = () => {
 
         if (error) {
           console.error("Error updating training:", error);
-
-          // Check for RLS issue
-          if (error.message.includes("row-level security")) {
-            alert(
-              "Database RLS policy is blocking updates. Please check your Supabase RLS settings."
-            );
-          } else {
-            alert("Failed to update training. Please try again.");
-          }
+          alert("Failed to update training. Please try again.");
           return;
         }
 
-        // Delete old certificate if it exists and we're uploading a new one
         if (
           certificateFile &&
           formData.certificateUrl &&
           !formData.certificateUrl.startsWith("data:")
         ) {
-          // Do this after successful update
           setTimeout(() => {
             deleteFile(formData.certificateUrl);
           }, 1000);
         }
       } else {
-        // Insert new training
         trainingData.created_at = new Date().toISOString();
-
         const { error } = await supabase
           .from("trainings")
           .insert([trainingData]);
 
         if (error) {
           console.error("Error adding training:", error);
-
-          // Check for RLS issue
-          if (error.message.includes("row-level security")) {
-            alert(
-              "Database RLS policy is blocking inserts. Please check your Supabase RLS settings."
-            );
-          } else {
-            alert("Failed to add training. Please try again.");
-          }
+          alert("Failed to add training. Please try again.");
           return;
         }
       }
 
       setUploadProgress(100);
-
       await loadTrainings();
       closeAllForms();
 
@@ -588,7 +630,6 @@ const Trainings = () => {
 
     if (window.confirm("Are you sure you want to delete this training?")) {
       try {
-        // Delete certificate file if it exists
         if (
           training.certificateUrl &&
           !training.certificateUrl.startsWith("data:")
@@ -596,7 +637,6 @@ const Trainings = () => {
           await deleteFile(training.certificateUrl);
         }
 
-        // Delete training record from database
         const { error } = await supabase
           .from("trainings")
           .delete()
@@ -621,7 +661,6 @@ const Trainings = () => {
   const viewCertificate = (url) => {
     if (url) {
       if (url.startsWith("data:")) {
-        // For data URLs, open in new tab
         const newWindow = window.open();
         if (newWindow) {
           newWindow.document.write(
@@ -662,7 +701,6 @@ const Trainings = () => {
   function applyFilters(items) {
     let filtered = [...items];
 
-    // Card filter
     if (currentFilterCard === "pending") {
       filtered = filtered.filter((i) => i.status?.toLowerCase() === "pending");
     } else if (currentFilterCard === "completed") {
@@ -677,7 +715,6 @@ const Trainings = () => {
       );
     }
 
-    // Text filters
     const s = search.trim().toLowerCase();
     const statusFilter = filterStatus.trim().toLowerCase();
 
@@ -714,7 +751,6 @@ const Trainings = () => {
 
     const buttons = [];
 
-    // Previous button
     buttons.push(
       <button
         key="prev"
@@ -728,7 +764,6 @@ const Trainings = () => {
       </button>
     );
 
-    // Always show first page
     buttons.push(
       <button
         key={1}
@@ -742,7 +777,6 @@ const Trainings = () => {
       </button>
     );
 
-    // Show ellipsis after first page if needed
     if (currentPage > 3) {
       buttons.push(
         <span key="ellipsis1" className={styles.TSPaginationEllipsis}>
@@ -751,7 +785,6 @@ const Trainings = () => {
       );
     }
 
-    // Show pages around current page
     let startPage = Math.max(2, currentPage - 1);
     let endPage = Math.min(pageCount - 1, currentPage + 1);
 
@@ -763,7 +796,6 @@ const Trainings = () => {
       startPage = Math.max(2, pageCount - 3);
     }
 
-    // Generate middle page buttons
     for (let i = startPage; i <= endPage; i++) {
       if (i > 1 && i < pageCount) {
         buttons.push(
@@ -781,7 +813,6 @@ const Trainings = () => {
       }
     }
 
-    // Show ellipsis before last page if needed
     if (currentPage < pageCount - 2) {
       buttons.push(
         <span key="ellipsis2" className={styles.TSPaginationEllipsis}>
@@ -790,7 +821,6 @@ const Trainings = () => {
       );
     }
 
-    // Always show last page if there is more than 1 page
     if (pageCount > 1) {
       buttons.push(
         <button
@@ -806,7 +836,6 @@ const Trainings = () => {
       );
     }
 
-    // Next button
     buttons.push(
       <button
         key="next"
@@ -876,7 +905,7 @@ const Trainings = () => {
     <div className={styles.TSAppContainer}>
       <Title>Training Management | BFP Villanueva</Title>
       <Meta name="robots" content="noindex, nofollow" />
-
+      <FloatingNotificationBell userId={userId} />
       <Hamburger />
       <Sidebar />
       <div className={`main-content ${isSidebarCollapsed ? "collapsed" : ""}`}>
@@ -969,17 +998,17 @@ const Trainings = () => {
         <button className={styles.TSAddBtn} onClick={addNewTraining}>
           Add Training for Personnel
         </button>
-
+        <div className={styles.TSPaginationContainer}>
+          {renderPaginationButtons()}
+        </div>
         {/* Table Container with Pagination */}
         <div className={styles.TSTableContainer}>
           {/* Pagination at the top */}
-          <div className={styles.TSPaginationContainer}>
-            {renderPaginationButtons()}
-          </div>
 
           <table className={styles.TSTable}>
             <thead>
               <tr>
+                <th>Photo</th>
                 <th>Name</th>
                 <th>Rank</th>
                 <th>Training Date</th>
@@ -992,7 +1021,7 @@ const Trainings = () => {
             <tbody>
               {paginated.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className={styles.TSNoRequestsTable}>
+                  <td colSpan="8" className={styles.TSNoRequestsTable}>
                     <div style={{ fontSize: "48px", marginBottom: "16px" }}>
                       <span className={styles.animatedEmoji}>📚</span>
                     </div>
@@ -1007,8 +1036,35 @@ const Trainings = () => {
               ) : (
                 paginated.map((training, index) => (
                   <tr key={training.id} className={styles.TSTableRow}>
+                    <td>
+                      <PersonnelPhotoCell training={training} />
+                    </td>
                     <td>{training.name}</td>
-                    <td>{training.rank}</td>
+                    <td>
+                      <div className={styles.rankCell}>
+                        {training.rankImage ? (
+                          <img
+                            src={training.rankImage}
+                            alt={training.rank}
+                            className={styles.rankImage}
+                            onError={(e) => {
+                              e.target.style.display = "none";
+                              const fallback = e.target.nextElementSibling;
+                              if (fallback) fallback.style.display = "flex";
+                            }}
+                          />
+                        ) : null}
+                        <div
+                          className={styles.rankFallback}
+                          style={{
+                            display: training.rankImage ? "none" : "flex",
+                          }}
+                        >
+                          <span className={styles.rankIcon}>🎖️</span>
+                        </div>
+                        <span className={styles.rankText}>{training.rank}</span>
+                      </div>
+                    </td>
                     <td>{training.date}</td>
                     <td>
                       {training.days} {training.days === "1" ? "day" : "days"}
@@ -1069,7 +1125,7 @@ const Trainings = () => {
           </table>
         </div>
 
-        {/* Sidebar Form for Add Training */}
+        {/* Sidebar Form for Add Training - Kept simple without rank image */}
         <div
           className={`${styles.TSFormCard} ${
             isFormOpen ? styles.TSActive : ""
@@ -1086,7 +1142,6 @@ const Trainings = () => {
             </button>
           </div>
 
-          {/* Upload Progress Bar */}
           {uploadProgress > 0 && uploadProgress < 100 && (
             <div className={styles.progressBarContainer}>
               <div
@@ -1098,7 +1153,6 @@ const Trainings = () => {
             </div>
           )}
 
-          {/* Upload Error Message */}
           {uploadError && (
             <div className={styles.errorMessage}>
               <strong>⚠️ Notice:</strong> {uploadError}
@@ -1110,7 +1164,6 @@ const Trainings = () => {
           )}
 
           <form onSubmit={handleSubmit}>
-            {/* Personnel Information Section */}
             <div className={styles.TSFormSection}>
               <h3>Personnel Information</h3>
               <div className={styles.TSFormRow}>
@@ -1161,7 +1214,6 @@ const Trainings = () => {
               </div>
             </div>
 
-            {/* Training Details Section */}
             <div className={styles.TSFormSection}>
               <h3>Training Details</h3>
               <div className={styles.TSFormRow}>
@@ -1207,7 +1259,6 @@ const Trainings = () => {
                 </div>
               </div>
 
-              {/* Certificate Upload Section */}
               <div className={styles.TSFormSection}>
                 <h3>Training Certificate</h3>
                 <div className={styles.TSFormRow}>
@@ -1245,7 +1296,6 @@ const Trainings = () => {
               </div>
             </div>
 
-            {/* Form Actions */}
             <div className={styles.TSFormActions}>
               <button type="submit" className={styles.TSSaveBtn}>
                 {editingTraining ? "Update Training" : "Save Training"}
@@ -1279,7 +1329,6 @@ const Trainings = () => {
                 </button>
               </div>
 
-              {/* Upload Progress Bar for Modal */}
               {uploadProgress > 0 && uploadProgress < 100 && (
                 <div className={styles.progressBarContainer}>
                   <div
@@ -1291,7 +1340,6 @@ const Trainings = () => {
                 </div>
               )}
 
-              {/* Upload Error Message */}
               {uploadError && (
                 <div className={styles.errorMessage}>
                   <strong>⚠️ Notice:</strong> {uploadError}
@@ -1303,7 +1351,6 @@ const Trainings = () => {
               )}
 
               <form onSubmit={handleSubmit}>
-                {/* Personnel Information Section */}
                 <div className={styles.TSFormSection}>
                   <h3>Personnel Information</h3>
                   <div className={styles.TSFormRow}>
@@ -1354,7 +1401,6 @@ const Trainings = () => {
                   </div>
                 </div>
 
-                {/* Training Details Section */}
                 <div className={styles.TSFormSection}>
                   <h3>Training Details</h3>
                   <div className={styles.TSFormRow}>
@@ -1400,7 +1446,6 @@ const Trainings = () => {
                     </div>
                   </div>
 
-                  {/* Certificate Upload Section */}
                   <div className={styles.TSFormSection}>
                     <h3>Training Certificate</h3>
                     <div className={styles.TSFormRow}>
@@ -1438,7 +1483,6 @@ const Trainings = () => {
                   </div>
                 </div>
 
-                {/* Form Actions */}
                 <div className={styles.TSFormActions}>
                   <button type="submit" className={styles.TSSaveBtn}>
                     Update Training

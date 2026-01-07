@@ -9,12 +9,13 @@ import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 // Import the BFP preloader component and its styles
 import BFPPreloader from "../../BFPPreloader.jsx"; // Adjust path as needed
-
+import FloatingNotificationBell from "../../FloatingNotificationBell.jsx";
+import { useUserId } from "../../hooks/useUserId";
 const AwardsCommendations = () => {
   const [awards, setAwards] = useState([]);
   const [loading, setLoading] = useState(true);
   const { isSidebarCollapsed } = useSidebar();
-
+const { userId, isAuthenticated, userRole } = useUserId();
   // Preloader state
   const [showPreloader, setShowPreloader] = useState(true);
   const [loadingProgress, setLoadingProgress] = useState(0);
@@ -498,7 +499,7 @@ const AwardsCommendations = () => {
 
       <Hamburger />
       <Sidebar />
-
+      <FloatingNotificationBell userId={userId} />
       <ToastContainer
         position="top-right"
         autoClose={3000}

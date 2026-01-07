@@ -60,7 +60,91 @@
   font-size: 12px;
   transition: background 0.3s;
 }
+/* Rank Display Styles */
+.rankDisplay {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
 
+.rankImageContainer {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  overflow: hidden;
+  background-color: #f0f0f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #e0e0e0;
+}
+
+.rankImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.rankPlaceholder {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 14px;
+}
+
+.rankInfo {
+  display: flex;
+  flex-direction: column;
+}
+
+.rankAbbreviation {
+  font-weight: 600;
+  color: #333;
+  font-size: 14px;
+}
+
+.rankFullName {
+  font-size: 12px;
+  color: #666;
+  max-width: 120px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Rank-specific color classes */
+.rankFO1 .rankPlaceholder {
+  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+}
+
+.rankFO2 .rankPlaceholder {
+  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+}
+
+.rankFO3 .rankPlaceholder {
+  background: linear-gradient(135deg, #0ea5e9 0%, #0369a1 100%);
+}
+
+.rankSFO1 .rankPlaceholder {
+  background: linear-gradient(135deg, #10b981 0%, #047857 100%);
+}
+
+.rankSFO2 .rankPlaceholder {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+}
+
+.rankSFO3 .rankPlaceholder {
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+}
+
+.rankSFO4 .rankPlaceholder {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+}
 .viewBtn:hover {
   background: #218838;
 }

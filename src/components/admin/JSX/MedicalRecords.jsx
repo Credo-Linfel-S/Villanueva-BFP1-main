@@ -10,6 +10,9 @@ import "react-toastify/dist/ReactToastify.css";
 // Import the BFP preloader component and its styles
 import BFPPreloader from "../../BFPPreloader.jsx"; // Adjust path as needed
 // Make sure this path is correct
+import FloatingNotificationBell from "../../FloatingNotificationBell.jsx";
+
+import { useUserId } from "../../hooks/useUserId.js";
 
 const MedicalRecords = () => {
   const [medicalRecords, setMedicalRecords] = useState([]);
@@ -19,7 +22,7 @@ const MedicalRecords = () => {
   // Preloader state
   const [showPreloader, setShowPreloader] = useState(true);
   const [loadingProgress, setLoadingProgress] = useState(0);
-
+const { userId, isAuthenticated, userRole } = useUserId();
   // State variables for table functionality
   const [currentPage, setCurrentPage] = useState(1);
   const rowsPerPage = 5;
@@ -492,7 +495,7 @@ const MedicalRecords = () => {
 
       <Hamburger />
       <Sidebar />
-
+      <FloatingNotificationBell userId={userId} />
       <ToastContainer
         position="top-right"
         autoClose={3000}

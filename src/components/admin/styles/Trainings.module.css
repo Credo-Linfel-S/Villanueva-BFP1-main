@@ -310,7 +310,227 @@
     transform: translateY(-10px);
   }
 } 
+/* Add these styles to your Trainings.module.css file */
 
+/* Rank cell styling */
+.rankCell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rankImage {
+  width: 50px;
+  height: 50px;
+  object-fit: contain;
+  border-radius: 4px;
+  background-color: #f0f0f000;
+  padding: 2px;
+  border: 1px solid #dddddd00;
+}
+
+.rankFallback {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #f0f0f0;
+  border-radius: 4px;
+  border: 1px solid #ddd;
+}
+
+.rankIcon {
+  font-size: 18px;
+}
+
+.rankText {
+  font-weight: 500;
+}
+
+/* Form rank display */
+.rankDisplay {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.formRankImage {
+  width: 50px;
+  height: 50px;
+  object-fit: contain;
+  border-radius: 4px;
+  background-color: #f0f0f0;
+  padding: 2px;
+  border: 1px solid #ddd;
+}
+
+/* For the dropdown options with images */
+.TSFormGroup option {
+  padding: 8px;
+}
+
+/* Table rank column styling */
+.TSTable td:nth-child(2) {
+  min-width: 180px;
+}
+/* ===== TABLE CONTAINER WITH SCROLLBAR ===== */
+.TSTableContainer {
+  width: 101%;
+  max-width: auto;
+  overflow-x: auto; /* Enable horizontal scrolling */
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+  border-radius: 12px;
+  box-shadow: 0 5px 4px rgba(16, 95, 175, 0.597);
+  background: #fff;
+  position: relative;
+  margin: -10px;
+padding-top: 30px;
+  margin-top: 20px;
+
+}
+
+/* Scrollbar styling - exactly like Personnel Register */
+.TSTableContainer::-webkit-scrollbar {
+  height: 10px;
+}
+
+.TSTableContainer::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 0 0 10px 10px;
+}
+
+.TSTableContainer::-webkit-scrollbar-thumb {
+  background: #529ae1;
+  border-radius: 10px;
+}
+
+.TSTableContainer::-webkit-scrollbar-thumb:hover {
+  background: #1060af;
+}
+
+/* ===== TABLE STYLES ===== */
+.TSTable {
+  width: auto !important; /* Change from 105% to auto */
+  min-width: 100%; /* Add this to make table fill container */
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 14px;
+  background: #fff;
+  border-radius: 12px;
+  text-align: center;
+  margin: 0; /* Remove negative margin */
+  box-shadow: none; /* Remove shadow since container has it */
+}
+
+/* Keep the table header sticky */
+.TSTable thead {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.TSTable thead tr {
+  background: var(--bg-header);
+}
+
+.TSTable th {
+  padding: 14px 16px;
+  text-align: center;
+  font-weight: bold;
+  font-size: 15px;
+  letter-spacing: 0.5px;
+  color: var(--text-primary);
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #529ae1;
+  white-space: nowrap; /* Prevent header text from wrapping */
+}
+
+.TSTable tbody td {
+  background: var(--bg-main);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.585);
+  color: var(--text-primary);
+  transition: background 0.25s ease;
+  padding: 12px 16px;
+  text-align: center;
+  white-space: nowrap; /* Prevent cell content from wrapping */
+}
+
+/* Update your existing row alternating colors */
+.TSTable tbody tr:nth-child(even) td {
+  background: #81878c;
+  color: var(--text-secondary, #fff);
+}
+
+.TSTable tbody tr:nth-child(even):hover td {
+  background: var(--accent);
+}
+
+.TSTable tbody tr:nth-child(odd) td {
+  background: rgba(255, 255, 255, 0.95);
+}
+
+.TSTable tbody tr:nth-child(odd):hover td {
+  background: var(--accent);
+}
+
+/* Row hover effects */
+.TSTable tbody tr {
+  transition: transform 0.25s ease, box-shadow 0.25s ease, background 0.25s ease;
+}
+
+.TSTable tbody tr:hover {
+  background: #549ee9;
+  color: #fff;
+  transform: translateY(-4px) scale(1.01);
+  box-shadow: 0 4px 8px rgba(33, 17, 17, 0.914), 0 8px 16px rgba(0, 0, 0, 0.1);
+  z-index: 5;
+  position: relative;
+}
+
+.TSTable tbody tr:hover td {
+  background: #549ee9 !important;
+  color: #fff;
+}
+
+/* Update the pagination container position */
+.TSPaginationContainer {
+  display: flex;
+  justify-content: flex-end;
+  margin: 10px;
+  margin-top: 51px;
+  margin-bottom: 10px;
+  gap: 10px;
+  padding-right: 10px;
+  position: relative;
+  left: 0; /* Remove left positioning */
+  bottom: 0; /* Remove bottom positioning */
+}
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .rankCell {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+  
+  .rankImage {
+    width: 24px;
+    height: 24px;
+  }
+  
+  .rankFallback {
+    width: 24px;
+    height: 24px;
+  }
+  
+  .TSTable td:nth-child(2) {
+    min-width: 150px;
+  }
+}
 .TSAddBtn:hover {
   background: linear-gradient(135deg, #0d4d8c, #3e76e6);
   transform: translateY(-2px);
@@ -579,9 +799,103 @@ bottom: 10px;
 /* ===== NO REQUESTS TABLE ===== */
 .TSNoRequestsTable {
   text-align: center;
-  padding: 60px 20px;
+  padding: 60px 20px !important; /* Add !important to override td padding */
   background: #f8f9fa;
   color: #6c757d;
+  border-radius: 0 0 12px 12px;
+}
+.TSNoRequestsTable h3 {
+  margin: 0 0 10px 0;
+  color: #495057;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.TSNoRequestsTable p {
+  margin: 0;
+  font-size: 14px;
+  color: #6c757d;
+}
+/* Add these styles to your Trainings.module.css */
+
+/* Personnel Photo Cell */
+.personnelPhotoCell {
+  width: 80px;
+  padding: 4px !important;
+}
+
+.personnelPhotoContainer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 2px solid #e0e0e0;
+  background: #f5f5f5;
+}
+
+.personnelPhotoThumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+.personnelPhotoLoading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+
+.personnelPhotoSpinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid #f3f3f3;
+  border-top: 2px solid #ff9500;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 4px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Update table layout for the new photo column */
+.TSTable th:first-child,
+.TSTable td:first-child {
+  width: 80px;
+  min-width: 80px;
+}
+
+/* Update the table header for the new column */
+.TSTable thead tr th:first-child {
+  text-align: center;
+}
+
+/* Update no requests table colspan */
+.TSNoRequestsTable {
+  text-align: center;
+  padding: 40px !important;
+}
+
+/* Make sure the table accommodates the new column */
+.TSTableContainer {
+  overflow-x: auto;
+}
+/* ===== NO REQUESTS TABLE ===== */
+.TSNoRequestsTable {
+  text-align: center;
+  padding: 60px 20px !important; /* Add !important to override td padding */
+  background: #f8f9fa;
+  color: #6c757d;
+  border-radius: 0 0 12px 12px;
 }
 
 .TSNoRequestsTable h3 {
@@ -596,7 +910,23 @@ bottom: 10px;
   font-size: 14px;
   color: #6c757d;
 }
-
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .personnelPhotoCell {
+    width: 60px;
+  }
+  
+  .personnelPhotoContainer {
+    width: 50px;
+    height: 50px;
+  }
+  
+  .TSTable th:first-child,
+  .TSTable td:first-child {
+    width: 60px;
+    min-width: 60px;
+  }
+}
 /* ===== PAGINATION STYLES ===== */
 .TSPaginationContainer {
   display: flex;

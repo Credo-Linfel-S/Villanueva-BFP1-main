@@ -15,11 +15,13 @@ import {
 } from "../../utils/leaveDocumentUpload.js";
 import { fillLeaveFormEnhanced } from "../../utils/pdfLeaveFormFiller.js";
 import BFPPreloader from "../../BFPPreloader.jsx";
-
+import FloatingNotificationBell from "../../FloatingNotificationBell.jsx";
+import { useUserId } from "../../hooks/useUserId.js";
 const LeaveRecords = () => {
   const [leaveData, setLeaveData] = useState([]);
   const [yearlyRecords, setYearlyRecords] = useState([]);
   const [loading, setLoading] = useState(true);
+  const { userId, isAuthenticated, userRole } = useUserId();
   const [preloaderProgress, setPreloaderProgress] = useState(0);
   const [noData, setNoData] = useState(false);
   const [viewMode, setViewMode] = useState("current");
@@ -54,7 +56,15 @@ const LeaveRecords = () => {
     new Date().getFullYear().toString()
   );
   const [archiveConfirmText, setArchiveConfirmText] = useState("");
+  const getRankImage = (rank) => {
+    // Find the rank in your rankOptions array
+    const rankOption = rankOptions.find(
+      (r) => r.rank.toUpperCase() === rank?.toUpperCase()
+    );
 
+    // Return the image URL if found, otherwise return null
+    return rankOption?.image || null;
+  };
   // State variables for table functionality
   const [currentPage, setCurrentPage] = useState(1);
   const rowsPerPage = 5;
@@ -2219,6 +2229,8 @@ const LeaveRecords = () => {
   // NEW: Function to render table row with checkbox for bulk delete mode
   const renderTableRow = (record) => {
     const isSelected = selectedRecords.includes(record.id);
+    // Add this line: Get the rank image for this specific record
+    const rankImage = getRankImage(record.rank);
 
     if (isBulkDeleteMode && viewMode === "yearly") {
       return (
@@ -2232,7 +2244,21 @@ const LeaveRecords = () => {
             />
           </td>
           <td>{record.fullName}</td>
-          <td>{record.rank}</td>
+          <td>
+            <div className={styles.rankCell}>
+              {rankImage && (
+                <img
+                  src={rankImage}
+                  alt={record.rank}
+                  className={styles.rankImage}
+                  onError={(e) => {
+                    e.target.style.display = "none";
+                  }}
+                />
+              )}
+              <span className={styles.rankText}>{record.rank}</span>
+            </div>
+          </td>
           <td>{record.badgeNumber}</td>
           <td>{record.station}</td>
           <td>
@@ -2287,7 +2313,21 @@ const LeaveRecords = () => {
     return (
       <tr key={record.id}>
         <td>{record.fullName}</td>
-        <td>{record.rank}</td>
+        <td>
+          <div className={styles.rankCell}>
+            {rankImage && (
+              <img
+                src={rankImage}
+                alt={record.rank}
+                className={styles.rankImage}
+                onError={(e) => {
+                  e.target.style.display = "none";
+                }}
+              />
+            )}
+            <span className={styles.rankText}>{record.rank}</span>
+          </div>
+        </td>
         <td>{record.badgeNumber}</td>
         <td>{record.station}</td>
         <td>
@@ -2725,7 +2765,7 @@ const LeaveRecords = () => {
 
     const isYearly = selectedRecordDetails.recordType === "yearly";
     const record = selectedRecordDetails;
-
+  const rankImage = getRankImage(record.rank);
     return (
       <div className={styles.modalOverlay}>
         <div className={styles.modalContent}>
@@ -2752,7 +2792,21 @@ const LeaveRecords = () => {
                 </div>
                 <div className={styles.modalDetailItem}>
                   <span className={styles.modalLabel}>Rank:</span>
-                  <span className={styles.modalValue}>{record.rank}</span>
+                  <span className={styles.modalValue}>
+                    <div className={styles.rankCell}>
+                      {rankImage && (
+                        <img
+                          src={rankImage}
+                          alt={record.rank}
+                          className={styles.rankImage}
+                          onError={(e) => {
+                            e.target.style.display = "none";
+                          }}
+                        />
+                      )}
+                      <span className={styles.rankText}>{record.rank}</span>
+                    </div>
+                  </span>
                 </div>
                 <div className={styles.modalDetailItem}>
                   <span className={styles.modalLabel}>Badge Number:</span>
@@ -3150,6 +3204,7 @@ const LeaveRecords = () => {
     <div className={styles.leaveAppContainer}>
       <Title>Leave Records | BFP Villanueva</Title>
       <Meta name="robots" content="noindex, nofollow" />
+      <FloatingNotificationBell userId={userId} />
 
       <Hamburger />
       <Sidebar />
@@ -3209,7 +3264,6 @@ const LeaveRecords = () => {
                     ))
                   )}
                 </select>
-              
               </div>
             )}
           </div>
@@ -3363,3 +3417,54 @@ const LeaveRecords = () => {
 };
 
 export default LeaveRecords;
+ const rankOptions = [
+   {
+     rank: "FO1",
+     name: "Fire Officer 1",
+     image: `${
+       import.meta.env.VITE_SUPABASE_URL
+     }/storage/v1/object/public/rank_images/FO1.png`,
+   },
+   {
+     rank: "FO2",
+     name: "Fire Officer 2",
+     image: `${
+       import.meta.env.VITE_SUPABASE_URL
+     }/storage/v1/object/public/rank_images/FO2.png`,
+   },
+   {
+     rank: "FO3",
+     name: "Fire Officer 3",
+     image: `${
+       import.meta.env.VITE_SUPABASE_URL
+     }/storage/v1/object/public/rank_images/FO3.png`,
+   },
+   {
+     rank: "SFO1",
+     name: "Senior Fire Officer 1",
+     image: `${
+       import.meta.env.VITE_SUPABASE_URL
+     }/storage/v1/object/public/rank_images/SFO1.png`,
+   },
+   {
+     rank: "SFO2",
+     name: "Senior Fire Officer 2",
+     image: `${
+       import.meta.env.VITE_SUPABASE_URL
+     }/storage/v1/object/public/rank_images/SFO2.png`,
+   },
+   {
+     rank: "SFO3",
+     name: "Senior Fire Officer 3",
+     image: `${
+       import.meta.env.VITE_SUPABASE_URL
+     }/storage/v1/object/public/rank_images/SFO3.png`,
+   },
+   {
+     rank: "SFO4",
+     name: "Senior Fire Officer 4",
+     image: `${
+       import.meta.env.VITE_SUPABASE_URL
+     }/storage/v1/object/public/rank_images/SFO4.png`,
+   },
+ ];

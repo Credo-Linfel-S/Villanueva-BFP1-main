@@ -10,11 +10,11 @@
     "preview": "vite preview",
     "cron:run": "node server/cron/monthly-accrual.js",
     "cron:start": "node server/cron/scheduler.js",
-      "cron:test": "node -r dotenv/config server/test.js dotenv_config_path=server/.env"
+    "cron:test": "node -r dotenv/config server/test.js dotenv_config_path=server/.env"
   },
   "dependencies": {
     "@floating-ui/react": "^0.27.16",
-    "@supabase/supabase-js": "^2.86.2",
+    "@supabase/supabase-js": "^2.89.0",
     "axios": "^1.13.2",
     "dotenv": "^16.6.1",
     "firebase": "^12.7.0",

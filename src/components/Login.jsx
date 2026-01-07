@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "./AuthContext";
 import { Title, Meta } from "react-head";
@@ -17,10 +17,16 @@ import {
   Lock as LockIcon,
   Key,
   UserCheck,
+  Info,
+  ShieldAlert,
+  Copyright,
+  FileWarning,
+  X,
+  Clock3,
 } from "lucide-react";
 import "./Login.css";
 import { supabase } from "../lib/supabaseClient";
-
+import logo from "../assets/OPSCORE.png";
 const Login = () => {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -31,10 +37,19 @@ const Login = () => {
     message: "",
     type: "info", // 'success', 'warning', 'error', 'info'
   });
+
+  // UPDATED: Enhanced notice modal state
+  const [noticeModal, setNoticeModal] = useState({
+    show: false,
+    title: "📌 Important Notice: Use of Generated Assets",
+    message: "",
+    acknowledged: false,
+  });
+
   const [isLocked, setIsLocked] = useState(false);
   const [loginButtonText, setLoginButtonText] = useState("Login");
   const [shake, setShake] = useState(false);
-  const [attemptStatus, setAttemptStatus] = useState(null); // Track current attempt status
+  const [attemptStatus, setAttemptStatus] = useState(null);
   const navigate = useNavigate();
   const { login: authLogin } = useAuth();
 
@@ -42,6 +57,21 @@ const Login = () => {
   const [securityData, setSecurityData] = useState(null);
   const [loadingSecurity, setLoadingSecurity] = useState(true);
   const [loading, setLoading] = useState(false);
+
+  // UPDATED: Enhanced idle timer
+  const idleTimerRef = useRef(null);
+  const lastActivityRef = useRef(Date.now());
+  const idleWarningRef = useRef(null);
+  const [timeRemaining, setTimeRemaining] = useState(60);
+  const [showIdleWarning, setShowIdleWarning] = useState(false);
+  const activityEvents = [
+    "mousemove",
+    "keydown",
+    "click",
+    "scroll",
+    "touchstart",
+    "mousedown",
+  ];
 
   const MAX_ATTEMPTS = 3;
   const MAX_LOCKOUTS = 3;
@@ -71,7 +101,190 @@ const Login = () => {
     }
   }, [clientIp]);
 
-  // Load security data
+  // UPDATED: Enhanced effect for showing notice modal
+  useEffect(() => {
+    // Check if user has already acknowledged the notice
+    const hasAcknowledged = localStorage.getItem("bfp_notice_acknowledged");
+
+    if (!hasAcknowledged) {
+      // Show notice modal after a short delay
+      const timer = setTimeout(() => {
+        showNoticeModal();
+      }, 2000);
+
+      return () => clearTimeout(timer);
+    }
+  }, []);
+
+  // UPDATED: Enhanced effect for idle time tracking
+  useEffect(() => {
+    if (noticeModal.show) {
+      // Reset timer
+      setTimeRemaining(60);
+      setShowIdleWarning(false);
+
+      // Clear existing timers
+      if (idleTimerRef.current) clearInterval(idleTimerRef.current);
+      if (idleWarningRef.current) clearTimeout(idleWarningRef.current);
+
+      // Start idle timer
+      idleTimerRef.current = setInterval(() => {
+        const now = Date.now();
+        const idleTime = now - lastActivityRef.current;
+
+        if (idleTime >= 50000 && !showIdleWarning) {
+          // 50 seconds
+          setShowIdleWarning(true);
+          idleWarningRef.current = setTimeout(() => {
+            closeNoticeModal();
+          }, 10000); // Close after 10 more seconds
+        }
+
+        // Update countdown
+        const remaining = Math.max(0, 60 - Math.floor(idleTime / 1000));
+        setTimeRemaining(remaining);
+
+        if (idleTime >= 60000) {
+          // 1 minute
+          closeNoticeModal();
+        }
+      }, 1000);
+
+      // Add activity listeners
+      activityEvents.forEach((event) => {
+        window.addEventListener(event, updateLastActivity);
+      });
+
+      // Cleanup function
+      return () => {
+        if (idleTimerRef.current) clearInterval(idleTimerRef.current);
+        if (idleWarningRef.current) clearTimeout(idleWarningRef.current);
+        activityEvents.forEach((event) => {
+          window.removeEventListener(event, updateLastActivity);
+        });
+      };
+    }
+  }, [noticeModal.show]);
+
+  // Function to update last activity time
+  const updateLastActivity = () => {
+    lastActivityRef.current = Date.now();
+    if (showIdleWarning) {
+      setShowIdleWarning(false);
+      if (idleWarningRef.current) {
+        clearTimeout(idleWarningRef.current);
+      }
+    }
+  };
+
+  // UPDATED: Enhanced function to show notice modal
+  const showNoticeModal = () => {
+    setNoticeModal({
+      show: true,
+      title: "📌 Important Notice: Use of Generated Assets",
+      message: `
+
+## Generated Visual Assets
+
+All rank insignias, badges, icons, logos, and visual elements displayed in this system are:
+📌Digitally generated for demonstration purposes
+📌Not official BFP representations
+📌Not authorized for operational use
+📌Not intended for identification or official government purposes
+
+## Intellectual Property Disclaimer
+
+The developers do not claim ownership of any official BFP trademarks, insignias, or intellectual property. All official BFP symbols remain the exclusive property of the Bureau of Fire Protection.
+
+## Purpose Statement
+
+This project is developed strictly for:
+📌Academic requirements fulfillment
+📌System functionality demonstration
+📌Interface design visualization
+📌Educational technology showcase
+
+## User Acknowledgement
+
+By continuing to use this system, you acknowledge that this is a demonstration project and not an official government system.`,
+      acknowledged: false,
+    });
+
+    // Reset last activity
+    lastActivityRef.current = Date.now();
+  };
+
+  // UPDATED: Enhanced function to close notice modal
+  const closeNoticeModal = (permanent = false) => {
+    if (permanent) {
+      localStorage.setItem("bfp_notice_acknowledged", "true");
+      setNoticeModal((prev) => ({ ...prev, acknowledged: true }));
+    }
+
+    setNoticeModal({
+      show: false,
+      title: "",
+      message: "",
+      acknowledged: false,
+    });
+
+    if (idleTimerRef.current) {
+      clearInterval(idleTimerRef.current);
+      idleTimerRef.current = null;
+    }
+
+    if (idleWarningRef.current) {
+      clearTimeout(idleWarningRef.current);
+      idleWarningRef.current = null;
+    }
+
+    setShowIdleWarning(false);
+  };
+
+  // Click outside handler for the notice modal
+  const handleNoticeOverlayClick = (e) => {
+    if (e.target.classList.contains("notice-modal-overlay")) {
+      // Don't close on overlay click - require explicit acknowledgement
+      showModal(
+        "Notice Acknowledgement Required",
+        "Please read and acknowledge the notice before proceeding.",
+        "info"
+      );
+    }
+  };
+
+  // Helper function to render markdown-like text
+  const renderNoticeMessage = (message) => {
+    const lines = message.split("\n");
+    return lines.map((line, index) => {
+      if (line.startsWith("## ")) {
+        return (
+          <h4 key={index} className="notice-section-title">
+            {line.replace("## ", "")}
+          </h4>
+        );
+      } else if (line.startsWith("**") && line.endsWith("**")) {
+        return (
+          <strong key={index} className="notice-bold">
+            {line.replace(/\*\*/g, "")}
+          </strong>
+        );
+      } else if (line.trim() === "") {
+        return <br key={index} />;
+      } else {
+        return (
+          <p key={index} className="notice-paragraph">
+            {line}
+          </p>
+        );
+      }
+    });
+  };
+
+  // Rest of the existing functions remain the same...
+  // [Keep all the existing functions from the previous code]
+  // ... (loadSecurityData, handleSecurityData, createSecurityRecord, etc.)
+
   const loadSecurityData = async () => {
     try {
       setLoadingSecurity(true);
@@ -564,6 +777,12 @@ const Login = () => {
     if (e.key === "Enter") {
       handleLogin();
     }
+    updateLastActivity();
+  };
+
+  const handleInputChange = (setter) => (e) => {
+    setter(e.target.value);
+    updateLastActivity();
   };
 
   if (loadingSecurity) {
@@ -600,7 +819,7 @@ const Login = () => {
       <div className="login-left">
         <div className="logo-container">
           <div className="logo-wrapper">
-            <h1>Bureau of Fire Protection</h1>
+            <h1 className="h1text">Bureau of Fire Protection</h1>
             <h2>Villanueva Fire Station</h2>
             <p className="tagline">
               Serving with Courage, Protecting with Care
@@ -688,7 +907,7 @@ const Login = () => {
                   id="username"
                   type="text"
                   value={username}
-                  onChange={(e) => setUsername(e.target.value)}
+                  onChange={handleInputChange(setUsername)}
                   onKeyPress={handleKeyPress}
                   required
                   placeholder=" "
@@ -712,7 +931,7 @@ const Login = () => {
                   id="password"
                   type={showPassword ? "text" : "password"}
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={handleInputChange(setPassword)}
                   onKeyPress={handleKeyPress}
                   required
                   placeholder=" "
@@ -729,7 +948,10 @@ const Login = () => {
                 <button
                   type="button"
                   className="password-toggle"
-                  onClick={() => setShowPassword(!showPassword)}
+                  onClick={() => {
+                    setShowPassword(!showPassword);
+                    updateLastActivity();
+                  }}
                   aria-label={showPassword ? "Hide password" : "Show password"}
                 >
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -780,7 +1002,10 @@ const Login = () => {
 
             <button
               className={`login-button ${attemptStatus ? attemptStatus : ""}`}
-              onClick={handleLogin}
+              onClick={() => {
+                handleLogin();
+                updateLastActivity();
+              }}
               disabled={
                 isLocked ||
                 (securityData?.brute_force_until &&
@@ -820,13 +1045,6 @@ const Login = () => {
           </div>
 
           <div className="login-footer">
-            <div className="footer-links">
-              <a href="#forgot">Forgot Password?</a>
-              <span>•</span>
-              <a href="#help">Need Help?</a>
-              <span>•</span>
-              <a href="#policy">Security Policy</a>
-            </div>
             <div className="system-info">
               <span>System v1.5.2</span>
               <span className="status-dot active"></span>
@@ -852,7 +1070,7 @@ const Login = () => {
               {modal.type === "info" && (
                 <AlertCircle className="modal-icon-log" size={28} />
               )}
-              <h3>{modal.title}</h3>
+              <h3 className={`modal-title-${modal.type}`}>{modal.title}</h3>
             </div>
             <p>{modal.message}</p>
             <button
@@ -862,6 +1080,170 @@ const Login = () => {
             >
               {modal.type === "success" ? "Continue" : "OK"}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* UPDATED: Enhanced Notice Modal with Logo at the top of the sentence */}
+      {noticeModal.show && (
+        <div
+          className="notice-modal-overlay"
+          onClick={handleNoticeOverlayClick}
+        >
+          <div
+            className="notice-modal-content"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="notice-modal-header">
+              <div className="notice-header-logo">
+                <img src={logo} alt="OPSCORE Logo" className="notice-logo" />
+              </div>
+              <div className="notice-header-content">
+                <h3>{noticeModal.title}</h3>
+                <div className="notice-subtitle">
+                  <Info size={14} />
+                  <span>Educational System • Demonstration Only</span>
+                </div>
+              </div>
+              <button
+                className="notice-modal-close"
+                onClick={() => closeNoticeModal(false)}
+                aria-label="Close notice"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="notice-alert-banner">
+              <div className="banner-content">
+                <FileWarning size={20} />
+                <span>
+                  <strong>Important Disclaimer:</strong> All visual assets in
+                  this system are digitally generated for demonstration purposes
+                  only and do not represent official BFP materials.
+                </span>
+              </div>
+            </div>
+            <div className="notice-modal-body">
+              {/* UPDATED: Logo at the top of the sentence */}
+              <div className="notice-top-section">
+                <div className="notice-logo-sentence">
+                  <div className="sentence-logo">
+                    <img
+                      src={logo}
+                      alt="OPSCORE Logo"
+                      className="sentence-logo-img"
+                    />
+                  </div>
+                  <div className="sentence-content">
+                    <h4 className="sentence-title">About OPSCORE</h4>
+                    <p className="sentence-text">
+                      <strong>OPSCORE</strong> is a capstone project developed
+                      for educational purposes only. This system demonstrates
+                      modern web application development concepts and is{" "}
+                      <strong>not</strong> an official Bureau of Fire Protection
+                      (BFP) system.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="notice-content">
+                {renderNoticeMessage(noticeModal.message)}
+              </div>
+
+              <div className="notice-highlights">
+                <div className="notice-highlight">
+                  <div className="highlight-icon">🎓</div>
+                  <span>Academic Project</span>
+                  <p className="highlight-description">
+                    Developed for educational requirements
+                  </p>
+                </div>
+                <div className="notice-highlight">
+                  <div className="highlight-icon">🖼️</div>
+                  <span>Generated Assets</span>
+                  <p className="highlight-description">
+                    All visuals are for demonstration only
+                  </p>
+                </div>
+                <div className="notice-highlight">
+                  <div className="highlight-icon">⚠️</div>
+                  <span>Not Official BFP</span>
+                  <p className="highlight-description">
+                    Not an official government system
+                  </p>
+                </div>
+              </div>
+
+              <div className="notice-project-info">
+                <div className="project-logo-container">
+                  <img
+                    src={logo}
+                    alt="OPSCORE Project Logo"
+                    className="project-logo"
+                  />
+                  <div className="project-details">
+                    <h4>OPSCORE Project</h4>
+                    <p>Capstone Development • Web Application Demonstration</p>
+                    <p className="project-version">
+                      Version 1.5.2 • Educational Use Only
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="notice-modal-footer">
+              <div className="notice-footer-left">
+                <div className="idle-timer">
+                  <Clock3 size={16} />
+                  <span>
+                    Auto-close in: <strong>{timeRemaining}s</strong>
+                  </span>
+                  {showIdleWarning && (
+                    <div className="idle-warning">
+                      ⚡ Stay active to keep this notice open
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="notice-footer-right">
+                <button
+                  className="notice-tertiary-btn"
+                  onClick={() =>
+                    showModal(
+                      "Contact Information",
+                      "For questions about this project, please contact the development team.",
+                      "info"
+                    )
+                  }
+                >
+                  <Info size={16} />
+                  Questions?
+                </button>
+                <button
+                  className="notice-secondary-btn"
+                  onClick={() => closeNoticeModal(false)}
+                >
+                  Read Later
+                </button>
+                <button
+                  className="notice-primary-btn"
+                  onClick={() => closeNoticeModal(true)}
+                >
+                  <CheckCircle size={18} />I Understand & Acknowledge
+                </button>
+              </div>
+            </div>
+
+            <div className="notice-footer-note">
+              <Copyright size={12} />
+              <span>
+                All official BFP symbols and trademarks are property of the
+                Bureau of Fire Protection
+              </span>
+            </div>
           </div>
         </div>
       )}

@@ -9,13 +9,15 @@ import BFPPreloader from "../../BFPPreloader.jsx";
 import { filterActivePersonnel } from "../../filterActivePersonnel.js"; // Import the utility
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import FloatingNotificationBell from "../../FloatingNotificationBell.jsx";
+import { useUserId } from "../../hooks/useUserId.js";
 const Promotion = () => {
   const [personnel, setPersonnel] = useState([]);
   const [filteredPersonnel, setFilteredPersonnel] = useState([]);
   const [loading, setLoading] = useState(true);
   const [preloaderProgress, setPreloaderProgress] = useState(0);
   const { isSidebarCollapsed } = useSidebar();
-
+const { userId, isAuthenticated, userRole } = useUserId();
   // State variables for table functionality
   const [currentPage, setCurrentPage] = useState(1);
   const rowsPerPage = 5;
@@ -513,7 +515,7 @@ const Promotion = () => {
     <div className={styles.QoPContainer}>
       <Title>Promotion | BFP Villanueva</Title>
       <Meta name="robots" content="noindex, nofollow" />
-
+      <FloatingNotificationBell userId={userId} />
       <Hamburger />
       <Sidebar />
       <div className={`main-content ${isSidebarCollapsed ? "collapsed" : ""}`}>
@@ -567,9 +569,9 @@ const Promotion = () => {
           >
             <h3>Active Personnel</h3>
             <p>{totalItems}</p>
-            <small className={styles.summaryNote}>
+            <span className={styles.summaryNote}>
               (Retired/Resigned excluded)
-            </small>
+            </span>
           </button>
           <button
             className={`${styles.QoPSummaryCard} ${styles.QoPEligible} ${
@@ -579,9 +581,9 @@ const Promotion = () => {
           >
             <h3>Eligible for Promotion</h3>
             <p>{eligibleItems}</p>
-            <medium className={styles.summaryNote}>
+            <span className={styles.summaryNote}>
               2 years and above in current rank
-            </medium>
+            </span>
           </button>
           <button
             className={`${styles.QoPSummaryCard} ${styles.QoPNotEligible} ${
@@ -591,9 +593,9 @@ const Promotion = () => {
           >
             <h3>Not Yet Eligible</h3>
             <p>{notEligibleItems}</p>
-            <medium className={styles.summaryNote}>
+            <span className={styles.summaryNote}>
               Less than in 2 years in current rank
-            </medium>
+            </span>
           </button>
         </div>
 

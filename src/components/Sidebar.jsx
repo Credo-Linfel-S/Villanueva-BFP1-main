@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import { useSidebar } from "./SidebarContext";
+import logo from "../assets/background.png";
 
 const Sidebar = () => {
   const { isSidebarCollapsed, expandSidebar, currentTheme, toggleTheme } =
@@ -197,7 +198,7 @@ const Sidebar = () => {
           onClick={(e) => handleTabClick(e, "/admin")}
         >
           <img
-            src="/src/assets/background.png"
+            src={logo}
             alt="Logo"
             style={{
               height: "30px",
