@@ -28,4 +28,4 @@ jobs:
         run: npm ci
       
       - name: Run quick recruitment check
-        run: node .github/workflows/scripts/quick-recruitment-check.js  # ← CHANGED THIS LINE
+        run: node ./cron/quick-recruitment-check.js  # ← CHANGED THIS LINE
