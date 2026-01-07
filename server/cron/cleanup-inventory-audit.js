@@ -1,4 +1,4 @@
-const { createClient } = require("@supabase/supabase-js");
+const { supabase } = require("../lib/supabaseClient");
 require("dotenv").config();
 const { program } = require("commander"); // Add commander for CLI options
 
