@@ -22,10 +22,17 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
       
-      - name: Install dependencies
+      - name: Debug environment variables
+        run: |
+          echo "SUPABASE_URL length: ${#SUPABASE_URL}"
+          echo "SUPABASE_SERVICE_ROLE_KEY length: ${#SUPABASE_SERVICE_ROLE_KEY}"
+          echo "SUPABASE_SERVICE_ROLE_KEY starts with 'eyJ'?: ${SUPABASE_SERVICE_ROLE_KEY:0:3}"
+      
+      - name: Install dependencies in server folder
+        working-directory: ./server
         run: npm ci
       
       - name: Run quick recruitment check
-        run: node server/cron/quick-recruitment-check.js  # ← CHANGED THIS LINE
+        working-directory: ./server
+        run: node cron/quick-recruitment-check.js  # ← FIXED PATH

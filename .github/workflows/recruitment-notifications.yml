@@ -31,8 +31,10 @@ jobs:
           echo ""
           echo "SUPABASE_SERVICE_ROLE_KEY starts with 'eyJ'? $(echo $SUPABASE_SERVICE_ROLE_KEY | head -c 3)"
       
-      - name: Install @supabase/supabase-js
-        run: npm install @supabase/supabase-js
+      - name: Install dependencies in server folder
+        working-directory: ./server
+        run: npm ci
       
       - name: Run recruitment notification checker
-        run: node server/cron/check-applicant-updates.js
+        working-directory: ./server
+        run: node cron/check-applicant-updates.js  # ← FIXED PATH

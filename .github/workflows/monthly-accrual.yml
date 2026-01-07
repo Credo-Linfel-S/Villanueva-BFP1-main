@@ -12,6 +12,10 @@ jobs:
   run-accrual:
     runs-on: ubuntu-latest
     
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}  # Fixed variable name
+    
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -21,16 +25,15 @@ jobs:
         with:
           node-version: '20'
       
-      - name: Install dependencies
+      - name: Debug environment variables
         run: |
-          cd server
-          npm install
+          echo "SUPABASE_URL length: ${#SUPABASE_URL}"
+          echo "SUPABASE_SERVICE_ROLE_KEY length: ${#SUPABASE_SERVICE_ROLE_KEY}"
+          echo "SUPABASE_SERVICE_ROLE_KEY starts with 'eyJ'?: ${SUPABASE_SERVICE_ROLE_KEY:0:3}"
       
-      - name: Create environment file
-        run: |
-          echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" > server/.env
-          echo "SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_KEY }}" >> server/.env
-          echo "NODE_ENV=production" >> server/.env
+      - name: Install dependencies in server folder
+        working-directory: ./server
+        run: npm ci
       
       - name: Check if it's January 1st
         id: check_date
@@ -50,21 +53,18 @@ jobs:
       
       - name: Run Annual Emergency Reset (January 1st only)
         if: steps.check_date.outputs.IS_NEW_YEAR == 'true'
+        working-directory: ./server
         run: |
-          cd server
           echo "🔄 RUNNING ANNUAL EMERGENCY LEAVE RESET"
           echo "Date: $(date)"
-          node ./cron/annual-reset.js
+          node cron/annual-reset.js
       
       - name: Run Monthly Accrual (All months including January)
+        working-directory: ./server
         run: |
-          cd server
           echo "🚀 RUNNING MONTHLY LEAVE ACCRUAL"
           echo "Date: $(date)"
-          node server/cron/monthly-accrual.js
-      
-      - name: Cleanup
-        run: rm -f server/.env
+          node cron/monthly-accrual.js
       
       - name: Success notification
         if: success()
