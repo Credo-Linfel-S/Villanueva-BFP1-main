@@ -1,7 +1,6 @@
 name: Hourly Recruitment Quick Check
 on:
   schedule:
-    # Runs every hour
     - cron: '0 * * * *'
   workflow_dispatch:
 
@@ -29,4 +28,4 @@ jobs:
         run: npm ci
       
       - name: Run quick recruitment check
-        run: node .github/workflows/scripts/quick-recruitment-check.js
+        run: node .github/scripts/quick-recruitment-check.js  # ← CHANGED THIS LINE
