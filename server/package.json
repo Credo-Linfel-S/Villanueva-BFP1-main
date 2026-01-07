@@ -18,11 +18,11 @@
     "create-workflow-scripts": "node scripts/create-workflow-scripts.js",
     
 
-    "check-pending-requests": "node cron/check-pending-requests.js",
-    "check-upcoming-inspections": "node cron/check-upcoming-inspections.js",
-    "check-new-applicants": "node cron/check-new-applicants.js",
-    "check-applicant-updates": "node cron/check-applicant-updates.js",
-    "daily-aggregator": "node cron/daily-aggregator.js",
+    "check-pending-requests": "node server/cron/check-pending-requests.js",
+    "check-upcoming-inspections": "node server/cron/check-upcoming-inspections.js",
+    "check-new-applicants": "node server/cron/check-new-applicants.js",
+    "check-applicant-updates": "node server/cron/check-applicant-updates.js",
+    "daily-aggregator": "node server/cron/daily-aggregator.js",
     "quick-recruitment-check": "node cron/quick-recruitment-check.js",
     
     "setup-workflows": "npm run create-workflow-scripts"
