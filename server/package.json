@@ -18,12 +18,15 @@
     "create-workflow-scripts": "node scripts/create-workflow-scripts.js",
     
 
+    "monthly-accrual": "node server/cron/monthly-accrual.js",
+    "annual-reset": "node server/cron/annual-reset.js",
     "check-pending-requests": "node server/cron/check-pending-requests.js",
     "check-upcoming-inspections": "node server/cron/check-upcoming-inspections.js",
     "check-new-applicants": "node server/cron/check-new-applicants.js",
     "check-applicant-updates": "node server/cron/check-applicant-updates.js",
     "daily-aggregator": "node server/cron/daily-aggregator.js",
-    "quick-recruitment-check": "node cron/quick-recruitment-check.js",
+    "quick-recruitment-check": "node server/cron/quick-recruitment-check.js",
+   
     
     "setup-workflows": "npm run create-workflow-scripts"
   }
