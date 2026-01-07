@@ -1,5 +1,5 @@
 // .github/scripts/check-pending-requests.js
-import { createClient } from "@supabase/supabase-js";
+const { createClient } = require("@supabase/supabase-js");
 
 // Get environment variables
 const supabaseUrl = process.env.SUPABASE_URL;
