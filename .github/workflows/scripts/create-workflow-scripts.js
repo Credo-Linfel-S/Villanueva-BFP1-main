@@ -1,6 +1,6 @@
 // scripts/create-workflow-scripts.js
-const fs = require("fs");
-const path = require("path");
+const fs = "fs";
+const path = "path";
 
 console.log("🚀 Creating GitHub Workflow scripts...");
 
