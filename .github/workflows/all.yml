@@ -1,9 +1,0 @@
-steps:
-  # ... other steps
-  - name: Install dependencies
-    working-directory: ./server
-    run: npm ci
-  
-  - name: Run script
-    working-directory: ./server
-    run: node .github/scripts/check-applicant-updates.js
