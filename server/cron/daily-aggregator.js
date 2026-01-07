@@ -1,5 +1,5 @@
 const { supabase } = require("../lib/supabaseClient");
-
+const adminUserId = "ddfe247f-234e-4960-a17d-29e0c929e1f1";
 async function createDailySummary() {
   try {
     console.log("📊 Creating daily summary...");
