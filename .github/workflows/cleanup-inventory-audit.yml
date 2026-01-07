@@ -23,16 +23,46 @@ jobs:
         with:
           node-version: '20'
       
+      - name: Debug GitHub Secrets First
+        run: |
+          echo "=== CHECKING GITHUB SECRETS ==="
+          echo "SUPABASE_URL exists: ${{ secrets.SUPABASE_URL != '' && 'YES' || 'NO' }}"
+          echo "SUPABASE_SERVICE_ROLE_KEY exists: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY != '' && 'YES' || 'NO' }}"
+          echo "SUPABASE_SERVICE_KEY exists: ${{ secrets.SUPABASE_SERVICE_KEY != '' && 'YES' || 'NO' }}"
+          echo ""
+          echo "=== TIP ==="
+          echo "If both are 'NO', you need to add the secrets in GitHub:"
+          echo "1. Go to: Settings → Secrets and variables → Actions"
+          echo "2. Add 'SUPABASE_SERVICE_ROLE_KEY' with your service_role key"
+      
       - name: Create .env file for server
         run: |
+          echo "=== CREATING .env FILE ==="
           echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" > server/.env
-          echo "SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY || secrets.SUPABASE_SERVICE_KEY }}" >> server/.env
+          echo "SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY || secrets.SUPABASE_SERVICE_KEY }}" >> server/.env  # FIXED THIS LINE
           echo "NODE_ENV=production" >> server/.env
           
-          # Debug: Show what was written
-          echo "=== .env file created ==="
-          echo "SUPABASE_URL length: $(echo ${{ secrets.SUPABASE_URL }} | wc -c)"
-          echo "SUPABASE_SERVICE_ROLE_KEY length: $(echo ${{ secrets.SUPABASE_SERVICE_ROLE_KEY || secrets.SUPABASE_SERVICE_KEY }} | wc -c)"
+          # Debug: Show what was written (masked)
+          echo ""
+          echo "=== .env FILE CREATED ==="
+          echo "SUPABASE_URL: $(echo ${{ secrets.SUPABASE_URL }} | head -c 20)..."
+          echo "SUPABASE_SERVICE_ROLE_KEY length: $(echo '${{ secrets.SUPABASE_SERVICE_ROLE_KEY || secrets.SUPABASE_SERVICE_KEY }}' | wc -c) chars"
+          echo "First 10 chars: $(echo '${{ secrets.SUPABASE_SERVICE_ROLE_KEY || secrets.SUPABASE_SERVICE_KEY }}' | head -c 10)"
+      
+      - name: Verify .env file
+        run: |
+          echo "=== VERIFYING .env FILE ==="
+          if [ -f "server/.env" ]; then
+            echo "✅ .env file exists"
+            echo ""
+            echo "Contents (masked):"
+            sed 's/=.*/=***MASKED***/' server/.env
+            echo ""
+            echo "Actual SUPABASE_SERVICE_ROLE_KEY line:"
+            grep SUPABASE_SERVICE_ROLE_KEY server/.env | sed 's/=.*/=***MASKED***/'
+          else
+            echo "❌ .env file NOT created!"
+          fi
       
       - name: Install dependencies in server folder
         working-directory: ./server
@@ -41,9 +71,25 @@ jobs:
       - name: Run cleanup script
         working-directory: ./server
         run: |
-          echo "Running cleanup script..."
+          echo "=== RUNNING CLEANUP SCRIPT ==="
           echo "Dry run mode: ${{ inputs.dry-run }}"
           
+          # First, check if supabaseClient.js will work
+          echo ""
+          echo "Testing supabaseClient.js..."
+          node -e "
+            try {
+              require('dotenv').config({ path: './.env' });
+              console.log('SUPABASE_URL:', process.env.SUPABASE_URL ? '✓ Set' : '✗ Missing');
+              console.log('SUPABASE_SERVICE_ROLE_KEY:', process.env.SUPABASE_SERVICE_ROLE_KEY ? '✓ Set' : '✗ Missing');
+              console.log('SUPABASE_SERVICE_KEY:', process.env.SUPABASE_SERVICE_KEY ? '✓ Set' : '✗ Missing');
+            } catch (error) {
+              console.error('Error:', error.message);
+            }
+          "
+          
+          echo ""
+          echo "Running main script..."
           if [ "${{ inputs.dry-run }}" = "true" ]; then
             node cron/cleanup-inventory-audit.js --dry-run
           else
@@ -51,4 +97,7 @@ jobs:
           fi
       
       - name: Cleanup .env file
-        run: rm -f server/.env
+        run: |
+          echo "Cleaning up .env file..."
+          rm -f server/.env
+          echo "✅ Cleanup complete"
