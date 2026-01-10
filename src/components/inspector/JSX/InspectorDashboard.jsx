@@ -553,33 +553,18 @@ const InspectorDashboard = () => {
           <div className={styles.INSHeader}>
             <div className={styles.headerContent}>
               <h1>
-                <Shield size={32} className={styles.headerIcon} />
+      
                 Inspector Dashboard
               </h1>
               <p className={styles.welcomeText}>
-                Welcome back! Here's your equipment accountability overview for{" "}
-                {currentDate.toLocaleDateString("en-US", {
+                Welcome back! Here's your equipment overview for{" "}
+                {currentDate.toLocaleDateString("en-PH", {
                   weekday: "long",
                   year: "numeric",
                   month: "long",
                   day: "numeric",
                 })}
               </p>
-            </div>
-            <div className={styles.headerActions}>
-              <button
-                className={`${styles.refreshBtn} ${
-                  statsLoading ? styles.loading : ""
-                }`}
-                onClick={loadDashboardSummary}
-                disabled={statsLoading}
-              >
-                <RefreshCw
-                  size={16}
-                  className={statsLoading ? styles.spinningIcon : ""}
-                />
-                {statsLoading ? "Refreshing..." : "Refresh Data"}
-              </button>
             </div>
           </div>
 
@@ -672,7 +657,7 @@ const InspectorDashboard = () => {
                   <DollarSign size={20} />
                 </div>
                 <span className={styles.statLabel}>
-                  Outstanding Accountability
+                 Personnel Accountability
                 </span>
               </div>
               <div className={styles.statMain}>
@@ -856,7 +841,7 @@ const InspectorDashboard = () => {
               </div>
               <div className={styles.quickStats}>
                 <div className={styles.quickStatItem}>
-                  <div className={styles.quickStatIcon}>
+                  <div className={styles.quickSttIcon}>
                     <Wrench size={18} />
                   </div>
                   <div className={styles.quickStatContent}>
@@ -1019,25 +1004,7 @@ const InspectorDashboard = () => {
             </div>
           </div>
 
-          {/* System Status Footer */}
-          <div className={styles.systemStatus}>
-            <div className={styles.statusItem}>
-              <span className={`${styles.statusDot} ${styles.healthy}`} />
-              <span>Database: Connected</span>
-            </div>
-            <div className={styles.statusItem}>
-              <span className={`${styles.statusDot} ${styles.healthy}`} />
-              <span>Last Updated: {new Date().toLocaleTimeString()}</span>
-            </div>
-            <div className={styles.statusItem}>
-              <span className={`${styles.statusDot} ${styles.healthy}`} />
-              <span>
-                Records Loaded:{" "}
-                {dashboardData.totalEquipment +
-                  dashboardData.pendingInspections}
-              </span>
-            </div>
-          </div>
+ 
         </div>
       </div>
     </>

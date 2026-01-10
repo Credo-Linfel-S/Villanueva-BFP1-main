@@ -130,7 +130,87 @@
   color: #333;
   font-size: 14px;
 }
+/* ================================
+    DATE/TIME INPUT FIXES
+  =============================== */
 
+/* Date row specific styling */
+.prFormRow.dateRow {
+  display:flex;
+
+  margin-bottom: 18px;
+}
+
+/* Make all date/time inputs consistent width */
+.prFormGroup .floatingInput[type="date"],
+.prFormGroup .floatingInput[type="time"] {
+  min-width: 200px;
+  max-width: 250;
+    padding-right: 50px;
+}
+
+/* Specific width for birth date */
+.prFormGroup:has(#birth-date) {
+  flex: 1;
+
+  min-width: 250px;
+  max-width: 300px;
+}
+
+/* Specific width for date hired */
+.prFormGroup:has(#date-hired) {
+  flex: 1;
+  min-width: 200px;
+  max-width: 250px;
+}
+
+/* Specific width for time hired */
+.prFormGroup:has(#hired-time) {
+  flex: 0 0 150px;
+  min-width: 150px;
+  max-width: 180px;
+}
+
+/* For edit modal date/time fields */
+#edit-form .prFormGroup:has(#edit-birth-date) {
+  flex: 1;
+  min-width: 250px;
+  max-width: 300px;
+}
+
+#edit-form .prFormGroup:has(#edit-date-hired) {
+  flex: 1;
+  min-width: 200px;
+  max-width: 250px;
+}
+
+#edit-form .prFormGroup:has(#edit-time-hired) {
+  flex: 0 0 150px;
+  min-width: 150px;
+  max-width: 180px;
+}
+.timeDisplay {
+  position: absolute;
+  right: 5px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: #f8f9fa;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid #dee2e6;
+  font-size: 11px;
+  color: #495057;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+/* Adjust for narrower time inputs */
+.prFormGroup:has(#hired-time) .timeDisplay,
+#edit-form .prFormGroup:has(#edit-time-hired) .timeDisplay {
+  right: 5px;
+  font-size: 10px;
+  padding: 1px 4px;
+}
 .leaveIcon {
   font-size: 16px;
 }
@@ -866,7 +946,7 @@
 /* Ensure the table has enough columns */
 
 .prTable {
-  width: 10%!important; /* Change from 98.5% to auto */
+  width: 100%!important; /* Change from 98.5% to auto */
 max-width: auto;
   padding: 20px;
   border-collapse: separate;
@@ -1181,41 +1261,38 @@ max-width: auto;
   display: none;
   position: fixed;
   z-index: 888;
-  left: 0;
   top: 0;
-  width: 200%;
   height: 100%;
-  
-    overflow-y:hidden;
   background-color: rgba(0, 0, 0, 0.5);
+  justify-content: center;
+  align-items: center;
+  transition: left 0.3s ease, width 0.3s ease; /* Smooth transition with sidebar */
 }
-
 .modal.show {
   display: flex !important;
   opacity: 1;
   transition: opacity 0.25s ease;
-  justify-content: center;
-  align-items: center;
 }
 
 .modalContent {
   background: #fff;
-  margin: 5% auto;
+  margin: 0 auto;
   padding: 20px 30px;
   border-radius: 10px;
   height: auto;
   max-height: 90vh;
-  width: 95%;
-  min-width: 800px;
+  width: 90%;
   max-width: 950px;
+  min-width: 800px;
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
-  position: relative;
-  left: -520px;
   overflow:hidden;
-  transform: none !important;
-  transition: none !important;
+  position: relative;
+  /* Remove the left positioning */
 }
-
+.sidebarCollapsed .modalContent {
+  transform: none !important;
+  /* No adjustment needed for sidebar collapsed state */
+}
 .modalHeader {
   position: relative;
   display: flex;
@@ -1493,7 +1570,91 @@ max-width: auto;
   background-color: rgba(255, 255, 255, 0);
   border: none;
 }
+/* ================================
+   DUAL TABLE FILTER STYLES
+   ================================ */
 
+.prFilterPanel {
+  background: #fff;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e0e0e0;
+}
+
+.prFilterRow {
+  display: flex;
+  gap: 15px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.prFilterGroup {
+  flex: 1;
+  min-width: 200px;
+}
+
+.prFilterInfo {
+  margin-top: 15px;
+  font-size: 14px;
+  color: #666;
+  font-style: italic;
+  text-align: center;
+  padding: 10px;
+  background: #f8f9fa;
+  border-radius: 4px;
+}
+
+/* Active Personnel specific filter colors */
+.prFilterPanel:has(+ .prTableBorder[style*="border-color: #FFC107"]) {
+  border-left: 4px solid #FFC107;
+}
+
+/* All Personnel specific filter colors */
+.prFilterPanel:has(+ .prTableBorder[style*="border-color: #2196F3"]) {
+  border-left: 4px solid #2196F3;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1200px) {
+  .prFilterGroup {
+    min-width: 180px;
+  }
+}
+
+@media (max-width: 992px) {
+  .prFilterGroup {
+    min-width: 150px;
+  }
+}
+
+@media (max-width: 768px) {
+  .prFilterRow {
+    flex-direction: column;
+  }
+  
+  .prFilterGroup {
+    min-width: 100%;
+  }
+}
+
+/* Table header colors for distinction */
+.prTableHeaderSection h2 {
+  border-left: 4px solid;
+  padding-left: 10px;
+}
+
+.prTableHeaderSection:first-of-type h2 {
+  border-color: #FFC107;
+  color: #FF9800;
+}
+
+.prTableHeaderSection:last-of-type h2 {
+  border-color: #2196F3;
+  color: #1976D2;
+}
 .rankModalClose:hover {
   color: #e63946;
 }
@@ -2045,17 +2206,16 @@ max-width: auto;
 /* Delete Modal Styles */
 .preModalDelete {
   position: fixed;
-  z-index: 100;
+  z-index: 1000;
   top: 0;
-  width: 110%;
   height: 100%;
   background: rgba(0, 0, 0, 0.6);
-
   display: flex;
   justify-content: center;
   align-items: center;
   padding: 20px;
   box-sizing: border-box;
+  transition: left 0.3s ease, width 0.3s ease;
 }
 
 .preModalContentDelete {
@@ -2067,8 +2227,8 @@ max-width: auto;
   overflow: hidden;
   animation: inventorySlideFadeIn 0.3s ease;
   position: relative;
-  left: 10px;
 }
+
 
 .preModalContentDelete::-webkit-scrollbar {
   display: none;
@@ -2078,7 +2238,7 @@ max-width: auto;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 20px 20px 0 20px;
+  padding: 15px 15px 0 20px;
   margin-bottom: 15px;
 }
 
@@ -2106,7 +2266,7 @@ max-width: auto;
   transition: all 0.25s ease;
   border-radius: 50%;
   position: relative;
-  left: 25px;
+  left: 20px;
   bottom: 20px;
 }
 
@@ -3689,29 +3849,371 @@ max-width: auto;
     opacity: 0.5;
     cursor: not-allowed;
   }
-  
-  /* Status modal */
+  /* Add to your PersonnelRegister.module.css */
+.statusBadgeTransferred {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+  background-color: #e3f2fd;
+  color: #1976d2;
+  border: 1px solid #90caf9;
+}
+
+.statusSummaryTransferred {
+  background: #e3f2fd;
+  color: #1976d2;
+  border: 1px solid #90caf9;
+}
+
+/* For the transfer action button */
+.prTransferBtn {
+  background-color: #2196f3;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-right: 5px;
+}
+
+.prTransferBtn:hover {
+  background-color: #1976d2;
+}
+
+.prTransferBtn.disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
+}
+/* In your PersonnelRegister.module.css */
+.statusModalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  /* Remove any fixed width/left positioning here since it's handled inline */
+}
+.statusModalOverlay[style*="left: 80px"] .statusModalContent,
+.statusModalOverlay[style*="left: 250px"] .statusModalContent {
+  margin: 0 auto;
+}
+@media (max-width: 768px) {
   .statusModalOverlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
+    left: 0 !important;
+    width: 100vw !important;
   }
   
   .statusModalContent {
-    background: white;
-    border-radius: 8px;
-    padding: 24px;
-    width: 90%;
-    max-width: 500px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    width: 95%;
+    margin: 10px;
   }
+}
+
+/* Password Modal specific styles - keep existing */
+.passwordChangeForm {
+  padding: 15px;
+}
+
+.passwordPreview {
+  margin-bottom: 20px;
+}
+
+.passwordInputGroup {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+/* Add to PersonnelRegister.module.css */
+.main-content .statusModalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+}
+
+.main-content .statusModalContent {
+  position: relative;
+  margin: auto;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+.passwordInput {
+  flex: 1;
+  padding: 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 16px;
+  font-family: monospace;
+}
+
+.passwordActions {
+  display: flex;
+  gap: 4px;
+}
+
+.passwordToggleBtn,
+.copyPasswordBtn {
+  padding: 10px 12px;
+  border: 1px solid #ddd;
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+}
+
+.passwordToggleBtn:hover,
+.copyPasswordBtn:hover:not(:disabled) {
+  background-color: #f5f5f5;
+}
+
+.copyPasswordBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.passwordStrength {
+  font-size: 12px;
+  color: #666;
+  text-align: center;
+  margin-top: 5px;
+}
+
+.passwordGuidelines {
+  background-color: #f9f9f9;
+  padding: 15px;
+  border-radius: 6px;
+  margin: 15px 0;
+}
+
+.passwordGuidelines h4 {
+  margin-top: 0;
+  margin-bottom: 10px;
+  color: #333;
+}
+
+.passwordGuidelines ul {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 14px;
+  color: #555;
+}
+
+.passwordGuidelines li {
+  margin-bottom: 5px;
+}
+
+.passwordWarning {
+  background-color: #fff3cd;
+  border: 1px solid #ffeaa7;
+  padding: 12px;
+  border-radius: 4px;
+  margin-top: 15px;
+}
+
+.passwordWarning p {
+  margin: 0;
+  font-size: 14px;
+  color: #856404;
+}
+
+/* Username Modal specific styles - keep existing */
+.usernameChangeForm {
+  padding: 5px;
+}
+
+.currentUsername {
+  background-color: #f0f0f0;
+  padding: 10px;
+  border-radius: 4px;
+  margin-bottom: 20px;
+}
+
+.currentUsername p {
+  margin: 0;
+  font-size: 15px;
+}
+
+.usernameInputGroup {
+  margin-bottom: 20px;
+}
+
+.usernameInputGroup label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 600;
+  color: #333;
+  font-size: 14px;
+}
+
+.usernameInput {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 16px;
+  box-sizing: border-box;
+  transition: border-color 0.3s;
+}
+
+.usernameInput:focus {
+  border-color: #4caf50;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
+}
+
+.usernameValidation {
+  margin-top: 5px;
+  font-size: 13px;
+}
+
+.usernameValidation small {
+  display: block;
+  padding: 4px 0;
+}
+
+.usernameGuidelines {
+  background-color: #f9f9f9;
+  padding: 15px;
+  border-radius: 6px;
+  margin: 15px 0;
+}
+
+.usernameGuidelines h4 {
+  margin-top: 0;
+  margin-bottom: 10px;
+  color: #333;
+  font-size: 15px;
+}
+
+.usernameGuidelines ul {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 14px;
+  color: #555;
+}
+
+.usernameGuidelines li {
+  margin-bottom: 6px;
+  line-height: 1.4;
+}
+
+.usernameWarning {
+  background-color: #fff3cd;
+  border: 1px solid #ffeaa7;
+  padding: 12px;
+  border-radius: 4px;
+  margin-top: 15px;
+}
+
+.usernameWarning p {
+  margin: 0;
+  font-size: 14px;
+  color: #856404;
+}
+
+/* Status modal base styles - keep existing */
+.statusModalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.statusModalTitle {
+  font-size: 20px;
+  font-weight: 600;
+  color: #1f2937;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.statusModalClose {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: #6b7280;
+}
+
+.statusModalBody {
+  margin-bottom: 20px;
+}
+
+.statusModalFooter {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.statusCancelBtn {
+  background: #f3f4f6;
+  color: #374151;
+  border: 1px solid #d1d5db;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.statusConfirmBtn {
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.statusConfirmBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.statusSpinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: white;
+  animation: spin 1s ease-in-out infinite;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.statusModalContent {
+  background: white;
+  border-radius: 8px;
+  padding: 5px;
+  width: 95%;
+  max-width: 500px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
   
   .statusModalHeader {
     display: flex;
@@ -4023,8 +4525,13 @@ max-width: auto;
   margin-bottom: 20px;
 }
 
+
 .currentUsername p {
   margin: 0;
+  font-size: 15px;
+}
+.usernameInputGroup {
+  margin-bottom: 20px;
 }
 
 .usernameInputGroup label {
@@ -4032,19 +4539,27 @@ max-width: auto;
   margin-bottom: 8px;
   font-weight: 600;
   color: #333;
+  font-size: 14px;
 }
 
 .usernameInputContainer {
   display: flex;
   gap: 8px;
 }
-
 .usernameInput {
-  flex: 1;
+  width: 100%;
   padding: 12px;
   border: 1px solid #ddd;
   border-radius: 4px;
   font-size: 16px;
+  box-sizing: border-box;
+  transition: border-color 0.3s;
+}
+
+.usernameInput:focus {
+  border-color: #4caf50;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
 }
 
 .suggestUsernameBtn {
@@ -4072,4 +4587,742 @@ max-width: auto;
 
 .usernameUnavailable {
   color: #f44336;
+}
+
+/* Delete Modal Personnel Information Styles */
+.personnelInfoPreview {
+  text-align: center;
+  margin-bottom: 25px;
+  padding: 20px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+}
+.personnelRankInfo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+.personnelRankImage {
+  width: 80px;
+  height: 80px;
+  object-fit: contain;
+  border-radius: 8px;
+  border: 2px solid #ddd;
+  background: white;
+  padding: 5px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.personnelRankText {
+  font-size: 16px;
+  font-weight: 600;
+  color: #2c3e50;
+  background: #e3f2fd;
+  padding: 5px 15px;
+  border-radius: 20px;
+  border: 1px solid #bbdefb;
+}
+
+.personnelFullName {
+  font-size: 20px;
+  font-weight: 700;
+  color: #2c3e50;
+  margin: 10px 0 5px 0;
+  padding: 10px;
+  background: white;
+  border-radius: 6px;
+  border-left: 4px solid #e74c3c;
+}
+
+.personnelBadgeNumber {
+  font-size: 15px;
+  color: #7f8c8d;
+  font-weight: 500;
+  background: #f1f1f1;
+  padding: 8px 15px;
+  border-radius: 6px;
+  display: inline-block;
+  margin-top: 5px;
+  border: 1px dashed #bdc3c7;
+}
+
+/* Delete confirmation content */
+.deleteConfirmationContent {
+  text-align: center;
+}
+
+.deleteWarningIcon {
+  font-size: 48px;
+  margin: 15px 0 20px 0;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+
+.deleteConfirmationText {
+  margin: 20px 0 10px 0;
+  color: #333;
+  font-size: 16px;
+  line-height: 1.5;
+  font-weight: 500;
+}
+
+.deleteWarning {
+  margin: 15px 0 0 0;
+  color: #e74c3c;
+  font-weight: 600;
+  font-size: 14px;
+  background: #ffebee;
+  padding: 12px;
+  border-radius: 6px;
+  border: 1px solid #ffcdd2;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .preModalDelete {
+    left: 0 !important;
+    width: 100vw !important;
+  }
+  
+  .preModalContentDelete {
+    width: 95%;
+    margin: 10px;
+  }
+
+  .preModalActions {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .preCancelBtn,
+  .deleteConfirmBtn {
+    width: 100%;
+    margin: 0 !important;
+  }
+}.deleteConfirmationContent {
+  text-align: center;
+}
+
+.deleteWarningIcon {
+  font-size: 48px;
+  margin: 15px 0 20px 0;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+
+.deleteConfirmationText {
+  margin: 20px 0 10px 0;
+  color: #333;
+  font-size: 16px;
+  line-height: 1.5;
+  font-weight: 500;
+}
+
+.deleteWarning {
+  margin: 15px 0 0 0;
+  color: #e74c3c;
+  font-weight: 600;
+  font-size: 14px;
+  background: #ffebee;
+  padding: 12px;
+  border-radius: 6px;
+  border: 1px solid #ffcdd2;
+}
+
+/* Delete button specific styles */
+.prSubmit.deleteConfirmBtn {
+  background: linear-gradient(135deg, #dc3545, #c82333) !important;
+  border: none;
+}
+
+.prSubmit.deleteConfirmBtn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #c82333, #bd2130) !important;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(220, 53, 69, 0.3);
+}
+
+.prSubmit.deleteConfirmBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Ensure modal content is centered */
+.modalContent[style*="max-width: 450px"] {
+  position: relative;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+
+/* ================================
+    TRANSFER MODAL SPECIFIC STYLES
+  =============================== */
+
+
+.transferModalContent {
+  max-height: 85vh !important; /* Adjust height as needed */
+  height: auto;
+  overflow-y: auto;
+  max-width: 600px !important; /* Adjust width as needed */
+}
+
+.transferModalBody {
+  max-height: 60vh; /* Limit body height */
+  overflow-y: auto;
+  padding-right: 5px; /* Prevent content shift from scrollbar */
+}
+
+/* Custom scrollbar for transfer modal */
+.transferModalBody::-webkit-scrollbar {
+  width: 6px;
+}
+
+.transferModalBody::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+.transferModalBody::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 3px;
+}
+
+.transferModalBody::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* Make textareas in transfer modal resizable */
+.transferModalBody textarea {
+  resize: vertical;
+  min-height: 80px;
+  max-height: 150px;
+}
+
+/* Responsive adjustments for transfer modal */
+@media (max-width: 768px) {
+  .transferModalContent {
+    max-height: 90vh !important;
+    width: 95% !important;
+    margin: 10px;
+  }
+  
+  .transferModalBody {
+    max-height: 65vh;
+  }
+}
+
+/* For taller modals on larger screens */
+@media (min-height: 800px) {
+  .transferModalContent {
+    max-height: 80vh !important;
+  }
+  
+  .transferModalBody {
+    max-height: 55vh;
+  }
+}
+/* ================================
+    REACTIVATION MODAL SPECIFIC STYLES
+  =============================== */
+
+.reactivationModalOverlay {
+  /* Ensure the overlay covers the entire viewport */
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  z-index: 1000 !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+}
+
+.reactivationModalContent {
+  max-height: 90vh !important;
+  height: auto !important;
+  min-height: 250px !important; /* Minimum height to ensure buttons are visible */
+  display: flex !important;
+  flex-direction: column !important;
+  max-width: 500px !important;
+  width: 95% !important;
+  margin: 20px auto !important;
+}
+
+.reactivationModalBody {
+  flex: 1 !important;
+  overflow-y: auto !important;
+  max-height: 70vh !important;
+  padding: 20px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: space-between !important; /* Distribute space evenly */
+}
+
+.reactivationModalFooter {
+  margin-top: auto !important; /* Push footer to bottom */
+  padding: 20px !important;
+  border-top: 1px solid #e0e0e0 !important;
+  background: #f9f9f9 !important;
+  border-bottom-left-radius: 8px !important;
+  border-bottom-right-radius: 8px !important;
+  display: flex !important;
+  gap: 12px !important;
+  justify-content: flex-end !important;
+}
+
+/* Reactivation confirmation specific styles */
+.reactivateConfirmation {
+  text-align: center;
+  padding: 20px 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  min-height: 150px; /* Ensure enough space for content */
+}
+
+.reactivateConfirmation p {
+  margin: 10px 0;
+  font-size: 16px;
+  line-height: 1.5;
+  color: #333;
+}
+
+.reactivateNote {
+  font-size: 14px !important;
+  color: #666 !important;
+  font-style: italic !important;
+  margin-top: 15px !important;
+  padding: 10px !important;
+  background-color: #f8f9fa !important;
+  border-radius: 6px !important;
+  border-left: 3px solid #4CAF50 !important;
+}
+
+/* Ensure buttons are always visible */
+.statusCancelBtn,
+.statusConfirmBtn {
+  min-height: 40px !important;
+  padding: 10px 20px !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  border-radius: 6px !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  white-space: nowrap !important;
+}
+
+.statusCancelBtn {
+  background: #f3f4f6 !important;
+  color: #374151 !important;
+  border: 1px solid #d1d5db !important;
+}
+
+.statusCancelBtn:hover:not(:disabled) {
+  background: #e5e7eb !important;
+}
+
+.statusConfirmBtn {
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8) !important;
+  color: white !important;
+  border: none !important;
+}
+
+.statusConfirmBtn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #2563eb, #1e40af) !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 6px rgba(37, 99, 235, 0.3) !important;
+}
+
+.statusConfirmBtn:disabled,
+.statusCancelBtn:disabled {
+  opacity: 0.5 !important;
+  cursor: not-allowed !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* Make sure the modal body content is properly spaced */
+.statusForm {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  flex: 1;
+}
+
+.statusFormGroup {
+  margin-bottom: 15px;
+}
+
+.statusNotice {
+  background-color: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: 6px;
+  padding: 15px;
+  margin-top: 15px;
+}
+
+.statusNotice p {
+  margin-top: 0;
+  font-weight: 600;
+  color: #0369a1;
+}
+
+.statusNotice ul {
+  margin: 10px 0 0 0;
+  padding-left: 20px;
+  color: #0c4a6e;
+}
+
+.statusNotice li {
+  margin-bottom: 5px;
+  font-size: 14px;
+}
+
+/* Responsive adjustments for reactivation modal */
+@media (max-height: 600px) {
+  /* For very short screens */
+  .reactivationModalContent {
+    max-height: 95vh !important;
+    margin: 10px auto !important;
+  }
+  
+  .reactivationModalBody {
+    max-height: 75vh !important;
+    padding: 15px !important;
+  }
+  
+  .reactivateConfirmation {
+    min-height: 100px !important;
+    padding: 10px 0 !important;
+  }
+  
+  .reactivateConfirmation p {
+    font-size: 14px !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .reactivationModalContent {
+    max-height: 95vh !important;
+    width: 98% !important;
+    margin: 10px auto !important;
+  }
+  
+  .reactivationModalBody {
+    max-height: 80vh !important;
+    padding: 15px !important;
+  }
+  
+  .reactivationModalFooter {
+    padding: 15px !important;
+    flex-direction: column !important;
+    gap: 10px !important;
+  }
+  
+  .statusCancelBtn,
+  .statusConfirmBtn {
+    width: 100% !important;
+    text-align: center !important;
+  }
+}
+
+/* For reactivation modal specifically */
+.reactivationModalContent:has(.reactivateConfirmation) {
+  min-height: 300px !important; /* Ensure enough height for reactivation modal */
+}
+
+/* Ensure the modal is properly centered */
+.reactivationModalOverlay {
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* Prevent body scroll when modal is open */
+body:has(.reactivationModalOverlay) {
+  overflow: hidden !important;
+}
+
+/* ================================
+    RETIREMENT MODAL SPECIFIC STYLES
+  =============================== */
+
+.retirementModalContent {
+  border-top: 4px solid #f59e0b !important;
+}
+
+.retirementModalBody {
+  background: linear-gradient(to bottom, #fffefb, #fff9e6);
+}
+
+.retirementModalFooter {
+  background: linear-gradient(135deg, #fff8e1, #fff3cd) !important;
+  border-top: 2px solid #f59e0b !important;
+  padding: 25px 20px !important;
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  gap: 15px !important;
+}
+
+.retirementWarning {
+  display: flex;
+  align-items: center;
+  color: #b45309;
+  font-size: 13px;
+  flex: 1;
+}
+
+.retirementConfirmBtn {
+  background: linear-gradient(135deg, #f59e0b, #d97706) !important;
+  color: white !important;
+  border: none !important;
+  font-weight: 600 !important;
+  min-width: 140px !important;
+}
+
+.retirementConfirmBtn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #d97706, #b45309) !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 6px rgba(217, 119, 6, 0.3) !important;
+}
+
+/* ================================
+    RESIGNATION MODAL SPECIFIC STYLES
+  =============================== */
+
+.resignationModalContent {
+  border-top: 4px solid #ef4444 !important;
+}
+
+.resignationModalBody {
+  background: linear-gradient(to bottom, #fffafa, #ffeaea);
+}
+
+.resignationModalFooter {
+  background: linear-gradient(135deg, #fee, #fde8e8) !important;
+  border-top: 2px solid #ef4444 !important;
+  padding: 25px 20px !important;
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  gap: 15px !important;
+  
+}
+
+.resignationWarning {
+  display: flex;
+  align-items: center;
+  color: #b91c1c;
+  font-size: 13px;
+  flex: 1;
+}
+
+.resignationConfirmBtn {
+  background: linear-gradient(135deg, #ef4444, #dc2626) !important;
+  color: white !important;
+  border: none !important;
+  font-weight: 600 !important;
+  min-width: 140px !important;
+}
+
+.resignationConfirmBtn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #dc2626, #b91c1c) !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 6px rgba(220, 38, 38, 0.3) !important;
+}
+
+/* ================================
+    REACTIVATION MODAL SPECIFIC STYLES (Updated)
+  =============================== */
+
+.reactivationModalContent {
+  border-top: 4px solid #10b981 !important;
+}
+
+.reactivationModalBody {
+  background: linear-gradient(to bottom, #f0fdf4, #dcfce7);
+}
+
+.reactivationModalFooter {
+  background: linear-gradient(135deg, #f0fdf4, #dcfce7) !important;
+  border-top: 2px solid #10b981 !important;
+  padding: 25px 20px !important;
+  display: flex !important;
+  justify-content: flex-end !important;
+  gap: 12px !important;
+}
+
+.reactivateConfirmation p:first-child {
+  font-weight: 600;
+  color: #065f46;
+  font-size: 17px;
+}
+
+.reactivateNote {
+  background: linear-gradient(135deg, #d1fae5, #a7f3d0) !important;
+  border: 1px solid #6ee7b7 !important;
+  color: #047857 !important;
+  font-weight: 500 !important;
+}
+
+/* ================================
+    STATUS NOTICE UPDATES FOR EACH MODAL TYPE
+  =============================== */
+
+.retirementModalContent .statusNotice {
+  background: linear-gradient(135deg, #fffbeb, #fef3c7) !important;
+  border: 1px solid #fcd34d !important;
+  border-left: 4px solid #f59e0b !important;
+}
+
+.retirementModalContent .statusNotice p {
+  color: #92400e !important;
+}
+
+.retirementModalContent .statusNotice ul {
+  color: #78350f !important;
+}
+
+.resignationModalContent .statusNotice {
+  background: linear-gradient(135deg, #fef2f2, #fee2e2) !important;
+  border: 1px solid #fca5a5 !important;
+  border-left: 4px solid #ef4444 !important;
+}
+
+.resignationModalContent .statusNotice p {
+  color: #7f1d1d !important;
+}
+
+.resignationModalContent .statusNotice ul {
+  color: #991b1b !important;
+}
+
+.reactivationModalContent .statusNotice {
+  background: linear-gradient(135deg, #f0fdf4, #dcfce7) !important;
+  border: 1px solid #86efac !important;
+  border-left: 4px solid #10b981 !important;
+}
+
+.reactivationModalContent .statusNotice p {
+  color: #065f46 !important;
+}
+
+.reactivationModalContent .statusNotice ul {
+  color: #047857 !important;
+}
+
+/* ================================
+    RESPONSIVE DESIGN FOR ALL MODAL FOOTERS
+  =============================== */
+
+@media (max-width: 768px) {
+  .retirementModalFooter,
+  .resignationModalFooter,
+  .reactivationModalFooter {
+    flex-direction: column !important;
+    gap: 15px !important;
+    padding: 20px 15px !important;
+  }
+  
+  .retirementWarning,
+  .resignationWarning {
+    text-align: center;
+    justify-content: center;
+    margin-bottom: 10px;
+  }
+  
+  .retirementModalFooter > div:last-child,
+  .resignationModalFooter > div:last-child {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .retirementConfirmBtn,
+  .resignationConfirmBtn,
+  .statusCancelBtn,
+  .statusConfirmBtn {
+    width: 100% !important;
+    min-width: unset !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .retirementModalContent,
+  .resignationModalContent,
+  .reactivationModalContent {
+    width: 98% !important;
+    margin: 10px auto !important;
+  }
+  
+  .retirementModalFooter,
+  .resignationModalFooter,
+  .reactivationModalFooter {
+    padding: 15px !important;
+  }
+}
+
+/* ================================
+    BUTTON STYLES FOR ALL MODALS
+  =============================== */
+
+.statusCancelBtn,
+.statusConfirmBtn,
+.retirementConfirmBtn,
+.resignationConfirmBtn {
+  min-height: 40px !important;
+  padding: 10px 20px !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  border-radius: 6px !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  white-space: nowrap !important;
+  border: none !important;
+}
+
+.statusCancelBtn {
+  background: #6c757d !important;
+  color: white !important;
+}
+
+.statusCancelBtn:hover:not(:disabled) {
+  background: #5a6268 !important;
+}
+
+/* Spinner for all modals */
+.statusSpinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: white;
+  animation: spin 1s ease-in-out infinite;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }

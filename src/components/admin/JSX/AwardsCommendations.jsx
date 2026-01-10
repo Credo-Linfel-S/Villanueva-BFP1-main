@@ -14,7 +14,7 @@ const AwardsCommendations = () => {
   const [awards, setAwards] = useState([]);
   const [loading, setLoading] = useState(true);
   const { isSidebarCollapsed } = useSidebar();
-const { userId, isAuthenticated, userRole } = useUserId();
+
   // Preloader state
   const [showPreloader, setShowPreloader] = useState(true);
   const [loadingProgress, setLoadingProgress] = useState(0);

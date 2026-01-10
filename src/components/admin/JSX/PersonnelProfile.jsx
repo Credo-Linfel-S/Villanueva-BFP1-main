@@ -9,10 +9,11 @@ import "react-toastify/dist/ReactToastify.css";
 import { supabase } from "../../../lib/supabaseClient.js";
 // Import the BFP preloader component and its styles
 import BFPPreloader from "../../BFPPreloader.jsx"; // Adjust path as needed
- // Make sure this path is correct
+// Make sure this path is correct
 import logo from "../../../assets/Firefighter.png";
 import FloatingNotificationBell from "../../FloatingNotificationBell.jsx";
 import { useUserId } from "../../hooks/useUserId.js";
+
 const PersonnelProfile = () => {
   const { isSidebarCollapsed } = useSidebar();
   const [personnelList, setPersonnelList] = useState([]);
@@ -30,7 +31,7 @@ const PersonnelProfile = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [documentToDelete, setDocumentToDelete] = useState(null);
   const [uploading, setUploading] = useState(false);
-const { userId, isAuthenticated, userRole } = useUserId();
+  const { userId, isAuthenticated, userRole } = useUserId();
   // Preloader state
   const [showPreloader, setShowPreloader] = useState(true);
   const [loadingProgress, setLoadingProgress] = useState(0);
@@ -729,7 +730,7 @@ const { userId, isAuthenticated, userRole } = useUserId();
       <Meta name="robots" content="noindex, nofollow" />
       <Hamburger />
       <Sidebar />
-     
+
       <ToastContainer
         position="top-right"
         autoClose={5000}
@@ -1197,7 +1198,7 @@ const PreviewSidebar = ({ document, onClose, formatTimestamp }) => {
   );
 };
 
-// Enhanced PersonnelCard Component with Rank Image
+
 const PersonnelCard = ({
   personnel,
   index,
@@ -1216,28 +1217,34 @@ const PersonnelCard = ({
   formatTimestamp,
 }) => {
   const [selectedCategory, setSelectedCategory] = useState("Medical Record");
+  const [isHoveringName, setIsHoveringName] = useState(false);
+
   const handleImageError = (e) => {
     console.log("Image failed to load, using default logo");
-    e.target.src = logo; // Use the imported logo as default
-    e.target.onerror = null; // Prevent infinite loop
+    e.target.src = logo;
+    e.target.onerror = null;
   };
-  // Get rank image URL (you need to fetch this from your database)
-  // Add this to your loadPersonnel function to include rank_image in the data
+
   const rankImage = personnel.rank_image || "";
 
   const handleCategoryChange = (e) => {
     setSelectedCategory(e.target.value);
   };
 
-  const safeRender = (value, defaultValue = "") => {
-    if (value === null || value === undefined) return defaultValue;
-    if (value instanceof Date) {
-      return isNaN(value.getTime()) ? defaultValue : formatDate(value);
-    }
-    if (typeof value === "object") return JSON.stringify(value);
-    return String(value);
-  };
+  // Calculate if name needs carousel - THIS SHOULD BE INSIDE PersonnelCard
+  const fullName = `${personnel.first_name || ""} ${
+    personnel.last_name || ""
+  }`.trim();
+  const rankAndDesignation = `${personnel.rank || ""} – ${
+    personnel.designation || ""
+  }`.trim();
 
+  // Check if name is too long (more than 20 characters)
+  const needsCarousel = fullName.length > 20;
+  // Check if rank/designation is too long
+  const needsRankCarousel = rankAndDesignation.length > 25;
+
+  // Highlight text for search
   const firstName = highlightText(personnel.first_name || "", "first_name");
   const lastName = highlightText(personnel.last_name || "", "last_name");
   const rank = highlightText(personnel.rank || "", "rank");
@@ -1266,7 +1273,7 @@ const PersonnelCard = ({
             {personnel.photo_url ? (
               <img
                 src={personnel.photo_url}
-                alt={`${personnel.first_name} ${personnel.last_name}`}
+                alt={fullName}
                 className={styles.profilePhoto}
                 onError={handleImageError}
               />
@@ -1280,13 +1287,66 @@ const PersonnelCard = ({
               </div>
             )}
           </div>
+
           <div className={styles.headerText}>
-            <h3
-              dangerouslySetInnerHTML={{ __html: `${firstName} ${lastName}` }}
-            />
-            <small
-              dangerouslySetInnerHTML={{ __html: `${rank} – ${designation}` }}
-            />
+            {/* Name with Carousel */}
+            <div
+              className={styles.nameHoverContainer}
+              onMouseEnter={() => setIsHoveringName(true)}
+              onMouseLeave={() => setIsHoveringName(false)}
+            >
+              {needsCarousel ? (
+                <div className={styles.nameCarouselContainer}>
+                  <div
+                    className={`${styles.nameText} ${
+                      isHoveringName ? styles.paused : styles.scrolling
+                    }`}
+                    dangerouslySetInnerHTML={{
+                      __html: `${firstName} ${lastName}`,
+                    }}
+                  />
+                </div>
+              ) : (
+                <h3
+                  dangerouslySetInnerHTML={{
+                    __html: `${firstName} ${lastName}`,
+                  }}
+                />
+              )}
+
+              {/* Full name tooltip on hover */}
+              {needsCarousel && (
+                <div className={styles.fullNameTooltip}>
+                  {personnel.first_name} {personnel.last_name}
+                </div>
+              )}
+            </div>
+
+            {/* Rank and Designation with Carousel */}
+            <div className={styles.nameCarouselContainer}>
+              {needsRankCarousel ? (
+                <div
+                  className={`${styles.nameText} ${
+                    isHoveringName ? styles.paused : styles.scrolling
+                  }`}
+                  style={{
+                    fontSize: "14px",
+                    color: "#666",
+                    fontWeight: "normal",
+                  }}
+                  dangerouslySetInnerHTML={{
+                    __html: `${rank} – ${designation}`,
+                  }}
+                />
+              ) : (
+                <small
+                  dangerouslySetInnerHTML={{
+                    __html: `${rank} – ${designation}`,
+                  }}
+                />
+              )}
+            </div>
+
             <small>Badge: {personnel.badge_number || "N/A"}</small>
           </div>
         </div>

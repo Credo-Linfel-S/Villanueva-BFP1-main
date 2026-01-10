@@ -13,8 +13,6 @@
 /* Notification Container */
 .notification-container {
   position: relative;
-  
-
 }
 
 .notification-badge {
@@ -23,7 +21,7 @@
   padding: 8px 15px;
   border-radius: 25px;
   font-size: 14px;
-  
+
   display: flex;
   align-items: center;
   gap: 8px;
@@ -50,7 +48,7 @@
   border-radius: 50%;
   display: flex;
   align-items: center;
-margin-bottom: 10px;
+  margin-bottom: 10px;
   justify-content: center;
   font-weight: bold;
   font-size: 12px;
@@ -60,7 +58,7 @@ margin-bottom: 10px;
 .notification-dropdown {
   position: absolute;
   top: 90%;
-  
+
   right: 0;
   width: 350px;
   max-height: 500px;
@@ -190,7 +188,7 @@ margin-bottom: 10px;
 
 .notification-item.unread {
   background: #f0f7ff;
-  border-left: 3px solid #4CAF50;
+  border-left: 3px solid #4caf50;
 }
 
 .notification-item.read {
@@ -218,11 +216,11 @@ margin-bottom: 10px;
 }
 
 .notification-type-icon.success {
-  color: #4CAF50;
+  color: #4caf50;
 }
 
 .notification-type-icon.info {
-  color: #2196F3;
+  color: #2196f3;
 }
 
 .notification-icon-small {
@@ -273,7 +271,7 @@ margin-bottom: 10px;
 .notification-unread-dot {
   width: 8px;
   height: 8px;
-  background: #4CAF50;
+  background: #4caf50;
   border-radius: 50%;
   margin-top: 8px;
 }
@@ -295,8 +293,6 @@ margin-bottom: 10px;
   padding: 40px 20px;
   text-align: center;
   color: #999;
- 
-
 }
 
 .notification-loading {
@@ -335,12 +331,12 @@ margin-bottom: 10px;
     width: auto;
     max-width: calc(100vw - 20px);
   }
-  
+
   .notification-badge {
     padding: 6px 12px;
     font-size: 13px;
   }
-  
+
   .notification-count {
     min-width: 20px;
     height: 20px;
@@ -352,28 +348,28 @@ margin-bottom: 10px;
   .notification-dropdown {
     width: 300px;
   }
-  
+
   .notification-badge {
     padding: 5px 10px;
     font-size: 12px;
   }
-  
+
   .notification-header {
     padding: 12px;
   }
-  
+
   .notification-header h3 {
     font-size: 14px;
   }
-  
+
   .notification-item {
     padding: 10px 12px;
   }
-  
+
   .notification-title {
     font-size: 13px;
   }
-  
+
   .notification-message {
     font-size: 12px;
   }
@@ -391,11 +387,11 @@ margin-bottom: 10px;
 }
 
 .notification-item[data-type="success"] {
-  border-left-color: #4CAF50;
+  border-left-color: #4caf50;
 }
 
 .notification-item[data-type="info"] {
-  border-left-color: #2196F3;
+  border-left-color: #2196f3;
 }
 
 /* ================================
@@ -488,21 +484,23 @@ margin-bottom: 10px;
 .floatingContainer {
   position: fixed !important;
   right: 30px !important;
-  padding-top: -100px;
+  padding-top: 0px;
   margin-top: -100px;
-  padding-bottom: 100px;
-  top: auto!important;
+  padding-bottom: 0px;
+  top: auto !important;
   bottom: 100px !important; /* Below header */
   z-index: 999999 !important;
   cursor: move;
+  height: 0px;
   user-select: none;
+  background-color: #4caf50;
   touch-action: none;
   transition: right 0.3s ease, top 0.3s ease;
 }
 
 /* Position classes for dropdown direction */
 .floatingContainer.below .floatingDropdown::before {
-  content: '';
+  content: "";
   position: absolute;
   bottom: 100%;
   right: 20px;
@@ -513,7 +511,7 @@ margin-bottom: 10px;
 }
 
 .floatingContainer.above .floatingDropdown::before {
-  content: '';
+  content: "";
   position: absolute;
   top: 100%;
   right: 20px;
@@ -524,7 +522,7 @@ margin-bottom: 10px;
 }
 
 .floatingContainer.left .floatingDropdown::before {
-  content: '';
+  content: "";
   position: absolute;
   top: 20px;
   left: 100%;
@@ -535,7 +533,7 @@ margin-bottom: 10px;
 }
 
 .floatingContainer.right .floatingDropdown::before {
-  content: '';
+  content: "";
   position: absolute;
   top: 20px;
   right: 100%;
@@ -706,19 +704,19 @@ margin-bottom: 10px;
     right: 20px !important;
     top: 80px !important;
   }
-  
+
   .floatingBell {
     width: 50px !important;
     height: 50px !important;
   }
-  
+
   .floatingDropdown {
     width: calc(100vw - 40px) !important;
     max-width: 400px !important;
     right: 20px !important;
     left: auto !important;
   }
-  
+
   /* On mobile, always position below */
   .floatingContainer.below .floatingDropdown::before,
   .floatingContainer.above .floatingDropdown::before,
@@ -726,7 +724,7 @@ margin-bottom: 10px;
   .floatingContainer.right .floatingDropdown::before {
     display: none;
   }
-  
+
   .floatingDropdown {
     top: 140px !important;
     animation: slideDown 0.3s ease !important;
@@ -738,12 +736,12 @@ margin-bottom: 10px;
     right: 15px !important;
     top: 70px !important;
   }
-  
+
   .floatingBell {
     width: 45px !important;
     height: 45px !important;
   }
-  
+
   .floatingDropdown {
     width: calc(100vw - 30px) !important;
     top: 125px !important;
@@ -755,7 +753,7 @@ margin-bottom: 10px;
   .floatingContainer {
     z-index: 100001 !important;
   }
-  
+
   .floatingDropdown {
     z-index: 100000 !important;
   }
@@ -766,15 +764,15 @@ margin-bottom: 10px;
   .floatingContainer {
     cursor: pointer;
   }
-  
+
   .floatingBell {
     width: 70px !important;
-    height: 70px !important;
+    height: 10px !important;
   }
-  
+
   /* Larger hit area for touch */
   .floatingContainer::after {
-    content: '';
+    content: "";
     position: absolute;
     top: -20px;
     right: -20px;
@@ -823,7 +821,8 @@ margin-bottom: 10px;
 
 /* Edge collision warning animation */
 @keyframes edgeWarning {
-  0%, 100% {
+  0%,
+  100% {
     box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.4);
   }
   50% {
@@ -842,7 +841,7 @@ margin-bottom: 10px;
 
 /* Smart positioning debug (development only) */
 .floatingContainer.debug::after {
-  content: 'Position: ' attr(data-direction);
+  content: "Position: " attr(data-direction);
   position: absolute;
   top: -30px;
   right: 0;

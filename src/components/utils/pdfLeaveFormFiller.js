@@ -2,7 +2,7 @@
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 
 /**
- * Enhanced PDF filling function based on LeaveManagement.jsx
+ * Enhanced PDF filling function with payment type text
  * @param {ArrayBuffer} pdfBytes - Original PDF template bytes
  * @param {Object} leaveData - Leave request data
  * @param {Object} options - Additional options
@@ -28,86 +28,31 @@ export const fillLeaveFormEnhanced = async (
     const defaultFontSize = 10;
     const textColor = rgb(0, 0, 0);
 
-    // Define coordinates for each leave type checkbox (from LeaveManagement)
-    const leaveTypeCheckboxCoordinates = {
-      "Vacation Leave": { x: 57, y: 702 },
-      "Mandatory/Forced Leave": { x: 57, y: 702 },
-      "Sick Leave": { x: 57, y: 673 },
-      "Maternity Leave": { x: 57, y: 702 },
-      "Paternity Leave": { x: 57, y: 702 },
-      "Special Privilege Leave": { x: 57, y: 702 },
-      "Solo Parent Leave": { x: 57, y: 702 },
-      "Study Leave": { x: 57, y: 702 },
-      "10-Day VAWC Leave": { x: 57, y: 702 },
-      "Rehabilitation Privilege": { x: 57, y: 702 },
-      "Special Leave Benefits for Women": { x: 57, y: 702 },
-      "Special Emergency (Calamity) Leave": { x: 57, y: 543 },
-      "Adoption Leave": { x: 57, y: 702 },
-      Others: { x: 57, y: 702 },
+    // ========== HELPER FUNCTIONS - MOVED TO THE TOP ==========
+
+    // Helper function for drawing text
+    const drawText = (text, x, y, size = defaultFontSize) => {
+      if (text && typeof text === "string" && text.trim() !== "") {
+        firstPage.drawText(text.trim(), {
+          x,
+          y,
+          size: size,
+          font: font,
+          color: textColor,
+        });
+      }
     };
 
-    // Coordinates for abroad/Philippines checkboxes
-    const vacationLocationCoordinates = {
-      philippines: { x: 347, y: 687 }, // Coordinates for "Within the Philippines" checkbox
-      abroad: { x: 347, y: 672 }, // Coordinates for "Abroad" checkbox
-    };
+    // Helper function to draw numbers
+    const drawNumber = (number, x, y, size = defaultFontSize) => {
+      if (number !== null && number !== undefined) {
+        const formatted =
+          typeof number === "number"
+            ? number.toFixed(2)
+            : parseFloat(number || 0).toFixed(2);
 
-    // Coordinates for sick leave checkboxes (IN HOSPITAL / OUT PATIENT)
-    const sickLeaveCheckboxCoordinates = {
-      in_hospital: { x: 347, y: 644 }, // Coordinates for "IN HOSPITAL" checkbox
-      out_patient: { x: 347, y: 630 }, // Coordinates for "OUT PATIENT" checkbox
-    };
-
-    // Define coordinates for name fields with boundaries (from LeaveManagement)
-    const nameFields = {
-      lastName: {
-        x: 270,
-        y: 775,
-        minX: 250,
-        maxX: 370,
-        maxWidth: 100,
-        text: leaveData.lastName || "",
-      },
-      firstName: {
-        x: 385,
-        y: 775,
-        minX: 365,
-        maxX: 485,
-        maxWidth: 100,
-        text: leaveData.firstName || "",
-      },
-      middleName: {
-        x: 505,
-        y: 775,
-        minX: 475,
-        maxX: 550,
-        maxWidth: 60,
-        text: leaveData.middleName || "",
-      },
-    };
-
-    // Define coordinates for other form fields (from LeaveManagement with adjustments)
-    const fieldCoordinates = {
-      // Rank and station
-      rank: { x: 316, y: 753 },
-      station: { x: 90, y: 775 },
-      dateOfFiling: { x: 150, y: 753 },
-      // Additional Info - Vacation
-      locationPhilippines: { x: 460, y: 690 }, // Position for Philippines location
-      locationAbroad: { x: 460, y: 675 }, // Position for Abroad location (below Philippines)
-
-      // Additional Info - Sick Leave (SEPARATE POSITIONS)
-      illnessDetailsInHospital: { x: 460, y: 644 }, // Position for IN HOSPITAL illness details
-      illnessDetailsOutPatient: { x: 460, y: 630 }, // Position for OUT PATIENT illness details (below IN HOSPITAL)
-
-      // Balance fields (from LeaveRecords but using LeaveManagement positions)
-      asOfDate: { x: 152, y: 375 },
-      vacationTotalEarned: { x: 155, y: 340 },
-      vacationLessApplication: { x: 155, y: 323 },
-      vacationBalance: { x: 155, y: 310 },
-      sickTotalEarned: { x: 237, y: 340 },
-      sickLessApplication: { x: 237, y: 323 },
-      sickBalance: { x: 237, y: 310 },
+        drawText(formatted, x, y, size);
+      }
     };
 
     // Helper function to split long text into multiple lines
@@ -156,30 +101,108 @@ export const fillLeaveFormEnhanced = async (
       return text.length * avgCharWidthRatio * fontSize;
     };
 
-    // Helper function for drawing text
-    const drawText = (text, x, y, size = defaultFontSize) => {
-      if (text && typeof text === "string" && text.trim() !== "") {
-        firstPage.drawText(text.trim(), {
-          x,
-          y,
-          size: size,
-          font: font,
-          color: textColor,
-        });
-      }
+    // ========== COORDINATE DEFINITIONS ==========
+
+    // Add these coordinates to your existing coordinate definitions
+    const officerCoordinates = {
+      // Officer signatures/names positions
+      oicOfficer: { x: 130, y: 270 },
+      adminOfficer: { x: 425, y: 270 },
+
+      municipalFireMarshal: { x: 240, y: 155 },
     };
 
-    // Helper function to draw numbers
-    const drawNumber = (number, x, y, size = defaultFontSize) => {
-      if (number !== null && number !== undefined) {
-        const formatted =
-          typeof number === "number"
-            ? number.toFixed(2)
-            : parseFloat(number || 0).toFixed(2);
-
-        drawText(formatted, x, y, size);
-      }
+    // Define coordinates for each leave type checkbox
+    const leaveTypeCheckboxCoordinates = {
+      "Vacation Leave": { x: 57, y: 702 },
+      "Mandatory/Forced Leave": { x: 57, y: 702 },
+      "Sick Leave": { x: 57, y: 673 },
+      "Maternity Leave": { x: 57, y: 702 },
+      "Paternity Leave": { x: 57, y: 702 },
+      "Special Privilege Leave": { x: 57, y: 702 },
+      "Solo Parent Leave": { x: 57, y: 702 },
+      "Study Leave": { x: 57, y: 702 },
+      "10-Day VAWC Leave": { x: 57, y: 702 },
+      "Rehabilitation Privilege": { x: 57, y: 702 },
+      "Special Leave Benefits for Women": { x: 57, y: 702 },
+      "Special Emergency (Calamity) Leave": { x: 57, y: 543 },
+      "Adoption Leave": { x: 57, y: 702 },
+      Others: { x: 57, y: 702 },
     };
+
+    // Coordinates for abroad/Philippines checkboxes
+    const vacationLocationCoordinates = {
+      philippines: { x: 347, y: 687 },
+      abroad: { x: 347, y: 672 },
+    };
+
+    // Coordinates for sick leave checkboxes
+    const sickLeaveCheckboxCoordinates = {
+      in_hospital: { x: 347, y: 644 },
+      out_patient: { x: 347, y: 630 },
+    };
+
+    // Coordinates for payment type text
+    const paymentTypeNumbersCoordinates = {
+      with_pay: { x: 57, y: 222 },
+      without_pay: { x: 57, y: 207 },
+      both_with_pay: { x: 57, y: 222 },
+      both_without_pay: { x: 57, y: 207 },
+    };
+
+    // Define coordinates for name fields with boundaries
+    const nameFields = {
+      lastName: {
+        x: 270,
+        y: 775,
+        minX: 250,
+        maxX: 370,
+        maxWidth: 100,
+        text: leaveData.lastName || "",
+      },
+      firstName: {
+        x: 385,
+        y: 775,
+        minX: 365,
+        maxX: 485,
+        maxWidth: 100,
+        text: leaveData.firstName || "",
+      },
+      middleName: {
+        x: 505,
+        y: 775,
+        minX: 475,
+        maxX: 550,
+        maxWidth: 60,
+        text: leaveData.middleName || "",
+      },
+    };
+
+    // Define coordinates for other form fields
+    const fieldCoordinates = {
+      // Rank and station
+      rank: { x: 316, y: 753 },
+      station: { x: 90, y: 775 },
+      dateOfFiling: { x: 150, y: 753 },
+      // Additional Info - Vacation
+      locationPhilippines: { x: 460, y: 690 },
+      locationAbroad: { x: 460, y: 675 },
+
+      // Additional Info - Sick Leave
+      illnessDetailsInHospital: { x: 460, y: 644 },
+      illnessDetailsOutPatient: { x: 460, y: 630 },
+
+      // Balance fields
+      asOfDate: { x: 152, y: 375 },
+      vacationTotalEarned: { x: 155, y: 340 },
+      vacationLessApplication: { x: 155, y: 323 },
+      vacationBalance: { x: 155, y: 310 },
+      sickTotalEarned: { x: 237, y: 340 },
+      sickLessApplication: { x: 237, y: 323 },
+      sickBalance: { x: 237, y: 310 },
+    };
+
+    // ========== ADDITIONAL HELPER FUNCTIONS FOR NAME POSITIONING ==========
 
     // Helper function to check if all names fit with a given font size
     const checkAllNamesFit = (fontSize) => {
@@ -205,7 +228,7 @@ export const fillLeaveFormEnhanced = async (
         if (checkAllNamesFit(fontSize)) {
           return fontSize;
         }
-        fontSize -= 0.5; // Decrease by 0.5 for finer granularity
+        fontSize -= 0.5;
       }
 
       // Return minimum font size if no better option
@@ -282,7 +305,7 @@ export const fillLeaveFormEnhanced = async (
 
       if (!overlaps.hasOverlap) return adjustedPositions;
 
-      // For simplicity, we'll adjust the later field to the right
+      // For simplicity, adjust the later field to the right
       const [firstField, secondField] = overlaps.overlappingFields;
       const secondFieldInfo = nameFields[secondField];
       const overlapAmount = overlaps.overlapAmount;
@@ -321,7 +344,7 @@ export const fillLeaveFormEnhanced = async (
     const fullName = leaveData.fullName || leaveData.employeeName || "";
     const nameParts = fullName.trim().split(/\s+/);
 
-    // Simple name parsing (adjust based on your data structure)
+    // Simple name parsing
     if (nameParts.length >= 2) {
       nameFields.lastName.text = nameParts[nameParts.length - 1] || "";
       nameFields.firstName.text = nameParts[0] || "";
@@ -354,13 +377,7 @@ export const fillLeaveFormEnhanced = async (
       const position = positions[fieldName];
 
       // Actually draw the text with calculated position and font size
-      firstPage.drawText(field.text.trim(), {
-        x: position.x,
-        y: field.y,
-        size: position.fontSize,
-        font: font,
-        color: textColor,
-      });
+      drawText(field.text.trim(), position.x, field.y, position.fontSize);
     }
 
     // Step 6: Fill other fields
@@ -406,7 +423,6 @@ export const fillLeaveFormEnhanced = async (
     }
 
     // Fill dates
-    // Fill dates
     if (fieldCoordinates.dateOfFiling) {
       // Format the date
       const filingDate = formatDateForPDF(
@@ -429,8 +445,120 @@ export const fillLeaveFormEnhanced = async (
     } else {
       console.warn("dateOfFiling coordinates not defined in fieldCoordinates");
     }
+
+    // ========== DRAW OFFICER NAMES ==========
+    if (leaveData.officerNames) {
+      const officers = leaveData.officerNames;
+
+      console.log("=== OFFICER NAMES DEBUG ===");
+      console.log("Officer names data:", officers);
+      console.log("Drawing at coordinates:", officerCoordinates);
+
+      // Draw OIC Officer
+      {
+        /**/
+      }
+      if (officers.oicOfficer) {
+        drawText(
+          officers.oicOfficer,
+          officerCoordinates.oicOfficer.x,
+          officerCoordinates.oicOfficer.y
+        );
+      }
+
+      // Draw Admin Officer
+      if (officers.adminOfficer) {
+        drawText(
+          officers.adminOfficer,
+          officerCoordinates.adminOfficer.x,
+          officerCoordinates.adminOfficer.y
+        );
+      }
+
+      // Draw Municipal Fire Marshal
+      if (officers.municipalFireMarshal) {
+        drawText(
+          officers.municipalFireMarshal,
+          officerCoordinates.municipalFireMarshal.x,
+          officerCoordinates.municipalFireMarshal.y
+        );
+      }
+    } else {
+      console.log("No officer names provided");
+    }
+
+    // ========== ADD PAYMENT TYPE TEXT ==========
+    const approveFor = leaveData.approve_for || "with_pay";
+    const paidDays = leaveData.paid_days || 0;
+    const unpaidDays = leaveData.unpaid_days || 0;
+
+    // Debug logging
+    console.log("=== PAYMENT TYPE DEBUG ===");
+    console.log("approve_for:", approveFor);
+    console.log("paid_days:", paidDays);
+    console.log("unpaid_days:", unpaidDays);
+    console.log("Payment coordinates:", paymentTypeNumbersCoordinates);
+
+    // Draw payment type text
+    if (approveFor === "with_pay") {
+      // Only with pay - draw the number only
+      console.log(
+        "Drawing WITH PAY number:",
+        paidDays,
+        "at coordinates:",
+        paymentTypeNumbersCoordinates.with_pay
+      );
+      if (paidDays > 0) {
+        drawText(
+          `${paidDays}`,
+          paymentTypeNumbersCoordinates.with_pay.x,
+          paymentTypeNumbersCoordinates.with_pay.y,
+          10
+        );
+      }
+    } else if (approveFor === "without_pay") {
+      // Only without pay - draw the number only
+      console.log(
+        "Drawing WITHOUT PAY number:",
+        unpaidDays,
+        "at coordinates:",
+        paymentTypeNumbersCoordinates.without_pay
+      );
+      if (unpaidDays > 0) {
+        drawText(
+          `${unpaidDays}`,
+          paymentTypeNumbersCoordinates.without_pay.x,
+          paymentTypeNumbersCoordinates.without_pay.y,
+          10
+        );
+      }
+    } else if (approveFor === "both") {
+      // Mixed: show both numbers only
+      console.log(
+        "Drawing BOTH numbers - Paid:",
+        paidDays,
+        "Unpaid:",
+        unpaidDays
+      );
+      if (paidDays > 0) {
+        drawText(
+          `${paidDays}`,
+          paymentTypeNumbersCoordinates.both_with_pay.x,
+          paymentTypeNumbersCoordinates.both_with_pay.y,
+          10
+        );
+      }
+      if (unpaidDays > 0) {
+        drawText(
+          `${unpaidDays}`,
+          paymentTypeNumbersCoordinates.both_without_pay.x,
+          paymentTypeNumbersCoordinates.both_without_pay.y,
+          10
+        );
+      }
+    }
+
     // Vacation location handling
-    // Vacation location handling - ENHANCED DEBUG
     if (leaveTypeLower.includes("vacation")) {
       console.log("=== VACATION DEBUG ===");
       console.log("Full leaveData:", JSON.stringify(leaveData, null, 2));
@@ -474,15 +602,9 @@ export const fillLeaveFormEnhanced = async (
           console.log("Location lines:", locationLines.length);
 
           locationLines.forEach((line, index) => {
-            // MOVE DOWN for each line - FIX THIS!
             const lineY = fieldCoordinates.locationAbroad.y - index * 15;
             console.log(`Line ${index}: "${line}" at Y:${lineY}`);
-            drawText(
-              line,
-              fieldCoordinates.locationAbroad.x,
-              lineY, // THIS IS THE FIX!
-              10
-            );
+            drawText(line, fieldCoordinates.locationAbroad.x, lineY, 10);
           });
         }
       } else {
@@ -505,19 +627,14 @@ export const fillLeaveFormEnhanced = async (
           console.log("Location lines:", locationLines.length);
 
           locationLines.forEach((line, index) => {
-            // MOVE DOWN for each line - FIX THIS!
             const lineY = fieldCoordinates.locationPhilippines.y - index * 15;
             console.log(`Line ${index}: "${line}" at Y:${lineY}`);
-            drawText(
-              line,
-              fieldCoordinates.locationPhilippines.x,
-              lineY, // THIS IS THE FIX!
-              10
-            );
+            drawText(line, fieldCoordinates.locationPhilippines.x, lineY, 10);
           });
         }
       }
     }
+
     // Sick leave handling
     if (leaveTypeLower.includes("sick")) {
       const illnessType =
@@ -533,16 +650,15 @@ export const fillLeaveFormEnhanced = async (
           12
         );
 
-        // Display illness details - FIXED: Use the correct coordinates
+        // Display illness details
         if (leaveData.illness_details || leaveData.illnessDetails) {
           const illnessText =
             leaveData.illness_details || leaveData.illnessDetails;
           const illnessLines = splitTextIntoLines(illnessText, 60);
           illnessLines.forEach((line, index) => {
-            // Use the CORRECT coordinates from fieldCoordinates
             drawText(
               line,
-              fieldCoordinates.illnessDetailsInHospital.x, // Now this exists
+              fieldCoordinates.illnessDetailsInHospital.x,
               fieldCoordinates.illnessDetailsInHospital.y - index * 15
             );
           });
@@ -556,16 +672,15 @@ export const fillLeaveFormEnhanced = async (
           12
         );
 
-        // Display illness details - FIXED: Use the correct coordinates
+        // Display illness details
         if (leaveData.illness_details || leaveData.illnessDetails) {
           const illnessText =
             leaveData.illness_details || leaveData.illnessDetails;
           const illnessLines = splitTextIntoLines(illnessText, 60);
           illnessLines.forEach((line, index) => {
-            // Use the CORRECT coordinates from fieldCoordinates
             drawText(
               line,
-              fieldCoordinates.illnessDetailsOutPatient.x, // Now this exists
+              fieldCoordinates.illnessDetailsOutPatient.x,
               fieldCoordinates.illnessDetailsOutPatient.y - index * 15
             );
           });
@@ -573,11 +688,38 @@ export const fillLeaveFormEnhanced = async (
       }
     }
 
-    // Fill leave balance information
+    // ========== FILL LEAVE BALANCE INFORMATION ==========
     const balanceBefore =
       leaveData.balance_before || leaveData.balanceBefore || 0;
     const balanceAfter = leaveData.balance_after || leaveData.balanceAfter || 0;
-    const numDays = leaveData.numDays || 0;
+    const num_days = leaveData.num_days || 0;
+
+    // Calculate total deduction
+    const paidDaysForBalance = leaveData.paid_days || 0;
+    const unpaidDaysForBalance = leaveData.unpaid_days || 0;
+    let totalDeducted = 0;
+
+    if (leaveData.total_deducted) {
+      totalDeducted = leaveData.total_deducted;
+      console.log("Using total_deducted field:", totalDeducted);
+    } else if (leaveData.paid_days || leaveData.unpaid_days) {
+      const paidDaysForBalance = leaveData.paid_days || 0;
+      const unpaidDaysForBalance = leaveData.unpaid_days || 0;
+      totalDeducted = paidDaysForBalance + unpaidDaysForBalance;
+      console.log("Calculated from paid+unpaid:", totalDeducted);
+    } else {
+      totalDeducted = num_days;
+      console.log("Using num_days as fallback:", totalDeducted);
+    }
+
+    console.log("=== BALANCE CALCULATION DEBUG ===");
+    console.log("balanceBefore:", balanceBefore);
+    console.log("balanceAfter:", balanceAfter);
+    console.log("num_days:", num_days);
+    console.log("paid_days:", leaveData.paid_days || 0);
+    console.log("unpaid_days:", leaveData.unpaid_days || 0);
+    console.log("totalDeducted (final):", totalDeducted);
+    console.log("total_deducted field:", leaveData.total_deducted);
 
     // Add today's date for "As of" field
     const today = new Date().toLocaleDateString("en-US", {
@@ -589,14 +731,14 @@ export const fillLeaveFormEnhanced = async (
 
     // Determine which column to use based on leave type
     if (leaveTypeLower.includes("vacation")) {
-      // Fill Vacation Leave column
+      // Fill Vacation Leave column - USE totalDeducted instead of num_days
       drawNumber(
         balanceBefore,
         fieldCoordinates.vacationTotalEarned.x,
         fieldCoordinates.vacationTotalEarned.y
       );
       drawNumber(
-        numDays,
+        totalDeducted,
         fieldCoordinates.vacationLessApplication.x,
         fieldCoordinates.vacationLessApplication.y
       );
@@ -623,15 +765,20 @@ export const fillLeaveFormEnhanced = async (
         fieldCoordinates.sickBalance.x,
         fieldCoordinates.sickBalance.y
       );
+
+      console.log("=== VACATION LEAVE BALANCE SUMMARY ===");
+      console.log("Total Earned (Before):", balanceBefore);
+      console.log("Less Application (Deducted):", totalDeducted);
+      console.log("Balance (After):", balanceAfter);
     } else if (leaveTypeLower.includes("sick")) {
-      // Fill Sick Leave column
+      // Fill Sick Leave column - USE totalDeducted instead of num_days
       drawNumber(
         balanceBefore,
         fieldCoordinates.sickTotalEarned.x,
         fieldCoordinates.sickTotalEarned.y
       );
       drawNumber(
-        numDays,
+        totalDeducted,
         fieldCoordinates.sickLessApplication.x,
         fieldCoordinates.sickLessApplication.y
       );
@@ -658,6 +805,11 @@ export const fillLeaveFormEnhanced = async (
         fieldCoordinates.vacationBalance.x,
         fieldCoordinates.vacationBalance.y
       );
+
+      console.log("=== SICK LEAVE BALANCE SUMMARY ===");
+      console.log("Total Earned (Before):", balanceBefore);
+      console.log("Less Application (Deducted):", totalDeducted);
+      console.log("Balance (After):", balanceAfter);
     } else {
       // For other leave types, show balances as is
       drawNumber(
@@ -692,58 +844,24 @@ export const fillLeaveFormEnhanced = async (
         fieldCoordinates.sickBalance.y
       );
     }
-    {
-      /*
-    // Add additional info for yearly records
-    if (isYearly) {
-      const year = leaveData.year || new Date().getFullYear();
-      const recordDate =
-        leaveData.recordDate || generationDate || new Date().toISOString();
 
-      drawText(`Yearly Record - ${year}`, 50, 580, 10);
-      drawText(
-        `Record Generated: ${formatDateForPDF(recordDate)}`,
-        50,
-        565,
-        10
-      );
+    // ========== ADD ADDITIONAL DEBUG INFO ==========
+    console.log("=== FINAL PDF DEBUG SUMMARY ===");
+    console.log("Leave Type:", selectedLeaveType);
+    console.log("Approve For:", approveFor);
+    console.log("Payment Type Numbers:", {
+      with_pay: paymentTypeNumbersCoordinates.with_pay,
+      without_pay: paymentTypeNumbersCoordinates.without_pay,
+    });
+    console.log("Balance Fields:", {
+      vacationTotalEarned: fieldCoordinates.vacationTotalEarned,
+      vacationLessApplication: fieldCoordinates.vacationLessApplication,
+      vacationBalance: fieldCoordinates.vacationBalance,
+      sickTotalEarned: fieldCoordinates.sickTotalEarned,
+      sickLessApplication: fieldCoordinates.sickLessApplication,
+      sickBalance: fieldCoordinates.sickBalance,
+    });
 
-      // Leave summary
-      drawText(`Leave Summary:`, 50, 545, 10);
-      drawText(
-        `Vacation Days: ${leaveData.totalVacationDays || 0}`,
-        50,
-        530,
-        10
-      );
-      drawText(`Sick Days: ${leaveData.totalSickDays || 0}`, 50, 515, 10);
-      drawText(
-        `Emergency Days: ${leaveData.totalEmergencyDays || 0}`,
-        50,
-        500,
-        10
-      );
-      drawText(`Total Days: ${leaveData.numDays || 0}`, 50, 485, 10);
-    }
-
-    // Add timestamp and processed by info at the bottom
-    const timestamp = generationDate
-      ? new Date(generationDate).toLocaleString()
-      : new Date().toLocaleString();
-
-    const processedBy =
-      leaveData.approvedBy || adminUsername || "System Administrator";
-
-    drawText(`Processed by: ${processedBy}`, 50, 50, 8);
-    drawText(`Generated on: ${timestamp}`, 50, 35, 8);
-
-    // Add document type indicator
-    if (isYearly) {
-      const year = leaveData.year || new Date().getFullYear();
-      drawText(`Archived Yearly Record - ${year}`, 200, 30, 8);
-    }
-*/
-    }
     const pdfBytesFilled = await pdfDoc.save();
     console.log("✅ PDF successfully filled with enhanced form filler");
     return pdfBytesFilled;

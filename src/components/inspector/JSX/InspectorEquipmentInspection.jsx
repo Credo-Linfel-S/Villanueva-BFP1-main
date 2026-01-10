@@ -408,29 +408,31 @@ const InspectorEquipmentInspection = () => {
   };
 
   // Function to check if equipment is in pending clearance
-  const checkEquipmentClearanceStatus = async (inventoryIds) => {
-    try {
-      const cachedResults = {};
-      const idsToFetch = [];
+const checkEquipmentClearanceStatus = async (inventoryIds) => {
+  try {
+    const cachedResults = {};
+    const idsToFetch = [];
 
-      inventoryIds.forEach((id) => {
-        if (clearanceCache[id] !== undefined) {
-          cachedResults[id] = clearanceCache[id];
-        } else {
-          idsToFetch.push(id);
-        }
-      });
-
-      if (idsToFetch.length === 0) {
-        return cachedResults;
+    inventoryIds.forEach((id) => {
+      if (clearanceCache[id] !== undefined) {
+        cachedResults[id] = clearanceCache[id];
+      } else {
+        idsToFetch.push(id);
       }
+    });
 
-      console.log("Checking clearance status for inventory IDs:", idsToFetch);
+    if (idsToFetch.length === 0) {
+      return cachedResults;
+    }
 
-      const { data, error } = await supabase
-        .from("clearance_inventory")
-        .select(
-          `
+    console.log("Checking clearance status for inventory IDs:", idsToFetch);
+
+    // UPDATED QUERY: Remove .eq("clearance_requests.status", "Pending")
+    // This ensures we see ALL clearance requests, not just those with status "Pending"
+    const { data, error } = await supabase
+      .from("clearance_inventory")
+      .select(
+        `
         id,
         inventory_id,
         status,
@@ -441,98 +443,106 @@ const InspectorEquipmentInspection = () => {
           personnel_id
         )
       `
-        )
-        .in("inventory_id", idsToFetch)
-        .eq("status", "Pending")
-        .eq("clearance_requests.status", "Pending")
-        .in("clearance_requests.type", [
-          "Resignation",
-          "Retirement",
-          "Equipment Completion",
-        ]);
+      )
+      .in("inventory_id", idsToFetch)
+      .eq("status", "Pending") // This checks clearance_inventory status
+      .in("clearance_requests.type", [
+        "Resignation",
+        "Retirement",
+        "Equipment Completion",
+      ]);
+    // REMOVED: .eq("clearance_requests.status", "Pending")
 
-      if (error) {
-        console.error("Error checking clearance status:", error);
-        return cachedResults;
+    if (error) {
+      console.error("Error checking clearance status:", error);
+      return cachedResults;
+    }
+
+    // Rest of the function remains the same...
+    const inventoryClearanceMap = {};
+
+    data?.forEach((item) => {
+      const inventoryId = item.inventory_id;
+      const request = item.clearance_requests;
+
+      if (!inventoryClearanceMap[inventoryId]) {
+        inventoryClearanceMap[inventoryId] = [];
       }
 
-      // Group by inventory_id to handle multiple clearances for same equipment
-      const inventoryClearanceMap = {};
-
-      data?.forEach((item) => {
-        const inventoryId = item.inventory_id;
-        const request = item.clearance_requests;
-
-        if (!inventoryClearanceMap[inventoryId]) {
-          inventoryClearanceMap[inventoryId] = [];
-        }
-
-        inventoryClearanceMap[inventoryId].push({
-          requestId: request.id,
-          type: request.type,
-          personnelId: request.personnel_id,
-          clearanceInventoryId: item.id,
-        });
+      inventoryClearanceMap[inventoryId].push({
+        requestId: request.id,
+        type: request.type,
+        personnelId: request.personnel_id,
+        clearanceInventoryId: item.id,
+        clearanceRequestStatus: request.status, // Add this for debugging
       });
+    });
 
-      const newResults = {};
+    console.log("Clearance data found:", data);
+    console.log("Mapped clearance data:", inventoryClearanceMap);
 
-      // Process each inventory item
-      idsToFetch.forEach((id) => {
-        const clearances = inventoryClearanceMap[id] || [];
+    // Process each inventory item
+    const newResults = {};
 
-        if (clearances.length > 0) {
-          // Check if there are multiple clearance types
-          const clearanceTypes = [...new Set(clearances.map((c) => c.type))];
+    idsToFetch.forEach((id) => {
+      const clearances = inventoryClearanceMap[id] || [];
 
-          // Combine Retirement/Resignation with Equipment Completion
-          let displayType = "";
-          if (
-            clearanceTypes.includes("Retirement") &&
-            clearanceTypes.includes("Equipment Completion")
-          ) {
-            displayType = "Retirement & Equipment Completion";
-          } else if (
-            clearanceTypes.includes("Resignation") &&
-            clearanceTypes.includes("Equipment Completion")
-          ) {
-            displayType = "Resignation & Equipment Completion";
-          } else if (clearanceTypes.length === 1) {
-            displayType = clearanceTypes[0];
-          } else {
-            displayType = clearanceTypes.join(", ");
-          }
+      if (clearances.length > 0) {
+        // Log for debugging
+        console.log(
+          `Found ${clearances.length} clearances for inventory ${id}:`,
+          clearances
+        );
 
-          // Get all request IDs
-          const requestIds = clearances.map((c) => c.requestId);
+        // Combine types
+        const clearanceTypes = [...new Set(clearances.map((c) => c.type))];
 
-          newResults[id] = {
-            hasClearance: true,
-            type: displayType,
-            requestIds: requestIds, // Store multiple request IDs
-            clearanceInventoryIds: clearances.map(
-              (c) => c.clearanceInventoryId
-            ),
-            originalTypes: clearanceTypes, // Store original types
-            personnelId: clearances[0].personnelId, // Assuming same personnel for all
-          };
+        let displayType = "";
+        if (
+          clearanceTypes.includes("Retirement") &&
+          clearanceTypes.includes("Equipment Completion")
+        ) {
+          displayType = "Retirement & Equipment Completion";
+        } else if (
+          clearanceTypes.includes("Resignation") &&
+          clearanceTypes.includes("Equipment Completion")
+        ) {
+          displayType = "Resignation & Equipment Completion";
+        } else if (clearanceTypes.length === 1) {
+          displayType = clearanceTypes[0];
         } else {
-          newResults[id] = { hasClearance: false };
+          displayType = clearanceTypes.join(", ");
         }
-      });
 
-      const updatedCache = { ...clearanceCache, ...newResults };
-      setClearanceCache(updatedCache);
+        // Get all request IDs
+        const requestIds = clearances.map((c) => c.requestId);
 
-      const allResults = { ...cachedResults, ...newResults };
-      console.log("Total results:", Object.keys(allResults).length, "items");
-      return allResults;
-    } catch (error) {
-      console.error("Error in checkEquipmentClearanceStatus:", error);
-      return {};
-    }
-  };
+        newResults[id] = {
+          hasClearance: true,
+          type: displayType,
+          requestIds: requestIds,
+          clearanceInventoryIds: clearances.map((c) => c.clearanceInventoryId),
+          originalTypes: clearanceTypes,
+          personnelId: clearances[0].personnelId,
+          clearanceRequestStatuses: clearances.map(
+            (c) => c.clearanceRequestStatus
+          ), // Add statuses
+        };
+      } else {
+        newResults[id] = { hasClearance: false };
+      }
+    });
 
+    const updatedCache = { ...clearanceCache, ...newResults };
+    setClearanceCache(updatedCache);
+
+    console.log("Final results:", newResults);
+    return { ...cachedResults, ...newResults };
+  } catch (error) {
+    console.error("Error in checkEquipmentClearanceStatus:", error);
+    return {};
+  }
+};
   // Function to load clearance status for filtered equipment
   const loadEquipmentClearanceStatus = async (equipmentList) => {
     if (equipmentList.length === 0) {
@@ -757,16 +767,16 @@ const InspectorEquipmentInspection = () => {
   // Add loading state for clearances
   const [isLoadingClearances, setIsLoadingClearances] = useState(false);
 
-  // Update the loadPendingClearances function
-  const loadPendingClearances = async () => {
-    setIsLoadingClearances(true);
-    try {
-      console.log("Loading pending clearance inspections...");
+const loadPendingClearances = async () => {
+  setIsLoadingClearances(true);
+  try {
+    console.log("Loading pending clearance inspections...");
 
-      const { data, error } = await supabase
-        .from("clearance_inventory")
-        .select(
-          `
+    // UPDATED QUERY: Also look for "In Progress" status
+    const { data, error } = await supabase
+      .from("clearance_inventory")
+      .select(
+        `
         id,
         clearance_request_id,
         inventory_id,
@@ -795,110 +805,109 @@ const InspectorEquipmentInspection = () => {
           assigned_to
         )
       `
-        )
-        .eq("status", "Pending")
-        .eq("clearance_requests.status", "Pending")
-        .order("created_at", { ascending: true });
+      )
+      .eq("status", "Pending") // clearance_inventory status
+      .in("clearance_requests.status", ["Pending", "In Progress"]) // Accept both statuses
+      .order("created_at", { ascending: true });
 
-      if (error) {
-        console.error("Clearance inventory query error:", error);
-        setPendingClearances([]);
-        return;
+    if (error) {
+      console.error("Clearance inventory query error:", error);
+      setPendingClearances([]);
+      return;
+    }
+
+    console.log("Raw clearance data loaded:", data);
+
+    // Group by personnel_id AND type combination
+    const groupedByPersonnelAndType = {};
+
+    data.forEach((item) => {
+      const request = item.clearance_requests;
+      const personnelId = request.personnel_id;
+      const type = request.type;
+
+      // Create a key that combines personnel and type
+      let groupKey = `${personnelId}`;
+
+      // Combine Retirement/Resignation with Equipment Completion for same personnel
+      if (type === "Equipment Completion") {
+        groupKey = `${personnelId}_combined`;
+      } else {
+        groupKey = `${personnelId}_${type}`;
       }
 
-      // Group by personnel_id AND type combination
-      const groupedByPersonnelAndType = {};
+      if (!groupedByPersonnelAndType[groupKey]) {
+        groupedByPersonnelAndType[groupKey] = {
+          id: request.id,
+          personnel_id: personnelId,
+          type: request.type,
+          request_status: request.status,
+          request_created_at: request.created_at,
+          personnel_name: request.personnel
+            ? `${request.personnel.first_name || ""} ${
+                request.personnel.last_name || ""
+              }`.trim()
+            : "Unknown",
+          badge_number: request.personnel?.badge_number || "N/A",
+          equipment_count: 0,
+          equipment_items: [],
+          originalTypes: new Set([request.type]),
+        };
+      }
 
-      data.forEach((item) => {
-        const request = item.clearance_requests;
-        const personnelId = request.personnel_id;
-        const type = request.type;
-
-        // Create a key that combines personnel and type (but treat Equipment Completion differently)
-        let groupKey = `${personnelId}`;
-
-        // Combine Retirement/Resignation with Equipment Completion for same personnel
-        if (type === "Equipment Completion") {
-          groupKey = `${personnelId}_combined`;
-        } else {
-          groupKey = `${personnelId}_${type}`;
-        }
-
-        if (!groupedByPersonnelAndType[groupKey]) {
-          groupedByPersonnelAndType[groupKey] = {
-            id: request.id,
-            personnel_id: personnelId,
-            type: request.type,
-            request_status: request.status,
-            request_created_at: request.created_at,
-            personnel_name: request.personnel
-              ? `${request.personnel.first_name || ""} ${
-                  request.personnel.last_name || ""
-                }`.trim()
-              : "Unknown",
-            badge_number: request.personnel?.badge_number || "N/A",
-            equipment_count: 0,
-            equipment_items: [],
-            originalTypes: new Set([request.type]),
-          };
-        }
-
-        groupedByPersonnelAndType[groupKey].equipment_count++;
-        groupedByPersonnelAndType[groupKey].equipment_items.push({
-          inventory_id: item.inventory_id,
-          item_name: item.inventory?.item_name,
-          item_code: item.inventory?.item_code,
-          category: item.inventory?.category,
-          equipment_status: item.inventory?.status,
-          assigned_to: item.inventory?.assigned_to,
-          clearance_status: item.status,
-          clearance_inventory_id: item.id,
-          clearance_request_id: item.clearance_request_id,
-        });
-
-        // Add type to set
-        groupedByPersonnelAndType[groupKey].originalTypes.add(request.type);
+      groupedByPersonnelAndType[groupKey].equipment_count++;
+      groupedByPersonnelAndType[groupKey].equipment_items.push({
+        inventory_id: item.inventory_id,
+        item_name: item.inventory?.item_name,
+        item_code: item.inventory?.item_code,
+        category: item.inventory?.category,
+        equipment_status: item.inventory?.status,
+        assigned_to: item.inventory?.assigned_to,
+        clearance_status: item.status,
+        clearance_inventory_id: item.id,
+        clearance_request_id: item.clearance_request_id,
       });
 
-      // Process grouped data to combine types where needed
-      const equipmentClearances = Object.values(groupedByPersonnelAndType).map(
-        (clearance) => {
-          const typesArray = Array.from(clearance.originalTypes);
+      // Add type to set
+      groupedByPersonnelAndType[groupKey].originalTypes.add(request.type);
+    });
 
-          // Combine Retirement/Resignation with Equipment Completion
-          if (
-            typesArray.includes("Retirement") &&
-            typesArray.includes("Equipment Completion")
-          ) {
-            clearance.type = "Retirement & Equipment Completion";
-          } else if (
-            typesArray.includes("Resignation") &&
-            typesArray.includes("Equipment Completion")
-          ) {
-            clearance.type = "Resignation & Equipment Completion";
-          } else if (typesArray.length > 1) {
-            clearance.type = typesArray.join(", ");
-          }
+    // Process grouped data to combine types where needed
+    const equipmentClearances = Object.values(groupedByPersonnelAndType).map(
+      (clearance) => {
+        const typesArray = Array.from(clearance.originalTypes);
 
-          return clearance;
+        // Combine Retirement/Resignation with Equipment Completion
+        if (
+          typesArray.includes("Retirement") &&
+          typesArray.includes("Equipment Completion")
+        ) {
+          clearance.type = "Retirement & Equipment Completion";
+        } else if (
+          typesArray.includes("Resignation") &&
+          typesArray.includes("Equipment Completion")
+        ) {
+          clearance.type = "Resignation & Equipment Completion";
+        } else if (typesArray.length > 1) {
+          clearance.type = typesArray.join(", ");
         }
-      );
 
-      setPendingClearances(equipmentClearances);
-      console.log(
-        "Pending clearance inspections loaded:",
-        equipmentClearances.length
-      );
+        return clearance;
+      }
+    );
 
-      // Store the last update time
-      localStorage.setItem("lastClearanceUpdate", new Date().toISOString());
-    } catch (error) {
-      console.error("Error loading pending clearances:", error);
-      setPendingClearances([]);
-    } finally {
-      setIsLoadingClearances(false);
-    }
-  };
+    console.log("Processed clearances:", equipmentClearances);
+    setPendingClearances(equipmentClearances);
+
+    // Store the last update time
+    localStorage.setItem("lastClearanceUpdate", new Date().toISOString());
+  } catch (error) {
+    console.error("Error loading pending clearances:", error);
+    setPendingClearances([]);
+  } finally {
+    setIsLoadingClearances(false);
+  }
+};
 
   const loadPersonnel = async () => {
     try {
@@ -1367,84 +1376,130 @@ const InspectorEquipmentInspection = () => {
     setShowInspectModal(true);
   };
 
-  const checkAndUpdateClearanceStatus = async (
-    equipmentId,
-    clearanceStatus
-  ) => {
-    try {
-      // Get all clearance_inventory records for this equipment
-      const { data: clearanceRecords, error } = await supabase
-        .from("clearance_inventory")
-        .select("clearance_request_id, personnel_id, status")
-        .eq("inventory_id", equipmentId)
-        .eq("status", "Pending");
+const checkAndUpdateClearanceStatus = async (
+  equipmentId,
+  clearanceStatus,
+  inspectionId
+) => {
+  try {
+    // Get ALL clearance_inventory records for this equipment
+    const { data: clearanceRecords, error } = await supabase
+      .from("clearance_inventory")
+      .select(
+        `
+        id,
+        clearance_request_id,
+        personnel_id,
+        status,
+        clearance_requests!inner (type, status)
+      `
+      )
+      .eq("inventory_id", equipmentId)
+      .eq("status", "Pending");
 
-      if (error) throw error;
+    if (error) throw error;
 
-      if (clearanceRecords && clearanceRecords.length > 0) {
-        // Group by clearance request
-        const requestsMap = {};
-        clearanceRecords.forEach((record) => {
-          if (!requestsMap[record.clearance_request_id]) {
-            requestsMap[record.clearance_request_id] = {
-              requestId: record.clearance_request_id,
-              personnelId: record.personnel_id,
-              items: [],
-            };
+    if (clearanceRecords && clearanceRecords.length > 0) {
+      // Group by clearance request
+      const requestsMap = {};
+      clearanceRecords.forEach((record) => {
+        if (!requestsMap[record.clearance_request_id]) {
+          requestsMap[record.clearance_request_id] = {
+            requestId: record.clearance_request_id,
+            personnelId: record.personnel_id,
+            clearanceType: record.clearance_requests?.type,
+            currentStatus: record.clearance_requests?.status,
+            items: [],
+          };
+        }
+        requestsMap[record.clearance_request_id].items.push({
+          inventoryId: equipmentId,
+          originalStatus: record.status,
+          newStatus: clearanceStatus,
+        });
+      });
+
+      console.log("Processing clearance requests:", Object.keys(requestsMap));
+
+      // Update EACH clearance request separately
+      for (const requestId in requestsMap) {
+        const request = requestsMap[requestId];
+
+        // Get all items for this SPECIFIC clearance request
+        const { data: allItems, error: itemsError } = await supabase
+          .from("clearance_inventory")
+          .select(
+            `
+            id,
+            status,
+            inventory_id,
+            accountability_records!left (is_settled)
+          `
+          )
+          .eq("clearance_request_id", requestId);
+
+        if (itemsError) {
+          console.error(
+            `Error getting items for request ${requestId}:`,
+            itemsError
+          );
+          continue;
+        }
+
+        // Count statuses
+        const total = allItems.length;
+        const cleared = allItems.filter(
+          (item) => item.status === "Cleared"
+        ).length;
+        const pending = allItems.filter(
+          (item) => item.status === "Pending"
+        ).length;
+        const damaged = allItems.filter(
+          (item) => item.status === "Damaged"
+        ).length;
+        const lost = allItems.filter((item) => item.status === "Lost").length;
+
+        // Check accountability settlement status for THIS request
+        const { data: accountabilityData, error: accountabilityError } =
+          await supabase
+            .from("personnel_equipment_accountability_table")
+            .select("accountability_status")
+            .eq("personnel_id", request.personnelId)
+            .eq("clearance_request_id", requestId)
+            .maybeSingle();
+
+        const isAccountabilitySettled =
+          !accountabilityError &&
+          accountabilityData?.accountability_status === "SETTLED";
+
+        let newRequestStatus = "In Progress";
+
+        if (pending === 0 && damaged === 0 && lost === 0) {
+          // All items cleared
+          newRequestStatus = "Pending for Approval";
+        } else if (damaged > 0 || lost > 0) {
+          // Check if accountability is settled FOR THIS SPECIFIC REQUEST
+          if (isAccountabilitySettled) {
+            newRequestStatus = "Pending for Approval";
+          } else {
+            newRequestStatus = "In Progress";
           }
-          requestsMap[record.clearance_request_id].items.push({
-            originalStatus: record.status,
-            newStatus: clearanceStatus,
-          });
+        } else if (cleared > 0 && pending > 0) {
+          newRequestStatus = "In Progress";
+        }
+
+        console.log(`Request ${requestId} status analysis:`, {
+          total,
+          cleared,
+          pending,
+          damaged,
+          lost,
+          isAccountabilitySettled,
+          newStatus: newRequestStatus,
         });
 
-        // Update each clearance request
-        for (const requestId in requestsMap) {
-          const request = requestsMap[requestId];
-
-          // Get all items for this clearance request
-          const { data: allItems, error: itemsError } = await supabase
-            .from("clearance_inventory")
-            .select("status")
-            .eq("clearance_request_id", requestId);
-
-          if (itemsError) continue;
-
-          // Count statuses
-          const total = allItems.length;
-          const cleared = allItems.filter(
-            (item) => item.status === "Cleared"
-          ).length;
-          const pending = allItems.filter(
-            (item) => item.status === "Pending"
-          ).length;
-          const damaged = allItems.filter(
-            (item) => item.status === "Damaged"
-          ).length;
-          const lost = allItems.filter((item) => item.status === "Lost").length;
-
-          let newRequestStatus = "In Progress";
-
-          if (pending === 0 && damaged === 0 && lost === 0) {
-            // All items cleared
-            newRequestStatus = "Pending for Approval";
-          } else if (damaged > 0 || lost > 0) {
-            // Check if accountability is settled
-            const { data: accountabilityData } = await supabase
-              .from("personnel_equipment_accountability_table")
-              .select("accountability_status")
-              .eq("personnel_id", request.personnelId)
-              .eq("clearance_request_id", requestId)
-              .maybeSingle();
-
-            if (accountabilityData?.accountability_status === "SETTLED") {
-              newRequestStatus = "Pending for Approval";
-            } else {
-              newRequestStatus = "In Progress";
-            }
-          }
-
-          // Update clearance request status
+        // Update clearance request status
+        if (newRequestStatus !== request.currentStatus) {
           const { error: updateError } = await supabase
             .from("clearance_requests")
             .update({
@@ -1453,18 +1508,23 @@ const InspectorEquipmentInspection = () => {
             })
             .eq("id", requestId);
 
-          if (!updateError) {
+          if (updateError) {
+            console.error(
+              `Error updating clearance request ${requestId}:`,
+              updateError
+            );
+          } else {
             console.log(
               `✅ Updated clearance request ${requestId} to ${newRequestStatus}`
             );
           }
         }
       }
-    } catch (error) {
-      console.error("Error updating clearance status:", error);
     }
-  };
-
+  } catch (error) {
+    console.error("Error updating clearance status:", error);
+  }
+};
   const submitInspection = async () => {
     if (!inspectionData.findings) {
       toast.error("Please enter findings");
@@ -1488,19 +1548,20 @@ const InspectorEquipmentInspection = () => {
 
       // 1. FIRST: Find all clearance_inventory records for this equipment
       console.log("🔍 Searching for clearance_inventory records...");
-      const { data: clearanceRecords, error: findError } = await supabase
-        .from("clearance_inventory")
-        .select("*")
-        .eq("inventory_id", selectedSchedule.equipment_id)
-        .eq("status", "Pending");
+  const { data: clearanceRecords, error: findError } = await supabase
+    .from("clearance_inventory")
+    .select("clearance_request_id")
+    .eq("inventory_id", selectedSchedule.equipment_id)
+    .eq("status", "Pending");
 
-      if (findError) {
-        console.error("❌ Error finding clearance records:", findError);
-      } else {
-        console.log(
-          `🔍 Found ${clearanceRecords?.length || 0} pending clearance records`
-        );
-      }
+  let allClearanceRequestIds = [];
+  if (!findError && clearanceRecords) {
+    // Get UNIQUE clearance request IDs
+    allClearanceRequestIds = [
+      ...new Set(clearanceRecords.map((r) => r.clearance_request_id)),
+    ];
+    console.log("Found clearance requests:", allClearanceRequestIds);
+  }
 
       // Determine clearance status based on equipment status
       let clearanceStatus;
@@ -1626,22 +1687,20 @@ const InspectorEquipmentInspection = () => {
       }
 
       // 7. Create accountability record if needed
-      const isAccountabilityCase =
-        inspectionData.equipmentStatus === "Lost" ||
-        inspectionData.equipmentStatus === "Damaged";
+  const isAccountabilityCase =
+    inspectionData.equipmentStatus === "Lost" ||
+    inspectionData.equipmentStatus === "Damaged";
 
-      if (isAccountabilityCase && clearanceRecords) {
-        const requestIds =
-          clearanceRecords.map((r) => r.clearance_request_id) || [];
-        await createAccountabilityRecord(
-          selectedSchedule.id,
-          selectedSchedule.equipment_id,
-          selectedSchedule.personnel_id || null,
-          inspectionData.equipmentStatus,
-          inspectionData.findings,
-          requestIds
-        );
-      }
+  if (isAccountabilityCase) {
+    await createAccountabilityRecord(
+      selectedSchedule.id,
+      selectedSchedule.equipment_id,
+      selectedSchedule.personnel_id || null,
+      inspectionData.equipmentStatus,
+      inspectionData.findings,
+      allClearanceRequestIds // Pass ALL request IDs
+    );
+  }
 
       // 8. Show success message
       toast.success(
@@ -1967,275 +2026,248 @@ const InspectorEquipmentInspection = () => {
     recentStart + rowsPerPage
   );
 
-  const createAccountabilityRecord = async (
-    inspectionId,
-    equipmentId,
-    personnelId,
-    status,
-    findings,
-    clearanceRequestIds = []
-  ) => {
-    try {
-      // 1. Get equipment details
-      const { data: equipment, error: equipmentError } = await supabase
-        .from("inventory")
-        .select(
-          `
+const createAccountabilityRecord = async (
+  inspectionId,
+  equipmentId,
+  personnelId,
+  status,
+  findings,
+  clearanceRequestIds = [] // Accept MULTIPLE request IDs
+) => {
+  try {
+    // Get equipment details
+    const { data: equipment, error: equipmentError } = await supabase
+      .from("inventory")
+      .select(`
         assigned_personnel_id,
         current_value,
         price,
         item_name,
-        assigned_to,
-        personnel:assigned_personnel_id(first_name, last_name, badge_number)
-      `
-        )
-        .eq("id", equipmentId)
-        .single();
+        assigned_to
+      `)
+      .eq("id", equipmentId)
+      .single();
 
-      if (equipmentError) throw equipmentError;
+    if (equipmentError) throw equipmentError;
 
-      // If equipment is unassigned, we need personnelId from inspection
-      let targetPersonnelId = personnelId || equipment.assigned_personnel_id;
+    let targetPersonnelId = personnelId || equipment.assigned_personnel_id;
 
-      if (!targetPersonnelId) {
-        console.log("No personnel ID found for equipment");
-        return false;
-      }
+    if (!targetPersonnelId) {
+      console.log("No personnel ID found for equipment");
+      return false;
+    }
 
-      // 2. Get personnel name
-      const { data: personnelData, error: personnelError } = await supabase
-        .from("personnel")
-        .select("first_name, last_name")
-        .eq("id", targetPersonnelId)
-        .single();
+    // Calculate amount due
+    const baseValue = equipment.current_value || equipment.price || 0;
+    const amountDue = status.toUpperCase() === "LOST" ? baseValue : baseValue * 0.5;
 
-      const personnelName = personnelData
-        ? `${personnelData.first_name || ""} ${
-            personnelData.last_name || ""
-          }`.trim()
-        : equipment.assigned_to || "Unknown";
+    // Create accountability records for EACH clearance request
+    const recordsData = [];
 
-      // 3. Calculate amount due
-      const baseValue = equipment.current_value || equipment.price || 0;
-      const amountDue =
-        status.toUpperCase() === "LOST" ? baseValue : baseValue * 0.5;
-
-      // 4. Create accountability records for EACH clearance request
-      const recordsData = clearanceRequestIds.map((clearanceRequestId) => ({
-        personnel_id: targetPersonnelId,
-        inventory_id: equipmentId,
-        inspection_id: inspectionId,
-        record_type: status.toUpperCase(),
-        amount_due: amountDue,
-        remarks: `Equipment "${
-          equipment.item_name
-        }" marked as ${status.toLowerCase()} during inspection. Findings: ${
-          findings || "No findings specified"
-        }`,
-        is_settled: false,
-        source_type: clearanceRequestId ? "clearance-linked" : "routine",
-        record_date: new Date().toISOString().split("T")[0],
-        clearance_request_id: clearanceRequestId,
-      }));
-
-      // Also create a non-clearance linked record for general accountability
-      if (clearanceRequestIds.length === 0) {
+    // If there are multiple clearance requests, create records for EACH one
+    if (clearanceRequestIds && clearanceRequestIds.length > 0) {
+      clearanceRequestIds.forEach((clearanceRequestId) => {
         recordsData.push({
           personnel_id: targetPersonnelId,
           inventory_id: equipmentId,
           inspection_id: inspectionId,
           record_type: status.toUpperCase(),
           amount_due: amountDue,
-          remarks: `Equipment "${
-            equipment.item_name
-          }" marked as ${status.toLowerCase()} during inspection. Findings: ${
-            findings || "No findings specified"
-          }`,
+          remarks: `Equipment "${equipment.item_name}" marked as ${status.toLowerCase()} during inspection. Findings: ${findings || "No findings specified"}`,
           is_settled: false,
-          source_type: "routine",
+          source_type: "clearance-linked",
           record_date: new Date().toISOString().split("T")[0],
+          clearance_request_id: clearanceRequestId, // SPECIFIC clearance request
         });
-      }
-
-      const { data: records, error: recordError } = await supabase
-        .from("accountability_records")
-        .insert(recordsData)
-        .select();
-
-      if (recordError) throw recordError;
-
-      console.log(`Created ${records.length} accountability record(s)`);
-
-      // 5. Update personnel accountability summary for ALL clearance requests
-      await Promise.all(
-        clearanceRequestIds.map(async (clearanceRequestId) => {
-          await updatePersonnelAccountabilitySummary(
-            targetPersonnelId,
-            clearanceRequestId
-          );
-        })
-      );
-
-      // Also update summary for non-clearance records
-      if (clearanceRequestIds.length === 0) {
-        await updatePersonnelAccountabilitySummary(targetPersonnelId, null);
-      }
-
-      return true;
-    } catch (error) {
-      console.error("Error creating accountability record:", error);
-      toast.error(`Failed to create accountability record: ${error.message}`);
-      return false;
+      });
+    } else {
+      // Create a non-clearance linked record for general accountability
+      recordsData.push({
+        personnel_id: targetPersonnelId,
+        inventory_id: equipmentId,
+        inspection_id: inspectionId,
+        record_type: status.toUpperCase(),
+        amount_due: amountDue,
+        remarks: `Equipment "${equipment.item_name}" marked as ${status.toLowerCase()} during inspection. Findings: ${findings || "No findings specified"}`,
+        is_settled: false,
+        source_type: "routine",
+        record_date: new Date().toISOString().split("T")[0],
+      });
     }
-  };
+
+    // Insert all accountability records
+    const { data: records, error: recordError } = await supabase
+      .from("accountability_records")
+      .insert(recordsData)
+      .select();
+
+    if (recordError) throw recordError;
+
+    console.log(`Created ${records.length} accountability record(s) for equipment ${equipmentId}`);
+
+    // Update personnel accountability summary for EACH clearance request
+    if (clearanceRequestIds && clearanceRequestIds.length > 0) {
+      for (const clearanceRequestId of clearanceRequestIds) {
+        await updatePersonnelAccountabilitySummary(
+          targetPersonnelId,
+          clearanceRequestId
+        );
+      }
+    } else {
+      // Update summary for non-clearance records
+      await updatePersonnelAccountabilitySummary(targetPersonnelId, null);
+    }
+
+    return true;
+  } catch (error) {
+    console.error("Error creating accountability record:", error);
+    return false;
+  }
+};
 
   // Helper function to update the summary table
-  const updatePersonnelAccountabilitySummary = async (
-    personnelId,
-    clearanceRequestId = null
-  ) => {
-    try {
-      // Build query based on whether we're looking for clearance-linked or general records
-      let query = supabase
-        .from("accountability_records")
-        .select(
-          `
+const updatePersonnelAccountabilitySummary = async (
+  personnelId,
+  clearanceRequestId = null
+) => {
+  try {
+    // Build query based on whether we're looking for clearance-linked or general records
+    let query = supabase
+      .from("accountability_records")
+      .select(
+        `
         amount_due,
         record_type,
-        inventory:inventory_id(item_name, current_value)
+        inventory:inventory_id(item_name, current_value),
+        clearance_requests!left (type, status)
       `
-        )
-        .eq("personnel_id", personnelId)
-        .eq("is_settled", false)
-        .in("record_type", ["LOST", "DAMAGED"]);
+      )
+      .eq("personnel_id", personnelId)
+      .eq("is_settled", false)
+      .in("record_type", ["LOST", "DAMAGED"]);
 
-      // If clearanceRequestId is provided, get only records for that clearance
-      // If null, get only non-clearance records
-      if (clearanceRequestId !== null) {
-        query = query.eq("clearance_request_id", clearanceRequestId);
-      } else {
-        query = query.is("clearance_request_id", null);
+    // If clearanceRequestId is provided, get only records for that specific clearance
+    // If null, get only non-clearance records
+    if (clearanceRequestId !== null) {
+      query = query.eq("clearance_request_id", clearanceRequestId);
+    } else {
+      query = query.is("clearance_request_id", null);
+    }
+
+    const { data: records, error } = await query;
+
+    if (error) throw error;
+
+    let total_outstanding_amount = 0;
+    let lost_equipment_count = 0;
+    let damaged_equipment_count = 0;
+    let lost_equipment_value = 0;
+    let damaged_equipment_value = 0;
+
+    records?.forEach((record) => {
+      const amount = record.amount_due || record.inventory?.current_value || 0;
+      total_outstanding_amount += amount;
+
+      if (record.record_type === "LOST") {
+        lost_equipment_count++;
+        lost_equipment_value += amount;
+      } else if (record.record_type === "DAMAGED") {
+        damaged_equipment_count++;
+        damaged_equipment_value += amount;
       }
+    });
 
-      const { data: records, error } = await query;
+    // Get personnel info
+    const { data: personnel, error: personnelError } = await supabase
+      .from("personnel")
+      .select("first_name, last_name, rank, badge_number")
+      .eq("id", personnelId)
+      .single();
 
-      if (error) throw error;
+    if (personnelError) throw personnelError;
 
-      let total_outstanding_amount = 0;
-      let lost_equipment_count = 0;
-      let damaged_equipment_count = 0;
-      let lost_equipment_value = 0;
-      let damaged_equipment_value = 0;
+    const personnel_name = `${personnel.first_name} ${personnel.last_name}`;
 
-      records?.forEach((record) => {
-        const amount =
-          record.amount_due || record.inventory?.current_value || 0;
-        total_outstanding_amount += amount;
+    // Prepare summary data
+    const summaryData = {
+      personnel_id: personnelId,
+      personnel_name: personnel_name,
+      rank: personnel.rank,
+      badge_number: personnel.badge_number,
+      total_equipment_count: lost_equipment_count + damaged_equipment_count,
+      lost_equipment_count: lost_equipment_count,
+      damaged_equipment_count: damaged_equipment_count,
+      lost_equipment_value: lost_equipment_value,
+      damaged_equipment_value: damaged_equipment_value,
+      total_outstanding_amount: total_outstanding_amount,
+      accountability_status:
+        total_outstanding_amount > 0 ? "UNSETTLED" : "SETTLED",
+      last_inspection_date: new Date().toISOString().split("T")[0],
+      updated_at: new Date().toISOString(),
+      calculated_at: new Date().toISOString(),
+    };
 
-        if (record.record_type === "LOST") {
-          lost_equipment_count++;
-          lost_equipment_value += amount;
-        } else if (record.record_type === "DAMAGED") {
-          damaged_equipment_count++;
-          damaged_equipment_value += amount;
-        }
-      });
+    // Add clearance_request_id only if it exists
+    if (clearanceRequestId !== null) {
+      summaryData.clearance_request_id = clearanceRequestId;
 
-      // Get personnel info
-      const { data: personnel, error: personnelError } = await supabase
-        .from("personnel")
-        .select("first_name, last_name, rank, badge_number")
-        .eq("id", personnelId)
+      // Get clearance type and status for this specific request
+      const { data: clearanceRequest, error: clearanceError } = await supabase
+        .from("clearance_requests")
+        .select("type, status")
+        .eq("id", clearanceRequestId)
         .single();
 
-      if (personnelError) throw personnelError;
-
-      const personnel_name = `${personnel.first_name} ${personnel.last_name}`;
-
-      // Update or insert into summary table
-      const summaryData = {
-        personnel_id: personnelId,
-        personnel_name: personnel_name,
-        rank: personnel.rank,
-        badge_number: personnel.badge_number,
-        total_equipment_count: lost_equipment_count + damaged_equipment_count,
-        lost_equipment_count: lost_equipment_count,
-        damaged_equipment_count: damaged_equipment_count,
-        lost_equipment_value: lost_equipment_value,
-        damaged_equipment_value: damaged_equipment_value,
-        total_outstanding_amount: total_outstanding_amount,
-        accountability_status:
-          total_outstanding_amount > 0 ? "UNSETTLED" : "SETTLED",
-        last_inspection_date: new Date().toISOString().split("T")[0],
-        updated_at: new Date().toISOString(),
-        calculated_at: new Date().toISOString(),
-      };
-
-      // Add clearance_request_id only if it exists
-      if (clearanceRequestId !== null) {
-        summaryData.clearance_request_id = clearanceRequestId;
-
-        // Get clearance type for this specific request
-        const { data: clearanceRequest, error: clearanceError } = await supabase
-          .from("clearance_requests")
-          .select("type, status")
-          .eq("id", clearanceRequestId)
-          .single();
-
-        if (!clearanceError && clearanceRequest) {
-          summaryData.clearance_type = clearanceRequest.type;
-          summaryData.clearance_status = clearanceRequest.status;
-        } else {
-          summaryData.clearance_type =
-            "Resignation/Retirement/Equipment Completion";
-          summaryData.clearance_status = "Pending";
-        }
-
-        summaryData.clearance_request_date = new Date()
-          .toISOString()
-          .split("T")[0];
+      if (!clearanceError && clearanceRequest) {
+        summaryData.clearance_type = clearanceRequest.type;
+        summaryData.clearance_status = clearanceRequest.status;
       }
-
-      // Check if record exists
-      let checkQuery = supabase
-        .from("personnel_equipment_accountability_table")
-        .select("id")
-        .eq("personnel_id", personnelId);
-
-      if (clearanceRequestId !== null) {
-        checkQuery = checkQuery.eq("clearance_request_id", clearanceRequestId);
-      } else {
-        checkQuery = checkQuery.is("clearance_request_id", null);
-      }
-
-      const { data: existingRecord, error: checkError } =
-        await checkQuery.maybeSingle();
-
-      if (checkError) throw checkError;
-
-      if (existingRecord) {
-        // Update existing record
-        const { error: updateError } = await supabase
-          .from("personnel_equipment_accountability_table")
-          .update(summaryData)
-          .eq("id", existingRecord.id);
-
-        if (updateError) throw updateError;
-      } else {
-        // Insert new record
-        const { error: insertError } = await supabase
-          .from("personnel_equipment_accountability_table")
-          .insert([summaryData]);
-
-        if (insertError) throw insertError;
-      }
-
-      console.log("Updated personnel accountability summary");
-    } catch (error) {
-      console.error("Error updating accountability summary:", error);
-      throw error;
     }
-  };
+
+    // Check if record exists
+    let checkQuery = supabase
+      .from("personnel_equipment_accountability_table")
+      .select("id")
+      .eq("personnel_id", personnelId);
+
+    if (clearanceRequestId !== null) {
+      checkQuery = checkQuery.eq("clearance_request_id", clearanceRequestId);
+    } else {
+      checkQuery = checkQuery.is("clearance_request_id", null);
+    }
+
+    const { data: existingRecord, error: checkError } =
+      await checkQuery.maybeSingle();
+
+    if (checkError) throw checkError;
+
+    if (existingRecord) {
+      // Update existing record
+      const { error: updateError } = await supabase
+        .from("personnel_equipment_accountability_table")
+        .update(summaryData)
+        .eq("id", existingRecord.id);
+
+      if (updateError) throw updateError;
+    } else {
+      // Insert new record
+      const { error: insertError } = await supabase
+        .from("personnel_equipment_accountability_table")
+        .insert([summaryData]);
+
+      if (insertError) throw insertError;
+    }
+
+    console.log(
+      `Updated accountability summary for personnel ${personnelId}, clearance ${
+        clearanceRequestId || "routine"
+      }`
+    );
+  } catch (error) {
+    console.error("Error updating accountability summary:", error);
+    throw error;
+  }
+};
 
   // Render pagination buttons function
   const renderPaginationButtons = (

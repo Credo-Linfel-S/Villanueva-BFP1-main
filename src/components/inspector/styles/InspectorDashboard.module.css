@@ -1,17 +1,7 @@
 /* InspectorDashboard.module.css */
 
 /* Main container */
-.INSHeader {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 30px;
-  padding: 25px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border-radius: 12px;
-  color: white;
-  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
-}
+
 
 .headerContent h1 {
   font-size: 28px;
@@ -30,6 +20,7 @@
   margin: 8px 0 0;
   opacity: 0.9;
   font-size: 14px;
+  padding-bottom: 20px;
 }
 
 .headerActions {
@@ -380,7 +371,7 @@
   width: 36px;
   height: 36px;
   border-radius: 8px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #1060af, #529ae1);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -549,7 +540,7 @@
 
 .actionBtn {
   padding: 10px 20px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #1060af, #529ae1);
   border: none;
   border-radius: 8px;
   color: white;

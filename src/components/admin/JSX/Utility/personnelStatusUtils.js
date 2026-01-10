@@ -50,7 +50,14 @@ export const checkPersonnelStatus = (personnel) => {
       shouldDisplay: false,
     };
   }
-
+  if (personnel.status === "Transferred") {
+    return {
+      isActive: false, // Transferred personnel are inactive
+      status: "Transferred",
+      reason: "Transferred to another station/unit",
+      shouldDisplay: false, // Don't display in active personnel
+    };
+  }
   return defaultStatus;
 };
 /**
@@ -95,13 +102,21 @@ export const filterInactivePersonnel = (personnelList) => {
  */
 export const getPersonnelStatusSummary = (personnelList) => {
   if (!Array.isArray(personnelList)) {
-    return { active: 0, inactive: 0, retired: 0, resigned: 0, total: 0 };
+    return {
+      active: 0,
+      inactive: 0,
+      retired: 0,
+      resigned: 0,
+      transferred: 0,
+      total: 0,
+    };
   }
 
   let active = 0;
   let inactive = 0;
   let retired = 0;
   let resigned = 0;
+  let transferred = 0;
 
   personnelList.forEach((person) => {
     const status = checkPersonnelStatus(person);
@@ -116,6 +131,8 @@ export const getPersonnelStatusSummary = (personnelList) => {
         status.status === "Separated"
       ) {
         resigned++;
+      } else if (status.status === "Transferred") {
+        transferred++; // Count transferred personnel
       }
     } else {
       active++;
@@ -127,10 +144,10 @@ export const getPersonnelStatusSummary = (personnelList) => {
     inactive,
     retired,
     resigned,
+    transferred, // Add transferred count
     total: personnelList.length,
   };
 };
-
 /**
  * Update personnel status in database
  * @param {string} personnelId - Personnel ID
@@ -181,7 +198,29 @@ export const updatePersonnelStatus = async (personnelId, statusData) => {
     };
   }
 };
-
+/**
+ * Mark personnel as transferred
+ * @param {string} personnelId - Personnel ID
+ * @param {string} transferDate - Transfer date (YYYY-MM-DD)
+ * @param {string} newStation - New station/unit
+ * @param {string} reason - Transfer reason (optional)
+ * @returns {Promise<Object>} - Result
+ */
+export const markPersonnelAsTransferred = async (
+  personnelId,
+  transferDate,
+  newStation,
+  reason = "Transfer"
+) => {
+  return updatePersonnelStatus(personnelId, {
+    status: "Transferred",
+    station: newStation, // Update to new station
+    separation_type: "Transfer",
+    separation_date: transferDate,
+    separation_reason: reason,
+    is_active: false,
+  });
+};
 /**
  * Mark personnel as retired
  * @param {string} personnelId - Personnel ID

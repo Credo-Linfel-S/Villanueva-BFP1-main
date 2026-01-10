@@ -4,6 +4,7 @@ import {
   FaEyeSlash,
   FaCopy,
   FaCheck,
+  FaExchangeAlt,
   FaDownload,
   FaFilter,
   FaUserCheck, // ← ADD THIS
@@ -33,6 +34,7 @@ import {
   markPersonnelAsRetired,
   markPersonnelAsResigned,
   reactivatePersonnel,
+  markPersonnelAsTransferred,
 } from "./Utility/personnelStatusUtils.js";
 import FloatingNotificationBell from "../../FloatingNotificationBell.jsx";
 import { useUserId } from "../../hooks/useUserId.js";
@@ -57,7 +59,7 @@ const PersonnelRegister = () => {
   const [fileChosen, setFileChosen] = useState("No Photo selected");
   const [EditFileChosen, setEditFileChosen] = useState("No new Photo selected");
   const [allPersonnel, setAllPersonnel] = useState([]); // Store all personnel including inactive
-
+  const [personnelToDelete, setPersonnelToDelete] = useState(null);
   // ADD THESE STATES for separate tables
   const [activePersonnel, setActivePersonnel] = useState([]);
   const [allPersonnelTable, setAllPersonnelTable] = useState([]);
@@ -73,14 +75,33 @@ const PersonnelRegister = () => {
     useState(false);
   const [showEditLeaveModal, setShowEditLeaveModal] = useState(false);
   const [editingLeavePersonnel, setEditingLeavePersonnel] = useState(null);
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [transferModalPersonnel, setTransferModalPersonnel] = useState(null);
+  const [transferData, setTransferData] = useState({
+    date: new Date().toISOString().split("T")[0],
+    reason: "",
+    newStation: "",
+    remarks: "",
+  });
+  // ========== FILTER STATES FOR BOTH TABLES ==========
+  // For Active Personnel table
+  const [activeSearch, setActiveSearch] = useState("");
+  const [activeFilterRank, setActiveFilterRank] = useState("");
+  const [activeFilterStation, setActiveFilterStation] = useState("");
+  const [activeFilterDesignation, setActiveFilterDesignation] = useState("");
+  const [activeFilterMonth, setActiveFilterMonth] = useState("");
 
-  // ========== FILTER STATES (ADDED) ==========
-  const [search, setSearch] = useState("");
-  const [filterRank, setFilterRank] = useState("");
-  const [filterStation, setFilterStation] = useState("");
+  // For All Personnel table
+  const [allSearch, setAllSearch] = useState("");
+  const [allFilterRank, setAllFilterRank] = useState("");
+  const [allFilterStatus, setAllFilterStatus] = useState("");
+  const [allFilterDesignation, setAllFilterDesignation] = useState("");
+  const [allFilterMonth, setAllFilterMonth] = useState("");
+  const [allFilterStation, setAllFilterStation] = useState("");
+
   const [showFilters, setShowFilters] = useState(false);
   const [showStatusModal, setShowStatusModal] = useState(false);
-  const [filterStatus, setFilterStatus] = useState("active");
+
   const [statusModalPersonnel, setStatusModalPersonnel] = useState(null);
   const [statusAction, setStatusAction] = useState("");
   const [statusData, setStatusData] = useState({
@@ -277,52 +298,52 @@ const PersonnelRegister = () => {
 
     let filtered = [...items];
 
-    // Search filter
-    const searchTerm = search.trim().toLowerCase();
+    // Search filter - Use activeSearch instead of search
+    const searchTerm = activeSearch.trim().toLowerCase();
     if (searchTerm) {
       filtered = filtered.filter((person) => {
         if (!person) return false;
 
         const searchText = `
-          ${person.first_name || ""} 
-          ${person.middle_name || ""} 
-          ${person.last_name || ""}
-          ${person.rank || ""}
-          ${person.station || ""}
-          ${person.badge_number || ""}
-          ${person.status || ""}
-        `.toLowerCase();
+        ${person.first_name || ""} 
+        ${person.middle_name || ""} 
+        ${person.last_name || ""}
+        ${person.rank || ""}
+        ${person.station || ""}
+        ${person.badge_number || ""}
+        ${person.status || ""}
+      `.toLowerCase();
 
         return searchText.includes(searchTerm);
       });
     }
 
-    // Rank filter
-    if (filterRank) {
+    // Rank filter - Use activeFilterRank instead of filterRank
+    if (activeFilterRank) {
       filtered = filtered.filter(
-        (person) => person && person.rank === filterRank
+        (person) => person && person.rank === activeFilterRank
       );
     }
 
-    // Station filter
-    if (filterStation) {
+    // Station filter - Use activeFilterStation instead of filterStation
+    if (activeFilterStation) {
       filtered = filtered.filter(
         (person) =>
           person &&
           person.station &&
-          person.station.toLowerCase().includes(filterStation.toLowerCase())
+          person.station
+            .toLowerCase()
+            .includes(activeFilterStation.toLowerCase())
       );
     }
 
     return filtered;
   };
-
+  // Remove or update this function
   const clearFilters = () => {
-    setSearch("");
-    setFilterRank("");
-    setFilterStation("");
-    setActiveCurrentPage(1);
-    setAllCurrentPage(1);
+    // Clear both active and all filters
+    clearActiveFilters();
+    clearAllFilters();
   };
 
   const getUniqueStations = () => {
@@ -341,6 +362,227 @@ const PersonnelRegister = () => {
     return Array.from(stations).sort();
   };
 
+
+
+const openTransferModal = (personnel) => {
+  setTransferModalPersonnel(personnel);
+  // You can remove the setTransferData line since we're using local state now
+  setShowTransferModal(true);
+};
+
+
+const TransferModal = () => {
+  if (!showTransferModal || !transferModalPersonnel) return null;
+
+  const personName = `${transferModalPersonnel.first_name} ${transferModalPersonnel.last_name}`;
+
+  // Local state for the form
+  const [formValues, setFormValues] = useState({
+    date: new Date().toISOString().split("T")[0],
+    newStation: "",
+    reason: "",
+    remarks: "",
+  });
+
+  // Initialize form when modal opens
+  useEffect(() => {
+    if (showTransferModal) {
+      setFormValues({
+        date: new Date().toISOString().split("T")[0],
+        newStation: "",
+        reason: "",
+        remarks: "",
+      });
+    }
+  }, [showTransferModal]);
+
+  const handleTransferSubmit = async () => {
+    if (!transferModalPersonnel) return;
+
+    // Validate
+    if (!formValues.newStation.trim() || !formValues.reason.trim()) {
+      toast.error("Please fill in all required fields");
+      return;
+    }
+
+    try {
+      setIsUpdatingStatus(true);
+
+      // Directly mark personnel as transferred (like retire/resign)
+      const result = await markPersonnelAsTransferred(
+        transferModalPersonnel.id,
+        formValues.date,
+        formValues.newStation,
+        formValues.reason
+      );
+
+      if (result.success) {
+        toast.success(
+          `${transferModalPersonnel.first_name} ${transferModalPersonnel.last_name} transferred successfully!`
+        );
+
+        // Refresh data
+        await loadPersonnel(false);
+        setShowTransferModal(false);
+        setTransferModalPersonnel(null);
+      } else {
+        toast.error(result.message || "Failed to process transfer");
+      }
+    } catch (error) {
+      console.error("Error initiating transfer:", error);
+      toast.error("Failed to initiate transfer");
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
+
+  return (
+    <div
+      className={`${styles.statusModalOverlay} ${styles.transferModalOverlay}`}
+      style={{
+        left: isSidebarCollapsed ? "80px" : "250px",
+        width: isSidebarCollapsed
+          ? "calc(100vw - 80px)"
+          : "calc(100vw - 250px)",
+      }}
+    >
+      <div
+        className={`${styles.statusModalContent} ${styles.transferModalContent}`}
+      >
+        <div className={styles.statusModalHeader}>
+          <h3 className={styles.statusModalTitle}>Transfer - {personName}</h3>
+          <button
+            className={styles.statusModalClose}
+            onClick={() => {
+              setShowTransferModal(false);
+              setTransferModalPersonnel(null);
+            }}
+            disabled={isUpdatingStatus}
+          >
+            &times;
+          </button>
+        </div>
+
+        <div
+          className={`${styles.statusModalBody} ${styles.transferModalBody}`}
+        >
+          <div className={styles.statusForm}>
+            <div className={styles.statusFormGroup}>
+              <label htmlFor="transferDate">Transfer Date *</label>
+              <input
+                type="date"
+                id="transferDate"
+                value={formValues.date}
+                onChange={(e) =>
+                  setFormValues((prev) => ({
+                    ...prev,
+                    date: e.target.value,
+                  }))
+                }
+                max={new Date().toISOString().split("T")[0]}
+                required
+              />
+            </div>
+
+            <div className={styles.statusFormGroup}>
+              <label htmlFor="newStation">New Station/Unit *</label>
+              <input
+                type="text"
+                id="newStation"
+                value={formValues.newStation}
+                onChange={(e) =>
+                  setFormValues((prev) => ({
+                    ...prev,
+                    newStation: e.target.value,
+                  }))
+                }
+                placeholder="Enter new station or unit"
+                required
+                autoFocus
+              />
+            </div>
+
+            <div className={styles.statusFormGroup}>
+              <label htmlFor="transferReason">Reason for Transfer *</label>
+              <textarea
+                id="transferReason"
+                value={formValues.reason}
+                onChange={(e) =>
+                  setFormValues((prev) => ({
+                    ...prev,
+                    reason: e.target.value,
+                  }))
+                }
+                placeholder="Enter reason for transfer..."
+                required
+                rows={4}
+              />
+            </div>
+
+            <div className={styles.statusFormGroup}>
+              <label htmlFor="transferRemarks">Remarks (Optional)</label>
+              <textarea
+                id="transferRemarks"
+                value={formValues.remarks}
+                onChange={(e) =>
+                  setFormValues((prev) => ({
+                    ...prev,
+                    remarks: e.target.value,
+                  }))
+                }
+                placeholder="Additional remarks..."
+                rows={2}
+              />
+            </div>
+
+            <div className={styles.statusNotice}>
+              <p>
+                <strong>Note:</strong> Initiating transfer will:
+              </p>
+              <ul>
+                <li>Create a transfer clearance request</li>
+                <li>Mark the personnel as "Transferred" once completed</li>
+                <li>Update their station assignment</li>
+                <li>Preserve all their records and data</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div className={styles.statusModalFooter}>
+          <button
+            type="button"
+            className={styles.statusCancelBtn}
+            onClick={() => {
+              setShowTransferModal(false);
+              setTransferModalPersonnel(null);
+            }}
+            disabled={isUpdatingStatus}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            className={styles.statusConfirmBtn}
+            onClick={handleTransferSubmit}
+            disabled={
+              isUpdatingStatus || !formValues.newStation || !formValues.reason
+            }
+          >
+            {isUpdatingStatus ? (
+              <>
+                <span className={styles.statusSpinner}></span>
+                Processing...
+              </>
+            ) : (
+              "Initiate Transfer"
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
   const getPersonnelStatusBadge = (person) => {
     const status = checkPersonnelStatus(person);
 
@@ -362,6 +604,9 @@ const PersonnelRegister = () => {
     } else if (status.status === "Resigned" || status.status === "Separated") {
       badgeClass = styles.statusBadgeResigned;
       icon = <FaUserSlash />;
+    } else if (status.status === "Transferred") {
+      badgeClass = styles.statusBadgeTransferred;
+      icon = <FaExchangeAlt />; // You'll need to import this
     }
 
     return (
@@ -784,14 +1029,85 @@ const PersonnelRegister = () => {
     loadPersonnel();
   }, []);
 
-  // Apply filters when they change
+  // Apply filters when they change for Active Personnel
   useEffect(() => {
     if (activePersonnel.length > 0) {
-      const filtered = applyFilters(activePersonnel);
+      const filtered = applyActiveFilters(activePersonnel);
       setFilteredPersonnel(filtered);
       setActiveCurrentPage(1);
     }
-  }, [search, filterRank, filterStation, activePersonnel]);
+  }, [
+    activeSearch,
+    activeFilterRank,
+    activeFilterStation,
+    activeFilterDesignation,
+    activeFilterMonth,
+    activePersonnel,
+  ]);
+  // ========== HIGHLIGHT COMPONENTS FOR EACH TABLE ==========
+  const ActiveHighlightMatch = ({ text, searchTerm }) => {
+    if (!searchTerm || !text) return text || "-";
+
+    const lowerText = text.toLowerCase();
+    const lowerSearchTerm = searchTerm.toLowerCase();
+    const index = lowerText.indexOf(lowerSearchTerm);
+
+    if (index === -1) return text;
+
+    const before = text.substring(0, index);
+    const match = text.substring(index, index + searchTerm.length);
+    const after = text.substring(index + searchTerm.length);
+
+    return (
+      <>
+        {before}
+        <span
+          style={{
+            backgroundColor: "#FFEB3B", // Yellow for active table
+            padding: "0 2px",
+            borderRadius: "2px",
+            fontWeight: "bold",
+          }}
+        >
+          {match}
+        </span>
+        {after}
+      </>
+    );
+  };
+
+  const AllHighlightMatch = ({ text, searchTerm }) => {
+    if (!searchTerm || !text) return text || "-";
+
+    const lowerText = text.toLowerCase();
+    const lowerSearchTerm = searchTerm.toLowerCase();
+    const index = lowerText.indexOf(lowerSearchTerm);
+
+    if (index === -1) return text;
+
+    const before = text.substring(0, index);
+    const match = text.substring(index, index + searchTerm.length);
+    const after = text.substring(index + searchTerm.length);
+
+    return (
+      <>
+        {before}
+        <span
+          style={{
+            backgroundColor: "#90CAF9", // Blue for all table
+            padding: "0 2px",
+            borderRadius: "2px",
+            fontWeight: "bold",
+          }}
+        >
+          {match}
+        </span>
+        {after}
+      </>
+    );
+  };
+  // Apply filters for All Personnel (we'll handle this in render function)
+  // No need for separate useEffect since we'll filter directly in render
 
   // ========== UPDATED HELPER FUNCTIONS ==========
 
@@ -1429,7 +1745,14 @@ const PersonnelRegister = () => {
   };
 
   // ========== UPDATED USERNAME GENERATION FUNCTION ==========
-  const generateUsername = (first, middle, last, suffix) => {
+  const generateUsername = (
+    first,
+    middle,
+    last,
+    suffix,
+    badgeNumber = null,
+    birthDate = null
+  ) => {
     // Clean and format the name parts
     const cleanFirst =
       first
@@ -1454,20 +1777,66 @@ const PersonnelRegister = () => {
         .replace(/[^a-z0-9]/g, "")
         .charAt(0) || "";
 
-    // Create base username
+    // Create base username from name parts
     let baseUsername = `${cleanFirst}${cleanMiddle}${cleanLast}${cleanSuffix}`;
 
-    // If too short, add timestamp
-    if (baseUsername.length < 3) {
-      baseUsername = `user${Date.now().toString().slice(-6)}`;
+    // Generate identifier from badge number or birth date
+    let identifier = "";
+
+    // 1. Try badge number first
+    if (badgeNumber) {
+      const cleanBadge = badgeNumber.toString().trim().replace(/\s+/g, "");
+      if (cleanBadge.length > 0) {
+        // Take last 4 digits of badge number if it's long
+        identifier = cleanBadge.length > 4 ? cleanBadge.slice(-4) : cleanBadge;
+        console.log("Using badge number for username:", identifier);
+      }
     }
 
-    // Add random number to ensure uniqueness
-    const randomNum = Math.floor(Math.random() * 1000)
-      .toString()
-      .padStart(3, "0");
+    // 2. If no badge number, try birth date
+    if (!identifier && birthDate) {
+      try {
+        const date = new Date(birthDate);
+        if (!isNaN(date.getTime())) {
+          // Format as DDMM (day and month) or YYYY (year)
+          const day = String(date.getDate()).padStart(2, "0");
+          const month = String(date.getMonth() + 1).padStart(2, "0");
+          const year = date.getFullYear().toString();
 
-    return `${baseUsername}${randomNum}`;
+          // Use DDMM format for uniqueness
+          identifier = `${day}${month}`;
+          console.log("Using birth date for username:", identifier);
+        }
+      } catch (error) {
+        console.error("Error parsing birth date for username:", error);
+      }
+    }
+
+    // 3. If no badge or birth date, use current year and random digits
+    if (!identifier) {
+      const currentYear = new Date().getFullYear().toString().slice(-2);
+      const randomNum = Math.floor(Math.random() * 100)
+        .toString()
+        .padStart(2, "0");
+      identifier = `${currentYear}${randomNum}`;
+      console.log("Using fallback for username:", identifier);
+    }
+
+    // Ensure base username isn't too short
+    if (baseUsername.length < 3) {
+      baseUsername = `user${identifier}`;
+    }
+
+    // Combine base username with identifier
+    const finalUsername = `${baseUsername}${identifier}`;
+
+    // Ensure minimum length
+    if (finalUsername.length < 6) {
+      const extra = Math.random().toString(36).substring(2, 6);
+      return `${finalUsername}${extra}`;
+    }
+
+    return finalUsername;
   };
 
   // UPDATED useEffect for username generation
@@ -1477,7 +1846,9 @@ const PersonnelRegister = () => {
         formData.first_name,
         formData.middle_name,
         formData.last_name,
-        formData.suffix
+        formData.suffix,
+        formData.badge_number, // Pass badge number
+        formData.birth_date // Pass birth date
       );
       setGeneratedUsername(username);
     } else {
@@ -1488,6 +1859,8 @@ const PersonnelRegister = () => {
     formData.middle_name,
     formData.last_name,
     formData.suffix,
+    formData.badge_number, // Add badge number dependency
+    formData.birth_date, // Add birth date dependency
   ]);
 
   // Generate password
@@ -2236,23 +2609,23 @@ const PersonnelRegister = () => {
     }
   };
 
-  const handleDeleteClick = (id, name) => {
-    if (!id) {
-      toast.error("Invalid ID — cannot delete.");
+  const handleDeleteClick = (person) => {
+    if (!person || !person.id) {
+      toast.error("Invalid personnel — cannot delete.");
       return;
     }
 
     // Check if personnel is locked
-    if (lockedPersonnel[id]?.isLocked) {
-      toast.warning(`Cannot delete: ${lockedPersonnel[id]?.lockReason}`);
+    if (lockedPersonnel[person.id]?.isLocked) {
+      toast.warning(`Cannot delete: ${lockedPersonnel[person.id]?.lockReason}`);
       return;
     }
 
-    setDeleteId(id);
-    setDeleteName(name);
+    setDeleteId(person.id);
+    setDeleteName(`${person.first_name} ${person.last_name}`);
+    setPersonnelToDelete(person); // Store the full personnel object
     setShowDeleteConfirm(true);
   };
-
   const confirmDeletePersonnel = async () => {
     try {
       setIsDeleting(true);
@@ -2307,6 +2680,7 @@ const PersonnelRegister = () => {
     setShowDeleteConfirm(false);
     setDeleteId(null);
     setDeleteName("");
+    setPersonnelToDelete(null); // Clear the personnel object
     setIsDeleting(false);
   };
 
@@ -2405,122 +2779,122 @@ const PersonnelRegister = () => {
     return "-";
   };
 
- const PhotoCell = ({ person }) => {
-   const [isLoading, setIsLoading] = useState(true);
-   const [imageSrc, setImageSrc] = useState(logo); // Use your imported default image
+  const PhotoCell = ({ person }) => {
+    const [isLoading, setIsLoading] = useState(true);
+    const [imageSrc, setImageSrc] = useState(logo); // Use your imported default image
 
-   useEffect(() => {
-     const loadPhoto = async () => {
-       setIsLoading(true);
+    useEffect(() => {
+      const loadPhoto = async () => {
+        setIsLoading(true);
 
-       try {
-         let url = logo; // Default to your imported image
+        try {
+          let url = logo; // Default to your imported image
 
-         // Check in order of priority
-         if (person.photo_url && person.photo_url.startsWith("http")) {
-           // Test if the photo_url is accessible
-           const isValid = await testImage(person.photo_url);
-           if (isValid) {
-             url = person.photo_url;
-           } else {
-             // Try photo_path as fallback
-             if (person.photo_path) {
-               const { data: urlData } = supabase.storage
-                 .from("personnel-documents")
-                 .getPublicUrl(person.photo_path);
-               const pathUrl = urlData?.publicUrl;
-               // Check if the path URL is valid
-               if (pathUrl && (await testImage(pathUrl))) {
-                 url = pathUrl;
-               } else {
-                 url = logo; // Fallback to default
-               }
-             }
-           }
-         } else if (person.photo_path) {
-           // Use photo_path if photo_url is not available
-           const { data: urlData } = supabase.storage
-             .from("personnel-documents")
-             .getPublicUrl(person.photo_path);
-           const pathUrl = urlData?.publicUrl;
-           // Check if the path URL is valid
-           if (pathUrl && (await testImage(pathUrl))) {
-             url = pathUrl;
-           } else {
-             url = logo; // Fallback to default
-           }
-         }
+          // Check in order of priority
+          if (person.photo_url && person.photo_url.startsWith("http")) {
+            // Test if the photo_url is accessible
+            const isValid = await testImage(person.photo_url);
+            if (isValid) {
+              url = person.photo_url;
+            } else {
+              // Try photo_path as fallback
+              if (person.photo_path) {
+                const { data: urlData } = supabase.storage
+                  .from("personnel-documents")
+                  .getPublicUrl(person.photo_path);
+                const pathUrl = urlData?.publicUrl;
+                // Check if the path URL is valid
+                if (pathUrl && (await testImage(pathUrl))) {
+                  url = pathUrl;
+                } else {
+                  url = logo; // Fallback to default
+                }
+              }
+            }
+          } else if (person.photo_path) {
+            // Use photo_path if photo_url is not available
+            const { data: urlData } = supabase.storage
+              .from("personnel-documents")
+              .getPublicUrl(person.photo_path);
+            const pathUrl = urlData?.publicUrl;
+            // Check if the path URL is valid
+            if (pathUrl && (await testImage(pathUrl))) {
+              url = pathUrl;
+            } else {
+              url = logo; // Fallback to default
+            }
+          }
 
-         setImageSrc(url);
-       } catch (error) {
-         console.error("Error loading photo:", error);
-         setImageSrc(logo); // Fallback to default image on error
-       } finally {
-         // Small delay to prevent flash
-         setTimeout(() => setIsLoading(false), 100);
-       }
-     };
+          setImageSrc(url);
+        } catch (error) {
+          console.error("Error loading photo:", error);
+          setImageSrc(logo); // Fallback to default image on error
+        } finally {
+          // Small delay to prevent flash
+          setTimeout(() => setIsLoading(false), 100);
+        }
+      };
 
-     loadPhoto();
-   }, [person]);
+      loadPhoto();
+    }, [person]);
 
-   // Test if image URL is accessible
-   const testImage = (url) => {
-     return new Promise((resolve) => {
-       const img = new Image();
-       img.onload = () => resolve(true);
-       img.onerror = () => resolve(false);
-       img.src = url;
+    // Test if image URL is accessible
+    const testImage = (url) => {
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => resolve(true);
+        img.onerror = () => resolve(false);
+        img.src = url;
 
-       // Timeout to prevent hanging
-       setTimeout(() => resolve(false), 3000);
-     });
-   };
+        // Timeout to prevent hanging
+        setTimeout(() => resolve(false), 3000);
+      });
+    };
 
-   return (
-     <td className={styles.prPhotoCell}>
-       <div className={styles.prPhotoContainer}>
-         {isLoading ? (
-           <div className={styles.prPhotoLoading}>
-             <div className={styles.prPhotoSpinner}></div>
-             <small>Loading...</small>
-           </div>
-         ) : (
-           <img
-             src={imageSrc}
-             alt={`${person.first_name || ""} ${person.last_name || ""}`}
-             className={styles.prPhotoThumb}
-             onError={(e) => {
-               e.target.onerror = null;
-               e.target.src = logo; // Fallback to default image on load error
-             }}
-             loading="lazy"
-           />
-         )}
-       </div>
-     </td>
-   );
- };
+    return (
+      <td className={styles.prPhotoCell}>
+        <div className={styles.prPhotoContainer}>
+          {isLoading ? (
+            <div className={styles.prPhotoLoading}>
+              <div className={styles.prPhotoSpinner}></div>
+              <small>Loading...</small>
+            </div>
+          ) : (
+            <img
+              src={imageSrc}
+              alt={`${person.first_name || ""} ${person.last_name || ""}`}
+              className={styles.prPhotoThumb}
+              onError={(e) => {
+                e.target.onerror = null;
+                e.target.src = logo; // Fallback to default image on load error
+              }}
+              loading="lazy"
+            />
+          )}
+        </div>
+      </td>
+    );
+  };
 
-const getPhotoUrl = (person) => {
-  if (!person) return logo; // Use imported default image
+  const getPhotoUrl = (person) => {
+    if (!person) return logo; // Use imported default image
 
-  // If we have a valid photo_url, use it
-  if (person.photo_url && person.photo_url.startsWith("http")) {
-    return person.photo_url;
-  }
+    // If we have a valid photo_url, use it
+    if (person.photo_url && person.photo_url.startsWith("http")) {
+      return person.photo_url;
+    }
 
-  // If we have a photo_path, construct URL
-  if (person.photo_path) {
-    const { data: urlData } = supabase.storage
-      .from("personnel-documents")
-      .getPublicUrl(person.photo_path);
-    return urlData?.publicUrl || logo; // Fallback to default
-  }
+    // If we have a photo_path, construct URL
+    if (person.photo_path) {
+      const { data: urlData } = supabase.storage
+        .from("personnel-documents")
+        .getPublicUrl(person.photo_path);
+      return urlData?.publicUrl || logo; // Fallback to default
+    }
 
-  // Fallback to default image
-  return logo;
-};
+    // Fallback to default image
+    return logo;
+  };
 
   const findPhotoByName = async (person) => {
     if (!person.first_name || !person.last_name || !person.rank) {
@@ -2688,25 +3062,238 @@ const getPhotoUrl = (person) => {
       .in("type", ["Resignation", "Retirement", "Equipment Completion"]);
     console.log("4. Manual query:", manualQuery);
   };
+  // ========== FILTER FUNCTIONS FOR ACTIVE PERSONNEL ==========
+  const applyActiveFilters = (items) => {
+    if (!items || !Array.isArray(items)) {
+      return [];
+    }
 
+    let filtered = [...items];
+
+    // Search filter
+    const searchTerm = activeSearch.trim().toLowerCase();
+    if (searchTerm) {
+      filtered = filtered.filter((person) => {
+        if (!person) return false;
+
+        const searchText = `
+        ${person.first_name || ""} 
+        ${person.middle_name || ""} 
+        ${person.last_name || ""}
+        ${person.badge_number || ""}
+        ${person.designation || ""}
+      `.toLowerCase();
+
+        return searchText.includes(searchTerm);
+      });
+    }
+
+    // Rank filter
+    if (activeFilterRank) {
+      filtered = filtered.filter(
+        (person) => person && person.rank === activeFilterRank
+      );
+    }
+
+    // Station filter
+    if (activeFilterStation) {
+      filtered = filtered.filter(
+        (person) =>
+          person &&
+          person.station &&
+          person.station
+            .toLowerCase()
+            .includes(activeFilterStation.toLowerCase())
+      );
+    }
+
+    // Designation filter
+    if (activeFilterDesignation) {
+      filtered = filtered.filter(
+        (person) =>
+          person &&
+          person.designation &&
+          person.designation
+            .toLowerCase()
+            .includes(activeFilterDesignation.toLowerCase())
+      );
+    }
+
+    // Month filter (by date_hired)
+    if (activeFilterMonth) {
+      filtered = filtered.filter((person) => {
+        if (!person.date_hired) return false;
+
+        try {
+          const hiredDate = new Date(person.date_hired);
+          const month = hiredDate.getMonth() + 1; // 1-12
+          return month === parseInt(activeFilterMonth);
+        } catch (error) {
+          return false;
+        }
+      });
+    }
+
+    return filtered;
+  };
+
+  // ========== FILTER FUNCTIONS FOR ALL PERSONNEL ==========
+  const applyAllFilters = (items) => {
+    if (!items || !Array.isArray(items)) {
+      return [];
+    }
+
+    let filtered = [...items];
+
+    // Search filter
+    const searchTerm = allSearch.trim().toLowerCase();
+    if (searchTerm) {
+      filtered = filtered.filter((person) => {
+        if (!person) return false;
+
+        const searchText = `
+        ${person.first_name || ""} 
+        ${person.middle_name || ""} 
+        ${person.last_name || ""}
+        ${person.badge_number || ""}
+        ${person.designation || ""}
+        ${person.status || ""}
+      `.toLowerCase();
+
+        return searchText.includes(searchTerm);
+      });
+    }
+
+    // Rank filter
+    if (allFilterRank) {
+      filtered = filtered.filter(
+        (person) => person && person.rank === allFilterRank
+      );
+    }
+
+    // Status filter
+    if (allFilterStatus) {
+      if (allFilterStatus === "active") {
+        filtered = filtered.filter((person) => {
+          const status = checkPersonnelStatus(person);
+          return status.shouldDisplay;
+        });
+      } else {
+        filtered = filtered.filter((person) => {
+          const status = checkPersonnelStatus(person);
+          return status.status === allFilterStatus;
+        });
+      }
+    }
+
+    // Designation filter
+    if (allFilterDesignation) {
+      filtered = filtered.filter(
+        (person) =>
+          person &&
+          person.designation &&
+          person.designation
+            .toLowerCase()
+            .includes(allFilterDesignation.toLowerCase())
+      );
+    }
+
+    // Month filter (by date_hired)
+    if (allFilterMonth) {
+      filtered = filtered.filter((person) => {
+        if (!person.date_hired) return false;
+
+        try {
+          const hiredDate = new Date(person.date_hired);
+          const month = hiredDate.getMonth() + 1; // 1-12
+          return month === parseInt(allFilterMonth);
+        } catch (error) {
+          return false;
+        }
+      });
+    }
+
+    // Station filter for All Personnel table
+    if (allFilterStation) {
+      filtered = filtered.filter(
+        (person) =>
+          person &&
+          person.station &&
+          person.station.toLowerCase().includes(allFilterStation.toLowerCase())
+      );
+    }
+
+    return filtered;
+  };
+
+  // ========== CLEAR FILTER FUNCTIONS ==========
+  const clearActiveFilters = () => {
+    setActiveSearch("");
+    setActiveFilterRank("");
+    setActiveFilterStation("");
+    setActiveFilterDesignation("");
+    setActiveFilterMonth("");
+    setActiveCurrentPage(1);
+  };
+
+  const clearAllFilters = () => {
+    setAllSearch("");
+    setAllFilterRank("");
+    setAllFilterStatus("");
+    setAllFilterDesignation("");
+    setAllFilterMonth("");
+    setAllFilterStation("");
+    setAllCurrentPage(1);
+  };
   // ========== PASSWORD MODAL COMPONENT ==========
+  // ========== UPDATED PASSWORD MODAL COMPONENT ==========
   const PasswordModal = () => {
     if (!showPasswordModal || !passwordModalPersonnel) return null;
 
     const personName = `${passwordModalPersonnel.first_name} ${passwordModalPersonnel.last_name}`;
 
-    const generateNewPassword = () => {
-      setNewPassword(generatePassword());
-    };
-
     const copyPassword = () => {
-      navigator.clipboard.writeText(newPassword);
-      toast.success("Password copied to clipboard!");
+      if (newPassword.trim()) {
+        navigator.clipboard.writeText(newPassword);
+        toast.success("Password copied to clipboard!");
+      }
     };
 
     const handleChangePassword = async () => {
       if (!newPassword.trim()) {
-        toast.error("Please generate or enter a new password");
+        toast.error("Please enter a new password");
+        return;
+      }
+
+      // Password validation
+      if (newPassword.length < 8) {
+        toast.error("Password must be at least 8 characters long");
+        return;
+      }
+
+      // Check for at least one uppercase letter
+      if (!/[A-Z]/.test(newPassword)) {
+        toast.error("Password must contain at least one uppercase letter");
+        return;
+      }
+
+      // Check for at least one lowercase letter
+      if (!/[a-z]/.test(newPassword)) {
+        toast.error("Password must contain at least one lowercase letter");
+        return;
+      }
+
+      // Check for at least one number
+      if (!/\d/.test(newPassword)) {
+        toast.error("Password must contain at least one number");
+        return;
+      }
+
+      // Check for at least one special character
+      if (!/[@#$]/.test(newPassword)) {
+        toast.error(
+          "Password must contain at least one special character (@, #, or $)"
+        );
         return;
       }
 
@@ -2743,7 +3330,15 @@ const getPhotoUrl = (person) => {
     };
 
     return (
-      <div className={styles.statusModalOverlay}>
+      <div
+        className={styles.statusModalOverlay}
+        style={{
+          left: isSidebarCollapsed ? "80px" : "250px",
+          width: isSidebarCollapsed
+            ? "calc(100vw - 80px)"
+            : "calc(100vw - 250px)",
+        }}
+      >
         <div
           className={styles.statusModalContent}
           style={{ maxWidth: "500px" }}
@@ -2773,8 +3368,9 @@ const getPhotoUrl = (person) => {
                     type={showNewPassword ? "text" : "password"}
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="Enter or generate new password"
+                    placeholder="Enter new password"
                     className={styles.passwordInput}
+                    autoFocus
                   />
                   <div className={styles.passwordActions}>
                     <button
@@ -2792,15 +3388,9 @@ const getPhotoUrl = (person) => {
                       className={styles.copyPasswordBtn}
                       onClick={copyPassword}
                       title="Copy password"
+                      disabled={!newPassword.trim()}
                     >
                       <FaCopy />
-                    </button>
-                    <button
-                      type="button"
-                      className={styles.regeneratePasswordBtn}
-                      onClick={generateNewPassword}
-                    >
-                      Generate
                     </button>
                   </div>
                 </div>
@@ -2814,11 +3404,13 @@ const getPhotoUrl = (person) => {
               </div>
 
               <div className={styles.passwordGuidelines}>
-                <h4>Password Guidelines:</h4>
+                <h4>Password Requirements:</h4>
                 <ul>
                   <li>Minimum 8 characters</li>
-                  <li>Include uppercase and lowercase letters</li>
-                  <li>Include numbers and special characters (@#$)</li>
+                  <li>At least one uppercase letter (A-Z)</li>
+                  <li>At least one lowercase letter (a-z)</li>
+                  <li>At least one number (0-9)</li>
+                  <li>At least one special character (@, #, $)</li>
                   <li>Should not contain personal information</li>
                 </ul>
               </div>
@@ -2864,22 +3456,12 @@ const getPhotoUrl = (person) => {
     );
   };
 
-  // ========== USERNAME MODAL COMPONENT ==========
+  // ========== UPDATED USERNAME MODAL COMPONENT ==========
   const UsernameModal = () => {
     if (!showUsernameModal || !usernameModalPersonnel) return null;
 
     const personName = `${usernameModalPersonnel.first_name} ${usernameModalPersonnel.last_name}`;
     const currentUsername = usernameModalPersonnel.username;
-
-    const generateSuggestedUsername = () => {
-      const suggestedUsername = generateUsername(
-        usernameModalPersonnel.first_name,
-        usernameModalPersonnel.middle_name,
-        usernameModalPersonnel.last_name,
-        usernameModalPersonnel.suffix
-      );
-      setNewUsername(suggestedUsername);
-    };
 
     const checkUsernameAvailability = async (username) => {
       if (!username || username === currentUsername) return true;
@@ -2914,6 +3496,14 @@ const getPhotoUrl = (person) => {
 
       if (username.length < 3) {
         toast.error("Username must be at least 3 characters long");
+        return;
+      }
+
+      // Check for valid characters (letters, numbers, underscores only)
+      if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+        toast.error(
+          "Username can only contain letters, numbers, and underscores"
+        );
         return;
       }
 
@@ -2957,7 +3547,15 @@ const getPhotoUrl = (person) => {
     };
 
     return (
-      <div className={styles.statusModalOverlay}>
+      <div
+        className={styles.statusModalOverlay}
+        style={{
+          left: isSidebarCollapsed ? "80px" : "250px",
+          width: isSidebarCollapsed
+            ? "calc(100vw - 80px)"
+            : "calc(100vw - 250px)",
+        }}
+      >
         <div
           className={styles.statusModalContent}
           style={{ maxWidth: "500px" }}
@@ -2989,33 +3587,48 @@ const getPhotoUrl = (person) => {
 
               <div className={styles.usernameInputGroup}>
                 <label htmlFor="newUsername">New Username *</label>
-                <div className={styles.usernameInputContainer}>
-                  <input
-                    type="text"
-                    id="newUsername"
-                    value={newUsername}
-                    onChange={(e) => setNewUsername(e.target.value)}
-                    placeholder="Enter new username"
-                    className={styles.usernameInput}
-                    minLength={3}
-                  />
-                  <button
-                    type="button"
-                    className={styles.suggestUsernameBtn}
-                    onClick={generateSuggestedUsername}
-                  >
-                    Suggest
-                  </button>
-                </div>
+                <input
+                  type="text"
+                  id="newUsername"
+                  value={newUsername}
+                  onChange={(e) => setNewUsername(e.target.value)}
+                  placeholder="Enter new username"
+                  className={styles.usernameInput}
+                  minLength={3}
+                  autoFocus
+                />
+                {newUsername && newUsername !== currentUsername && (
+                  <div className={styles.usernameValidation}>
+                    <small>
+                      {newUsername.length < 3 ? (
+                        <span style={{ color: "#f44336" }}>
+                          Username too short (minimum 3 characters)
+                        </span>
+                      ) : !/^[a-zA-Z0-9_]+$/.test(newUsername) ? (
+                        <span style={{ color: "#f44336" }}>
+                          Invalid characters detected
+                        </span>
+                      ) : (
+                        <span style={{ color: "#4CAF50" }}>
+                          ✓ Username format is valid
+                        </span>
+                      )}
+                    </small>
+                  </div>
+                )}
               </div>
 
               <div className={styles.usernameGuidelines}>
                 <h4>Username Guidelines:</h4>
                 <ul>
                   <li>Minimum 3 characters</li>
-                  <li>Can contain letters, numbers, and underscores</li>
-                  <li>No spaces or special characters</li>
+                  <li>Maximum 50 characters</li>
+                  <li>Can contain letters (a-z, A-Z)</li>
+                  <li>Can contain numbers (0-9)</li>
+                  <li>Can contain underscores (_)</li>
+                  <li>No spaces or special characters other than underscore</li>
                   <li>Must be unique across all personnel</li>
+                  <li>Case-insensitive (USERNAME = username = UserName)</li>
                 </ul>
               </div>
 
@@ -3047,7 +3660,8 @@ const getPhotoUrl = (person) => {
                 isChangingUsername ||
                 !newUsername.trim() ||
                 newUsername.trim() === currentUsername ||
-                newUsername.trim().length < 3
+                newUsername.trim().length < 3 ||
+                !/^[a-zA-Z0-9_]+$/.test(newUsername.trim())
               }
             >
               {isChangingUsername ? (
@@ -3071,7 +3685,6 @@ const getPhotoUrl = (person) => {
       <div className={styles.prContainer}>
         <Title>Personnel Register | BFP Villanueva</Title>
         <Meta name="robots" content="noindex, nofollow" />
-
 
         <Hamburger />
         <Sidebar />
@@ -3105,530 +3718,719 @@ const getPhotoUrl = (person) => {
 
   // ========== RENDER ACTIVE PERSONNEL TABLE ==========
   const renderActivePersonnelTable = () => {
-    // First filter active personnel using the utility function
+    // Apply active filters
+    const filteredActiveData = applyActiveFilters(activePersonnel);
     const activeData = paginate(
-      activePersonnel,
+      filteredActiveData,
       activeCurrentPage,
       rowsPerPage
     );
 
+    // Get unique designations for filter dropdown
+    const activeUniqueDesignations = [
+      ...new Set(activePersonnel.map((p) => p.designation).filter(Boolean)),
+    ].sort();
+
     return (
-      <div className={styles.prTableBorder}>
-        <table className={styles.prTable}>
-          <thead>
-            <tr>
-              <th>Photo</th>
-              <th>Rank</th>
-              <th>Badge No.</th>
-              <th>First</th>
-              <th>Middle</th>
-              <th>Last</th>
-              <th>Suffix</th>
-              <th>Designation</th>
-              <th>Station</th>
-              <th>Birth Date</th>
-              <th>Date & Time Hired</th>
-              <th>Status</th>
-              <th>Username</th>
-              <th>Password</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {activeData.length === 0 ? (
-              <tr>
-                <td
-                  colSpan="15"
-                  style={{ textAlign: "center", padding: "40px" }}
-                >
-                  <div style={{ fontSize: "48px", marginBottom: "16px" }}>
-                    <span className={styles.animatedEmoji}>📇</span>
-                  </div>
-                  <h3
-                    style={{
-                      fontSize: "18px",
-                      fontWeight: "600",
-                      color: "#2b2b2b",
-                      marginBottom: "8px",
-                    }}
-                  >
-                    {search || filterRank || filterStation
-                      ? "No Active Personnel Found Matching Filters"
-                      : "No Active Personnel Registered"}
-                  </h3>
-                  <p style={{ fontSize: "14px", color: "#999" }}>
-                    {search || filterRank || filterStation
-                      ? "Try adjusting your search or filter criteria"
-                      : "Register your first team member to get started"}
-                  </p>
-                </td>
+      <>
+        {/* Active Personnel Filters */}
+        <div className={styles.prFilterPanel} style={{ marginBottom: "20px" }}>
+          <div className={styles.prFilterRow}>
+            <div className={styles.prFilterGroup}>
+              <input
+                type="text"
+                className={styles.prSearchBar}
+                placeholder="🔍 Search name, badge, designation..."
+                value={activeSearch}
+                onChange={(e) => setActiveSearch(e.target.value)}
+                style={{ borderColor: "#FFC107" }}
+              />
+            </div>
+            <div className={styles.prFilterGroup}>
+              <select
+                className={styles.prFilterSelect}
+                value={activeFilterRank}
+                onChange={(e) => setActiveFilterRank(e.target.value)}
+                style={{ borderColor: "#FFC107" }}
+              >
+                <option value="">All Ranks</option>
+                {rankOptions.map((rank) => (
+                  <option key={rank.rank} value={rank.rank}>
+                    {rank.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className={styles.prFilterGroup}>
+              <select
+                className={styles.prFilterSelect}
+                value={activeFilterStation}
+                onChange={(e) => setActiveFilterStation(e.target.value)}
+                style={{ borderColor: "#FFC107" }}
+              >
+                <option value="">All Stations</option>
+                {getUniqueStations().map((station) => (
+                  <option key={station} value={station}>
+                    {station}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className={styles.prFilterGroup}>
+              <select
+                className={styles.prFilterSelect}
+                value={activeFilterDesignation}
+                onChange={(e) => setActiveFilterDesignation(e.target.value)}
+                style={{ borderColor: "#FFC107" }}
+              >
+                <option value="">All Designations</option>
+                {activeUniqueDesignations.map((designation) => (
+                  <option key={designation} value={designation}>
+                    {designation}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className={styles.prFilterGroup}>
+              <select
+                className={styles.prFilterSelect}
+                value={activeFilterMonth}
+                onChange={(e) => setActiveFilterMonth(e.target.value)}
+                style={{ borderColor: "#FFC107" }}
+              >
+                <option value="">All Months</option>
+                <option value="1">January</option>
+                <option value="2">February</option>
+                <option value="3">March</option>
+                <option value="4">April</option>
+                <option value="5">May</option>
+                <option value="6">June</option>
+                <option value="7">July</option>
+                <option value="8">August</option>
+                <option value="9">September</option>
+                <option value="10">October</option>
+                <option value="11">November</option>
+                <option value="12">December</option>
+              </select>
+            </div>
+            <div className={styles.prFilterGroup}>
+              <button
+                className={styles.prClearFiltersBtn}
+                onClick={clearActiveFilters}
+                type="button"
+                style={{ background: "#FFC107", color: "#000" }}
+              >
+                Clear Filters
+              </button>
+            </div>
+          </div>
+          <div
+            className={styles.prFilterInfo}
+            style={{ background: "#FFF8E1" }}
+          >
+            Showing {filteredActiveData.length} of {activePersonnel.length}{" "}
+            active personnel
+            {activeSearch ||
+            activeFilterRank ||
+            activeFilterStation ||
+            activeFilterDesignation ||
+            activeFilterMonth
+              ? " (filtered)"
+              : ""}
+          </div>
+        </div>
+
+        {/* Active Personnel Table */}
+        <div
+          className={styles.prTableBorder}
+          style={{ borderColor: "#FFC107" }}
+        >
+          <table className={styles.prTable}>
+            <thead>
+              <tr style={{ background: "#FFC107" }}>
+                <th>Photo</th>
+                <th>Rank</th>
+                <th>Badge No.</th>
+                <th>First</th>
+                <th>Middle</th>
+                <th>Last</th>
+                <th>Suffix</th>
+                <th>Designation</th>
+                <th>Station</th>
+                <th>Birth Date</th>
+                <th>Date & Time Hired</th>
+                <th>Status</th>
+                <th>Username</th>
+                <th>Password</th>
+                <th>Actions</th>
               </tr>
-            ) : (
-              activeData.map((person) => {
-                if (!person) return null;
-
-                // REMOVE the checkPersonnelStatus call here since
-                // activePersonnel should already contain only active personnel
-                const status = checkPersonnelStatus(person);
-                return (
-                  <tr key={person.id}>
-                    <PhotoCell person={person} />
-                    <td>{getRankDisplay(person)}</td>
-                    <td>
-                      {person.badge_number ? (
-                        <HighlightMatch
-                          text={person.badge_number}
-                          searchTerm={search}
+            </thead>
+            <tbody>
+              {activeData.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan="15"
+                    style={{ textAlign: "center", padding: "40px" }}
+                  >
+                    <div style={{ fontSize: "48px", marginBottom: "16px" }}>
+                      <span className={styles.animatedEmoji}>📇</span>
+                    </div>
+                    <h3
+                      style={{
+                        fontSize: "18px",
+                        fontWeight: "600",
+                        color: "#2b2b2b",
+                        marginBottom: "8px",
+                      }}
+                    >
+                      {activeSearch ||
+                      activeFilterRank ||
+                      activeFilterStation ||
+                      activeFilterDesignation ||
+                      activeFilterMonth
+                        ? "No Active Personnel Found Matching Filters"
+                        : "No Active Personnel Registered"}
+                    </h3>
+                    <p style={{ fontSize: "14px", color: "#999" }}>
+                      {activeSearch ||
+                      activeFilterRank ||
+                      activeFilterStation ||
+                      activeFilterDesignation ||
+                      activeFilterMonth
+                        ? "Try adjusting your search or filter criteria"
+                        : "Register your first team member to get started"}
+                    </p>
+                  </td>
+                </tr>
+              ) : (
+                activeData.map((person) => {
+                  if (!person) return null;
+                  return (
+                    <tr key={person.id}>
+                      <PhotoCell person={person} />
+                      <td>{getRankDisplay(person)}</td>
+                      <td>
+                        {person.badge_number ? (
+                          <ActiveHighlightMatch
+                            text={person.badge_number}
+                            searchTerm={activeSearch}
+                          />
+                        ) : (
+                          "-"
+                        )}
+                      </td>
+                      <td>
+                        <ActiveHighlightMatch
+                          text={person.first_name}
+                          searchTerm={activeSearch}
                         />
-                      ) : (
-                        "-"
-                      )}
-                    </td>
-                    <td>
-                      <HighlightMatch
-                        text={person.first_name}
-                        searchTerm={search}
-                      />
-                    </td>
-                    <td>
-                      {person.middle_name ? (
-                        <HighlightMatch
-                          text={person.middle_name}
-                          searchTerm={search}
+                      </td>
+                      <td>
+                        {person.middle_name ? (
+                          <ActiveHighlightMatch
+                            text={person.middle_name}
+                            searchTerm={activeSearch}
+                          />
+                        ) : (
+                          "-"
+                        )}
+                      </td>
+                      <td>
+                        <ActiveHighlightMatch
+                          text={person.last_name}
+                          searchTerm={activeSearch}
                         />
-                      ) : (
-                        "-"
-                      )}
-                    </td>
-                    <td>
-                      <HighlightMatch
-                        text={person.last_name}
-                        searchTerm={search}
-                      />
-                    </td>
-                    <td>{person.suffix || "-"}</td>
-                    <td>{person.designation || "-"}</td>
-                    <td>
-                      {person.station ? (
-                        <HighlightMatch
-                          text={person.station}
-                          searchTerm={search}
-                        />
-                      ) : (
-                        "-"
-                      )}
-                    </td>
-                    <td>{formatDate(person.birth_date)}</td>
-                    <td>{formatDateTimeHired(person)}</td>
-                    <td className={styles.statusCell}>
-                      {getPersonnelStatusBadge(person)}
-                    </td>
-                    <td>{person.username}</td>
-                    <PasswordCell password={person.password} />
-
-                    <td className={styles.prActionsCell}>
-                      <div className={styles.prActionsContainer}>
-                        {/* Show lock status prominently */}
-                        {lockedPersonnel[person.id]?.isLocked ? (
-                          <div
-                            style={{
-                              background: "#ffebee",
-                              padding: "5px 10px",
-                              borderRadius: "4px",
-                              border: "1px solid #f44336",
-                              marginRight: "10px",
-                              display: "flex",
-                              alignItems: "center",
-                            }}
-                          >
-                            <span
+                      </td>
+                      <td>{person.suffix || "-"}</td>
+                      <td>
+                        {person.designation ? (
+                          <ActiveHighlightMatch
+                            text={person.designation}
+                            searchTerm={activeSearch}
+                          />
+                        ) : (
+                          "-"
+                        )}
+                      </td>
+                      <td>
+                        {person.station ? (
+                          <ActiveHighlightMatch
+                            text={person.station}
+                            searchTerm={activeSearch}
+                          />
+                        ) : (
+                          "-"
+                        )}
+                      </td>
+                      <td>{formatDate(person.birth_date)}</td>
+                      <td>{formatDateTimeHired(person)}</td>
+                      <td className={styles.statusCell}>
+                        {getPersonnelStatusBadge(person)}
+                      </td>
+                      <td>{person.username}</td>
+                      <PasswordCell password={person.password} />
+                      <td className={styles.prActionsCell}>
+                        <div className={styles.prActionsContainer}>
+                          {/* Show lock status prominently */}
+                          {lockedPersonnel[person.id]?.isLocked ? (
+                            <div
                               style={{
-                                color: "#f44336",
-                                marginRight: "5px",
+                                background: "#ffebee",
+                                padding: "5px 10px",
+                                borderRadius: "4px",
+                                border: "1px solid #f44336",
+                                marginRight: "10px",
+                                display: "flex",
+                                alignItems: "center",
                               }}
                             >
-                              🔒
-                            </span>
-                            <span
-                              style={{ fontSize: "12px", color: "#d32f2f" }}
-                            >
-                              {lockedPersonnel[person.id].lockReason}
-                            </span>
-                          </div>
-                        ) : (
-                          <LockStatusIcon personnelId={person.id} />
-                        )}
-
-                        {/* Add Password Change Button */}
-                        <button
-                          className={`${styles.prPasswordChangeBtn} ${
-                            lockedPersonnel[person.id]?.isLocked
-                              ? styles.disabled
-                              : ""
-                          }`}
-                          onClick={() => {
-                            if (lockedPersonnel[person.id]?.isLocked) {
-                              toast.warning(
-                                `Cannot change password: ${
-                                  lockedPersonnel[person.id]?.lockReason
-                                }`
-                              );
-                            } else {
-                              setPasswordModalPersonnel(person);
-                              setNewPassword(generatePassword());
-                              setShowPasswordModal(true);
-                            }
-                          }}
-                          disabled={lockedPersonnel[person.id]?.isLocked}
-                          title="Change Password"
-                        >
-                          <FaKey />
-                        </button>
-
-                        {/* Add Username Change Button */}
-                        <button
-                          className={`${styles.prUsernameChangeBtn} ${
-                            lockedPersonnel[person.id]?.isLocked
-                              ? styles.disabled
-                              : ""
-                          }`}
-                          onClick={() => {
-                            if (lockedPersonnel[person.id]?.isLocked) {
-                              toast.warning(
-                                `Cannot change username: ${
-                                  lockedPersonnel[person.id]?.lockReason
-                                }`
-                              );
-                            } else {
-                              setUsernameModalPersonnel(person);
-                              setNewUsername(person.username);
-                              setShowUsernameModal(true);
-                            }
-                          }}
-                          disabled={lockedPersonnel[person.id]?.isLocked}
-                          title="Change Username"
-                        >
-                          <FaUserEdit />
-                        </button>
-
-                        <button
-                          className={`${styles.prEditBtn} ${
-                            lockedPersonnel[person.id]?.isLocked
-                              ? styles.disabled
-                              : ""
-                          }`}
-                          onClick={() => {
-                            if (lockedPersonnel[person.id]?.isLocked) {
-                              toast.warning(
-                                `Cannot edit: ${
-                                  lockedPersonnel[person.id]?.lockReason
-                                }`
-                              );
-                            } else {
-                              openEdit(person);
-                            }
-                          }}
-                          disabled={lockedPersonnel[person.id]?.isLocked}
-                        >
-                          Edit
-                        </button>
-
-                        <button
-                          className={`${styles.prDeleteBtn} ${
-                            lockedPersonnel[person.id]?.isLocked
-                              ? styles.disabled
-                              : ""
-                          }`}
-                          onClick={() => {
-                            if (lockedPersonnel[person.id]?.isLocked) {
-                              toast.warning(
-                                `Cannot delete: ${
-                                  lockedPersonnel[person.id]?.lockReason
-                                }`
-                              );
-                            } else {
-                              handleDeleteClick(
-                                person.id,
-                                `${person.first_name} ${person.last_name}`
-                              );
-                            }
-                          }}
-                          disabled={lockedPersonnel[person.id]?.isLocked}
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
-    );
-  };
-
-  // ========== RENDER ALL PERSONNEL TABLE ==========
-  const renderAllPersonnelTable = () => {
-    const allData = paginate(allPersonnelTable, allCurrentPage, rowsPerPage);
-
-    return (
-      <div className={styles.prTableBorder}>
-        <table className={styles.prTable}>
-          <thead>
-            <tr>
-              <th>Photo</th>
-              <th>Rank</th>
-              <th>Badge No.</th>
-              <th>First</th>
-              <th>Middle</th>
-              <th>Last</th>
-              <th>Suffix</th>
-              <th>Designation</th>
-              <th>Station</th>
-              <th>Birth Date</th>
-              <th>Date & Time Hired</th>
-              <th>Status</th>
-              <th>Username</th>
-              <th>Password</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {allData.length === 0 ? (
-              <tr>
-                <td
-                  colSpan="15"
-                  style={{ textAlign: "center", padding: "40px" }}
-                >
-                  <div style={{ fontSize: "48px", marginBottom: "16px" }}>
-                    <span className={styles.animatedEmoji}>📇</span>
-                  </div>
-                  <h3
-                    style={{
-                      fontSize: "18px",
-                      fontWeight: "600",
-                      color: "#2b2b2b",
-                      marginBottom: "8px",
-                    }}
-                  >
-                    No Personnel Found
-                  </h3>
-                </td>
-              </tr>
-            ) : (
-              allData.map((person) => {
-                if (!person) return null;
-                const status = checkPersonnelStatus(person);
-                const isInactive = !status.shouldDisplay;
-
-                return (
-                  <tr
-                    key={person.id}
-                    className={isInactive ? styles.inactiveRow : ""}
-                  >
-                    <PhotoCell person={person} />
-                    <td>{getRankDisplay(person)}</td>
-                    <td>
-                      {person.badge_number ? (
-                        <HighlightMatch
-                          text={person.badge_number}
-                          searchTerm={search}
-                        />
-                      ) : (
-                        "-"
-                      )}
-                    </td>
-                    <td>
-                      <HighlightMatch
-                        text={person.first_name}
-                        searchTerm={search}
-                      />
-                    </td>
-                    <td>
-                      {person.middle_name ? (
-                        <HighlightMatch
-                          text={person.middle_name}
-                          searchTerm={search}
-                        />
-                      ) : (
-                        "-"
-                      )}
-                    </td>
-                    <td>
-                      <HighlightMatch
-                        text={person.last_name}
-                        searchTerm={search}
-                      />
-                    </td>
-                    <td>{person.suffix || "-"}</td>
-                    <td>{person.designation || "-"}</td>
-                    <td>
-                      {person.station ? (
-                        <HighlightMatch
-                          text={person.station}
-                          searchTerm={search}
-                        />
-                      ) : (
-                        "-"
-                      )}
-                    </td>
-                    <td>{formatDate(person.birth_date)}</td>
-                    <td>{formatDateTimeHired(person)}</td>
-                    <td className={styles.statusCell}>
-                      {getPersonnelStatusBadge(person)}
-                    </td>
-                    <td>{person.username}</td>
-                    <PasswordCell password={person.password} />
-
-                    <td className={styles.prActionsCell}>
-                      <div className={styles.prActionsContainer}>
-                        {isInactive ? (
-                          <button
-                            className={styles.prReactivateBtn}
-                            onClick={() =>
-                              openStatusModal(person, "reactivate")
-                            }
-                            title="Reactivate personnel"
-                          >
-                            <FaRedo /> Reactivate
-                          </button>
-                        ) : (
-                          <>
-                            {lockedPersonnel[person.id]?.isLocked ? (
-                              <div
+                              <span
                                 style={{
-                                  background: "#ffebee",
-                                  padding: "5px 10px",
-                                  borderRadius: "4px",
-                                  border: "1px solid #f44336",
-                                  marginRight: "10px",
-                                  display: "flex",
-                                  alignItems: "center",
+                                  color: "#f44336",
+                                  marginRight: "5px",
                                 }}
                               >
-                                <span
+                                🔒
+                              </span>
+                              <span
+                                style={{ fontSize: "12px", color: "#d32f2f" }}
+                              >
+                                {lockedPersonnel[person.id].lockReason}
+                              </span>
+                            </div>
+                          ) : (
+                            <LockStatusIcon personnelId={person.id} />
+                          )}
+
+                          {/* Add Password Change Button */}
+                          <button
+                            className={`${styles.prPasswordChangeBtn} ${
+                              lockedPersonnel[person.id]?.isLocked
+                                ? styles.disabled
+                                : ""
+                            }`}
+                            onClick={() => {
+                              if (lockedPersonnel[person.id]?.isLocked) {
+                                toast.warning(
+                                  `Cannot change password: ${
+                                    lockedPersonnel[person.id]?.lockReason
+                                  }`
+                                );
+                              } else {
+                                setPasswordModalPersonnel(person);
+                                setNewPassword(generatePassword());
+                                setShowPasswordModal(true);
+                              }
+                            }}
+                            disabled={lockedPersonnel[person.id]?.isLocked}
+                            title="Change Password"
+                          >
+                            <FaKey />
+                          </button>
+
+                          {/* Add Username Change Button */}
+                          <button
+                            className={`${styles.prUsernameChangeBtn} ${
+                              lockedPersonnel[person.id]?.isLocked
+                                ? styles.disabled
+                                : ""
+                            }`}
+                            onClick={() => {
+                              if (lockedPersonnel[person.id]?.isLocked) {
+                                toast.warning(
+                                  `Cannot change username: ${
+                                    lockedPersonnel[person.id]?.lockReason
+                                  }`
+                                );
+                              } else {
+                                setUsernameModalPersonnel(person);
+                                setNewUsername(person.username);
+                                setShowUsernameModal(true);
+                              }
+                            }}
+                            disabled={lockedPersonnel[person.id]?.isLocked}
+                            title="Change Username"
+                          >
+                            <FaUserEdit />
+                          </button>
+
+                          <button
+                            className={`${styles.prEditBtn} ${
+                              lockedPersonnel[person.id]?.isLocked
+                                ? styles.disabled
+                                : ""
+                            }`}
+                            onClick={() => {
+                              if (lockedPersonnel[person.id]?.isLocked) {
+                                toast.warning(
+                                  `Cannot edit: ${
+                                    lockedPersonnel[person.id]?.lockReason
+                                  }`
+                                );
+                              } else {
+                                openEdit(person);
+                              }
+                            }}
+                            disabled={lockedPersonnel[person.id]?.isLocked}
+                          >
+                            Edit
+                          </button>
+
+                          <button
+                            className={`${styles.prDeleteBtn} ${
+                              lockedPersonnel[person.id]?.isLocked
+                                ? styles.disabled
+                                : ""
+                            }`}
+                            onClick={() => {
+                              if (lockedPersonnel[person.id]?.isLocked) {
+                                toast.warning(
+                                  `Cannot delete: ${
+                                    lockedPersonnel[person.id]?.lockReason
+                                  }`
+                                );
+                              } else {
+                                handleDeleteClick(person);
+                              }
+                            }}
+                            disabled={lockedPersonnel[person.id]?.isLocked}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </>
+    );
+  };
+  // ========== RENDER ALL PERSONNEL TABLE ==========
+  const renderAllPersonnelTable = () => {
+    // Apply all filters
+    const filteredAllData = applyAllFilters(allPersonnelTable);
+    const allData = paginate(filteredAllData, allCurrentPage, rowsPerPage);
+
+    // Get unique values for filters
+    const allUniqueDesignations = [
+      ...new Set(allPersonnelTable.map((p) => p.designation).filter(Boolean)),
+    ].sort();
+
+    const allUniqueStations = [
+      ...new Set(allPersonnelTable.map((p) => p.station).filter(Boolean)),
+    ].sort();
+
+    return (
+      <>
+        {/* All Personnel Filters */}
+        <div
+          className={styles.prFilterPanel}
+          style={{ marginBottom: "20px", background: "#E3F2FD" }}
+        >
+          <div className={styles.prFilterRow}>
+            <div className={styles.prFilterGroup}>
+              <input
+                type="text"
+                className={styles.prSearchBar}
+                placeholder="🔍 Search all personnel..."
+                value={allSearch}
+                onChange={(e) => setAllSearch(e.target.value)}
+                style={{ borderColor: "#2196F3" }}
+              />
+            </div>
+            <div className={styles.prFilterGroup}>
+              <select
+                className={styles.prFilterSelect}
+                value={allFilterRank}
+                onChange={(e) => setAllFilterRank(e.target.value)}
+                style={{ borderColor: "#2196F3" }}
+              >
+                <option value="">All Ranks</option>
+                {rankOptions.map((rank) => (
+                  <option key={rank.rank} value={rank.rank}>
+                    {rank.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className={styles.prFilterGroup}>
+              <select
+                className={styles.prFilterSelect}
+                value={allFilterStatus}
+                onChange={(e) => setAllFilterStatus(e.target.value)}
+                style={{ borderColor: "#2196F3" }}
+              >
+                <option value="">All Status</option>
+                <option value="active">Active</option>
+                <option value="Retired">Retired</option>
+                <option value="Resigned">Resigned</option>
+                <option value="Transferred">Transferred</option>
+              </select>
+            </div>
+            <div className={styles.prFilterGroup}>
+              <select
+                className={styles.prFilterSelect}
+                value={allFilterDesignation}
+                onChange={(e) => setAllFilterDesignation(e.target.value)}
+                style={{ borderColor: "#2196F3" }}
+              >
+                <option value="">All Designations</option>
+                {allUniqueDesignations.map((designation) => (
+                  <option key={designation} value={designation}>
+                    {designation}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className={styles.prFilterGroup}>
+              <select
+                className={styles.prFilterSelect}
+                value={allFilterMonth}
+                onChange={(e) => setAllFilterMonth(e.target.value)}
+                style={{ borderColor: "#2196F3" }}
+              >
+                <option value="">All Months</option>
+                <option value="1">January</option>
+                <option value="2">February</option>
+                <option value="3">March</option>
+                <option value="4">April</option>
+                <option value="5">May</option>
+                <option value="6">June</option>
+                <option value="7">July</option>
+                <option value="8">August</option>
+                <option value="9">September</option>
+                <option value="10">October</option>
+                <option value="11">November</option>
+                <option value="12">December</option>
+              </select>
+            </div>
+          </div>
+
+          <div className={styles.prFilterRow}>
+            <div className={styles.prFilterGroup}>
+              <select
+                className={styles.prFilterSelect}
+                value={allFilterStation}
+                onChange={(e) => setAllFilterStation(e.target.value)}
+                style={{ borderColor: "#2196F3" }}
+              >
+                <option value="">All Stations</option>
+                {allUniqueStations.map((station) => (
+                  <option key={station} value={station}>
+                    {station}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className={styles.prFilterGroup}>
+              <button
+                className={styles.prClearFiltersBtn}
+                onClick={clearAllFilters}
+                type="button"
+                style={{ background: "#2196F3", color: "#fff" }}
+              >
+                Clear All Filters
+              </button>
+            </div>
+            <div className={styles.prFilterGroup} style={{ flex: 2 }}>
+              <div
+                style={{
+                  fontSize: "14px",
+                  color: "#1976D2",
+                  fontWeight: "500",
+                }}
+              >
+                Showing {filteredAllData.length} of {allPersonnelTable.length}{" "}
+                total personnel
+                {allSearch ||
+                allFilterRank ||
+                allFilterStatus ||
+                allFilterDesignation ||
+                allFilterMonth ||
+                allFilterStation
+                  ? " (filtered)"
+                  : ""}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* All Personnel Table */}
+        <div
+          className={styles.prTableBorder}
+          style={{ borderColor: "#2196F3" }}
+        >
+          <table className={styles.prTable}>
+            <thead>
+              <tr style={{ background: "#2196F3" }}>
+                <th>Photo</th>
+                <th>Rank</th>
+                <th>Badge No.</th>
+                <th>First</th>
+                <th>Middle</th>
+                <th>Last</th>
+                <th>Suffix</th>
+                <th>Designation</th>
+                <th>Station</th>
+                <th>Birth Date</th>
+                <th>Date & Time Hired</th>
+                <th>Status</th>
+                <th>Username</th>
+                <th>Password</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {allData.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan="15"
+                    style={{ textAlign: "center", padding: "40px" }}
+                  >
+                    <div style={{ fontSize: "48px", marginBottom: "16px" }}>
+                      <span className={styles.animatedEmoji}>📊</span>
+                    </div>
+                    <h3
+                      style={{
+                        fontSize: "18px",
+                        fontWeight: "600",
+                        color: "#2b2b2b",
+                        marginBottom: "8px",
+                      }}
+                    >
+                      No Personnel Found
+                    </h3>
+                    <p style={{ fontSize: "14px", color: "#999" }}>
+                      Try adjusting your filters or search criteria
+                    </p>
+                  </td>
+                </tr>
+              ) : (
+                allData.map((person) => {
+                  if (!person) return null;
+                  const status = checkPersonnelStatus(person);
+                  const isInactive = !status.shouldDisplay;
+
+                  return (
+                    <tr
+                      key={person.id}
+                      className={isInactive ? styles.inactiveRow : ""}
+                    >
+                      <PhotoCell person={person} />
+                      <td>{getRankDisplay(person)}</td>
+                      <td>
+                        {person.badge_number ? (
+                          <AllHighlightMatch
+                            text={person.badge_number}
+                            searchTerm={allSearch}
+                          />
+                        ) : (
+                          "-"
+                        )}
+                      </td>
+                      <td>
+                        <AllHighlightMatch
+                          text={person.first_name}
+                          searchTerm={allSearch}
+                        />
+                      </td>
+                      <td>
+                        {person.middle_name ? (
+                          <AllHighlightMatch
+                            text={person.middle_name}
+                            searchTerm={allSearch}
+                          />
+                        ) : (
+                          "-"
+                        )}
+                      </td>
+                      <td>
+                        <AllHighlightMatch
+                          text={person.last_name}
+                          searchTerm={allSearch}
+                        />
+                      </td>
+                      <td>{person.suffix || "-"}</td>
+                      <td>
+                        {person.designation ? (
+                          <AllHighlightMatch
+                            text={person.designation}
+                            searchTerm={allSearch}
+                          />
+                        ) : (
+                          "-"
+                        )}
+                      </td>
+                      <td>
+                        {person.station ? (
+                          <AllHighlightMatch
+                            text={person.station}
+                            searchTerm={allSearch}
+                          />
+                        ) : (
+                          "-"
+                        )}
+                      </td>
+                      <td>{formatDate(person.birth_date)}</td>
+                      <td>{formatDateTimeHired(person)}</td>
+                      <td className={styles.statusCell}>
+                        {getPersonnelStatusBadge(person)}
+                      </td>
+                      <td>{person.username}</td>
+                      <PasswordCell password={person.password} />
+                      <td className={styles.prActionsCell}>
+                        <div className={styles.prActionsContainer}>
+                          {isInactive ? (
+                            <button
+                              className={styles.prReactivateBtn}
+                              onClick={() =>
+                                openStatusModal(person, "reactivate")
+                              }
+                              title="Reactivate personnel"
+                            >
+                              <FaRedo /> Reactivate
+                            </button>
+                          ) : (
+                            <>
+                              {lockedPersonnel[person.id]?.isLocked ? (
+                                <div
                                   style={{
-                                    color: "#f44336",
-                                    marginRight: "5px",
+                                    background: "#ffebee",
+                                    padding: "5px 10px",
+                                    borderRadius: "4px",
+                                    border: "1px solid #f44336",
+                                    marginRight: "10px",
+                                    display: "flex",
+                                    alignItems: "center",
                                   }}
                                 >
-                                  🔒
-                                </span>
-                                <span
-                                  style={{ fontSize: "12px", color: "#d32f2f" }}
-                                >
-                                  {lockedPersonnel[person.id].lockReason}
-                                </span>
-                              </div>
-                            ) : (
-                              <LockStatusIcon personnelId={person.id} />
-                            )}
-
-                            {/* Add Password Change Button for active personnel */}
-                            <button
-                              className={`${styles.prPasswordChangeBtn} ${
-                                lockedPersonnel[person.id]?.isLocked
-                                  ? styles.disabled
-                                  : ""
-                              }`}
-                              onClick={() => {
-                                if (lockedPersonnel[person.id]?.isLocked) {
-                                  toast.warning(
-                                    `Cannot change password: ${
-                                      lockedPersonnel[person.id]?.lockReason
-                                    }`
-                                  );
-                                } else {
-                                  setPasswordModalPersonnel(person);
-                                  setNewPassword(generatePassword());
-                                  setShowPasswordModal(true);
-                                }
-                              }}
-                              disabled={lockedPersonnel[person.id]?.isLocked}
-                              title="Change Password"
-                            >
-                              <FaKey />
-                            </button>
-
-                            {/* Add Username Change Button for active personnel */}
-                            <button
-                              className={`${styles.prUsernameChangeBtn} ${
-                                lockedPersonnel[person.id]?.isLocked
-                                  ? styles.disabled
-                                  : ""
-                              }`}
-                              onClick={() => {
-                                if (lockedPersonnel[person.id]?.isLocked) {
-                                  toast.warning(
-                                    `Cannot change username: ${
-                                      lockedPersonnel[person.id]?.lockReason
-                                    }`
-                                  );
-                                } else {
-                                  setUsernameModalPersonnel(person);
-                                  setNewUsername(person.username);
-                                  setShowUsernameModal(true);
-                                }
-                              }}
-                              disabled={lockedPersonnel[person.id]?.isLocked}
-                              title="Change Username"
-                            >
-                              <FaUserEdit />
-                            </button>
-
-                            <button
-                              className={`${styles.prEditBtn} ${
-                                lockedPersonnel[person.id]?.isLocked
-                                  ? styles.disabled
-                                  : ""
-                              }`}
-                              onClick={() => {
-                                if (lockedPersonnel[person.id]?.isLocked) {
-                                  toast.warning(
-                                    `Cannot edit: ${
-                                      lockedPersonnel[person.id]?.lockReason
-                                    }`
-                                  );
-                                } else {
-                                  openEdit(person);
-                                }
-                              }}
-                              disabled={lockedPersonnel[person.id]?.isLocked}
-                            >
-                              Edit
-                            </button>
-
-                            <button
-                              className={styles.prRetireBtn}
-                              onClick={() => openStatusModal(person, "retire")}
-                              disabled={lockedPersonnel[person.id]?.isLocked}
-                              title={
-                                lockedPersonnel[person.id]?.isLocked
-                                  ? "Cannot retire locked personnel"
-                                  : "Mark as retired"
-                              }
-                            >
-                              <FaArchive /> Retire
-                            </button>
-
-                            <button
-                              className={styles.prResignBtn}
-                              onClick={() => openStatusModal(person, "resign")}
-                              disabled={lockedPersonnel[person.id]?.isLocked}
-                              title={
-                                lockedPersonnel[person.id]?.isLocked
-                                  ? "Cannot resign locked personnel"
-                                  : "Mark as resigned"
-                              }
-                            >
-                              <FaUserSlash /> Resign
-                            </button>
-
-                            {!isInactive && (
+                                  <span
+                                    style={{
+                                      color: "#f44336",
+                                      marginRight: "5px",
+                                    }}
+                                  >
+                                    🔒
+                                  </span>
+                                  <span
+                                    style={{
+                                      fontSize: "12px",
+                                      color: "#d32f2f",
+                                    }}
+                                  >
+                                    {lockedPersonnel[person.id].lockReason}
+                                  </span>
+                                </div>
+                              ) : (
+                                <LockStatusIcon personnelId={person.id} />
+                              )}
+                              {/* Add Password Change Button for active personnel */}
                               <button
-                                className={`${styles.prDeleteBtn} ${
+                                className={`${styles.prPasswordChangeBtn} ${
                                   lockedPersonnel[person.id]?.isLocked
                                     ? styles.disabled
                                     : ""
@@ -3636,33 +4438,145 @@ const getPhotoUrl = (person) => {
                                 onClick={() => {
                                   if (lockedPersonnel[person.id]?.isLocked) {
                                     toast.warning(
-                                      `Cannot delete: ${
+                                      `Cannot change password: ${
                                         lockedPersonnel[person.id]?.lockReason
                                       }`
                                     );
                                   } else {
-                                    handleDeleteClick(
-                                      person.id,
-                                      `${person.first_name} ${person.last_name}`
+                                    setPasswordModalPersonnel(person);
+                                    setNewPassword(generatePassword());
+                                    setShowPasswordModal(true);
+                                  }
+                                }}
+                                disabled={lockedPersonnel[person.id]?.isLocked}
+                                title="Change Password"
+                              >
+                                <FaKey />
+                              </button>
+                              {/* Add Username Change Button for active personnel */}
+                              <button
+                                className={`${styles.prUsernameChangeBtn} ${
+                                  lockedPersonnel[person.id]?.isLocked
+                                    ? styles.disabled
+                                    : ""
+                                }`}
+                                onClick={() => {
+                                  if (lockedPersonnel[person.id]?.isLocked) {
+                                    toast.warning(
+                                      `Cannot change username: ${
+                                        lockedPersonnel[person.id]?.lockReason
+                                      }`
                                     );
+                                  } else {
+                                    setUsernameModalPersonnel(person);
+                                    setNewUsername(person.username);
+                                    setShowUsernameModal(true);
+                                  }
+                                }}
+                                disabled={lockedPersonnel[person.id]?.isLocked}
+                                title="Change Username"
+                              >
+                                <FaUserEdit />
+                              </button>
+                              <button
+                                className={`${styles.prEditBtn} ${
+                                  lockedPersonnel[person.id]?.isLocked
+                                    ? styles.disabled
+                                    : ""
+                                }`}
+                                onClick={() => {
+                                  if (lockedPersonnel[person.id]?.isLocked) {
+                                    toast.warning(
+                                      `Cannot edit: ${
+                                        lockedPersonnel[person.id]?.lockReason
+                                      }`
+                                    );
+                                  } else {
+                                    openEdit(person);
                                   }
                                 }}
                                 disabled={lockedPersonnel[person.id]?.isLocked}
                               >
-                                Delete
+                                Edit
                               </button>
-                            )}
-                          </>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
+                              <button
+                                className={styles.prRetireBtn}
+                                onClick={() =>
+                                  openStatusModal(person, "retire")
+                                }
+                                disabled={lockedPersonnel[person.id]?.isLocked}
+                                title={
+                                  lockedPersonnel[person.id]?.isLocked
+                                    ? "Cannot retire locked personnel"
+                                    : "Mark as retired"
+                                }
+                              >
+                                <FaArchive /> Retire
+                              </button>
+                              <button
+                                className={styles.prResignBtn}
+                                onClick={() =>
+                                  openStatusModal(person, "resign")
+                                }
+                                disabled={lockedPersonnel[person.id]?.isLocked}
+                                title={
+                                  lockedPersonnel[person.id]?.isLocked
+                                    ? "Cannot resign locked personnel"
+                                    : "Mark as resigned"
+                                }
+                              >
+                                <FaUserSlash /> Resign
+                              </button>
+
+                              <button
+                                className={styles.prTransferBtn}
+                                onClick={() => openTransferModal(person)}
+                                disabled={lockedPersonnel[person.id]?.isLocked}
+                                title={
+                                  lockedPersonnel[person.id]?.isLocked
+                                    ? "Cannot transfer locked personnel"
+                                    : "Initiate transfer"
+                                }
+                              >
+                                <FaExchangeAlt /> Transfer
+                              </button>
+                              {!isInactive && (
+                                <button
+                                  className={`${styles.prDeleteBtn} ${
+                                    lockedPersonnel[person.id]?.isLocked
+                                      ? styles.disabled
+                                      : ""
+                                  }`}
+                                  onClick={() => {
+                                    if (lockedPersonnel[person.id]?.isLocked) {
+                                      toast.warning(
+                                        `Cannot delete: ${
+                                          lockedPersonnel[person.id]?.lockReason
+                                        }`
+                                      );
+                                    } else {
+                                      handleDeleteClick(person);
+                                    }
+                                  }}
+                                  disabled={
+                                    lockedPersonnel[person.id]?.isLocked
+                                  }
+                                >
+                                  Delete
+                                </button>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </>
     );
   };
 
@@ -3677,31 +4591,72 @@ const StatusManagementModal = () => {
       ? "Resignation"
       : "Reactivation";
 
-  // Handle textarea change separately to prevent re-renders
-  const handleReasonChange = (e) => {
-    setStatusData((prev) => ({
-      ...prev,
-      reason: e.target.value,
-    }));
-  };
+  // FIX: Use an uncontrolled textarea with defaultValue
+  const [defaultReason, setDefaultReason] = useState("");
 
-  // Handle date change
-  const handleDateChange = (e) => {
-    setStatusData((prev) => ({
-      ...prev,
-      date: e.target.value,
-    }));
-  };
+  // Set default value only once when modal opens
+  useEffect(() => {
+    if (showStatusModal) {
+      setDefaultReason(statusData.reason || "");
+    }
+  }, [showStatusModal]);
 
-  // Handle form submission
   const handleFormSubmit = (e) => {
     e.preventDefault();
+
+    const formData = new FormData(e.target);
+    const reason = formData.get("reason") || "";
+
+    // Update state with the form value
+    setStatusData((prev) => ({
+      ...prev,
+      reason: reason,
+    }));
+
+    // Call update function
     handleUpdateStatus();
   };
 
   return (
-    <div className={styles.statusModalOverlay}>
-      <div className={styles.statusModalContent}>
+    <div
+      className={styles.statusModalOverlay}
+      style={{
+        position: "fixed",
+        top: 0,
+        left: isSidebarCollapsed ? "80px" : "250px",
+        width: isSidebarCollapsed
+          ? "calc(100vw - 80px)"
+          : "calc(100vw - 250px)",
+        height: "100vh",
+        backgroundColor: "rgba(0, 0, 0, 0.5)",
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        zIndex: 1000,
+      }}
+    >
+      <div
+        className={`${styles.statusModalContent} ${
+          statusAction === "reactivate"
+            ? styles.reactivationModalContent
+            : statusAction === "retire"
+            ? styles.retirementModalContent
+            : styles.resignationModalContent
+        }`}
+        style={{
+          maxHeight: "90vh",
+          height: "auto",
+          minHeight: "250px",
+          display: "flex",
+          flexDirection: "column",
+          maxWidth: "500px",
+          width: "95%",
+          margin: "20px auto",
+          background: "white",
+          borderRadius: "8px",
+          boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
+        }}
+      >
         <div className={styles.statusModalHeader}>
           <h3 className={styles.statusModalTitle}>
             {actionText} - {personName}
@@ -3716,17 +4671,82 @@ const StatusManagementModal = () => {
         </div>
 
         {statusAction === "reactivate" ? (
-          <div className={styles.statusModalBody}>
+          <div
+            className={`${styles.statusModalBody} ${styles.reactivationModalBody}`}
+            style={{
+              flex: 1,
+              overflowY: "auto",
+              maxHeight: "70vh",
+              padding: "20px",
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "space-between",
+            }}
+          >
             <div className={styles.reactivateConfirmation}>
               <p>Are you sure you want to reactivate {personName}?</p>
               <p className={styles.reactivateNote}>
                 This will restore their account and make them active again.
               </p>
             </div>
+
+            {/* Reactivation Modal Footer */}
+            <div
+              className={`${styles.statusModalFooter} ${styles.reactivationModalFooter}`}
+              style={{
+                marginTop: "auto",
+                padding: "20px",
+                borderTop: "1px solid #e0e0e0",
+                background: "#f9f9f9",
+                borderBottomLeftRadius: "8px",
+                borderBottomRightRadius: "8px",
+                display: "flex",
+                gap: "12px",
+                justifyContent: "flex-end",
+              }}
+            >
+              <button
+                type="button"
+                className={styles.statusCancelBtn}
+                onClick={closeStatusModal}
+                disabled={isUpdatingStatus}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className={styles.statusConfirmBtn}
+                onClick={handleUpdateStatus}
+                disabled={isUpdatingStatus}
+              >
+                {isUpdatingStatus ? (
+                  <>
+                    <span className={styles.statusSpinner}></span>
+                    Processing...
+                  </>
+                ) : (
+                  `Confirm ${actionText}`
+                )}
+              </button>
+            </div>
           </div>
         ) : (
-          <form onSubmit={handleFormSubmit}>
-            <div className={styles.statusModalBody}>
+          <form onSubmit={handleFormSubmit} className={styles.statusModalForm}>
+            <div
+              className={`${styles.statusModalBody} ${
+                statusAction === "retire"
+                  ? styles.retirementModalBody
+                  : styles.resignationModalBody
+              }`}
+              style={{
+                flex: 1,
+                overflowY: "auto",
+                maxHeight: "70vh",
+                padding: "20px",
+                display: "flex",
+                flexDirection: "column",
+              }}
+            >
               <div className={styles.statusForm}>
                 <div className={styles.statusFormGroup}>
                   <label htmlFor="statusDate">
@@ -3738,8 +4758,14 @@ const StatusManagementModal = () => {
                   <input
                     type="date"
                     id="statusDate"
+                    name="date"
                     value={statusData.date}
-                    onChange={handleDateChange}
+                    onChange={(e) =>
+                      setStatusData((prev) => ({
+                        ...prev,
+                        date: e.target.value,
+                      }))
+                    }
                     max={new Date().toISOString().split("T")[0]}
                     required
                   />
@@ -3751,16 +4777,16 @@ const StatusManagementModal = () => {
                   </label>
                   <textarea
                     id="statusReason"
-                    value={statusData.reason}
-                    onChange={handleReasonChange}
+                    name="reason"
+                    defaultValue={defaultReason}
                     placeholder={`Enter ${
                       statusAction === "retire" ? "retirement" : "resignation"
                     } reason...`}
                     required={statusAction === "resign"}
                     rows={4}
                     className={styles.statusReasonTextarea}
-                    // Add autoFocus for better UX
                     autoFocus={statusAction !== "reactivate"}
+                    key={`reason-${statusModalPersonnel.id}`}
                   />
                 </div>
 
@@ -3782,33 +4808,139 @@ const StatusManagementModal = () => {
               </div>
             </div>
 
-            <div className={styles.statusModalFooter}>
-              <button
-                type="button"
-                className={styles.statusCancelBtn}
-                onClick={closeStatusModal}
-                disabled={isUpdatingStatus}
+            {/* Different footers for retirement and resignation */}
+            {statusAction === "retire" ? (
+              <div
+                className={`${styles.statusModalFooter} ${styles.retirementModalFooter}`}
+                style={{
+                  marginTop: "auto",
+                  padding: "25px 20px",
+                  borderTop: "2px solid #f59e0b",
+                  background: "linear-gradient(135deg, #fff8e1, #fff3cd)",
+                  borderBottomLeftRadius: "8px",
+                  borderBottomRightRadius: "8px",
+                  display: "flex",
+                  gap: "15px",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
               >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className={styles.statusConfirmBtn}
-                disabled={
-                  isUpdatingStatus ||
-                  (statusAction === "resign" && !statusData.reason.trim())
-                }
+                <div className={styles.retirementWarning}>
+                  <span
+                    style={{
+                      color: "#f59e0b",
+                      fontSize: "18px",
+                      marginRight: "8px",
+                    }}
+                  >
+                    ⚠️
+                  </span>
+                  <small style={{ color: "#b45309", fontSize: "13px" }}>
+                    Retirement is permanent. Consider marking as inactive
+                    instead.
+                  </small>
+                </div>
+                <div style={{ display: "flex", gap: "12px" }}>
+                  <button
+                    type="button"
+                    className={styles.statusCancelBtn}
+                    onClick={closeStatusModal}
+                    disabled={isUpdatingStatus}
+                    style={{
+                      background: "#6c757d",
+                      color: "white",
+                      border: "none",
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className={`${styles.statusConfirmBtn} ${styles.retirementConfirmBtn}`}
+                    disabled={isUpdatingStatus}
+                    style={{
+                      background: "linear-gradient(135deg, #f59e0b, #d97706)",
+                      color: "white",
+                      border: "none",
+                    }}
+                  >
+                    {isUpdatingStatus ? (
+                      <>
+                        <span className={styles.statusSpinner}></span>
+                        Retiring...
+                      </>
+                    ) : (
+                      `Confirm Retirement`
+                    )}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div
+                className={`${styles.statusModalFooter} ${styles.resignationModalFooter}`}
+                style={{
+                  marginTop: "auto",
+                  padding: "25px 20px",
+                  borderTop: "2px solid #ef4444",
+                  background: "linear-gradient(135deg, #fee, #fde8e8)",
+                  borderBottomLeftRadius: "8px",
+                  borderBottomRightRadius: "8px",
+                  display: "flex",
+                  gap: "15px",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
               >
-                {isUpdatingStatus ? (
-                  <>
-                    <span className={styles.statusSpinner}></span>
-                    Processing...
-                  </>
-                ) : (
-                  `Confirm ${actionText}`
-                )}
-              </button>
-            </div>
+                <div className={styles.resignationWarning}>
+                  <span
+                    style={{
+                      color: "#ef4444",
+                      fontSize: "18px",
+                      marginRight: "8px",
+                    }}
+                  >
+                    ⚠️
+                  </span>
+                  <small style={{ color: "#b91c1c", fontSize: "13px" }}>
+                    Resignation will mark personnel as inactive immediately.
+                  </small>
+                </div>
+                <div style={{ display: "flex", gap: "12px" }}>
+                  <button
+                    type="button"
+                    className={styles.statusCancelBtn}
+                    onClick={closeStatusModal}
+                    disabled={isUpdatingStatus}
+                    style={{
+                      background: "#6c757d",
+                      color: "white",
+                      border: "none",
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className={`${styles.statusConfirmBtn} ${styles.resignationConfirmBtn}`}
+                    disabled={isUpdatingStatus}
+                    style={{
+                      background: "linear-gradient(135deg, #ef4444, #dc2626)",
+                      color: "white",
+                      border: "none",
+                    }}
+                  >
+                    {isUpdatingStatus ? (
+                      <>
+                        <span className={styles.statusSpinner}></span>
+                        Processing...
+                      </>
+                    ) : (
+                      `Confirm Resignation`
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
           </form>
         )}
       </div>
@@ -3823,7 +4955,7 @@ const StatusManagementModal = () => {
       return status.shouldDisplay;
     });
 
-    const filteredActiveData = applyFilters(trulyActivePersonnel);
+    const filteredActiveData = applyActiveFilters(trulyActivePersonnel); // Use applyActiveFilters
 
     return (
       <div className={styles.prFilterPanel}>
@@ -3861,6 +4993,19 @@ const StatusManagementModal = () => {
             </div>
             <div className={styles.statusSummaryLabel}>Resigned</div>
           </div>
+          <div
+            className={`${styles.statusSummaryItem} ${styles.statusSummaryTransferred}`}
+          >
+            <div
+              className={`${styles.statusSummaryItem} ${styles.statusSummaryTransferred}`}
+            >
+              <div className={styles.statusSummaryValue}>
+                {statusSummary.transferred || 0} {/* Add transferred count */}
+              </div>
+              <div className={styles.statusSummaryLabel}>Transferred</div>
+            </div>
+            <div className={styles.statusSummaryLabel}>Transferred</div>
+          </div>
           <div className={styles.statusSummaryItem}>
             <div className={styles.statusSummaryValue}>
               {statusSummary.total}
@@ -3875,15 +5020,15 @@ const StatusManagementModal = () => {
               type="text"
               className={styles.prSearchBar}
               placeholder="🔍 Search name, rank, station, badge..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              value={activeSearch} // Use activeSearch
+              onChange={(e) => setActiveSearch(e.target.value)}
             />
           </div>
           <div className={styles.prFilterGroup}>
             <select
               className={styles.prFilterSelect}
-              value={filterRank}
-              onChange={(e) => setFilterRank(e.target.value)}
+              value={activeFilterRank} // Use activeFilterRank
+              onChange={(e) => setActiveFilterRank(e.target.value)}
             >
               <option value="">All Ranks</option>
               {rankOptions.map((rank) => (
@@ -3896,8 +5041,8 @@ const StatusManagementModal = () => {
           <div className={styles.prFilterGroup}>
             <select
               className={styles.prFilterSelect}
-              value={filterStation}
-              onChange={(e) => setFilterStation(e.target.value)}
+              value={activeFilterStation} // Use activeFilterStation
+              onChange={(e) => setActiveFilterStation(e.target.value)}
             >
               <option value="">All Stations</option>
               {getUniqueStations().map((station) => (
@@ -3910,7 +5055,7 @@ const StatusManagementModal = () => {
           <div className={styles.prFilterGroup}>
             <button
               className={styles.prClearFiltersBtn}
-              onClick={clearFilters}
+              onClick={clearActiveFilters} // Use clearActiveFilters
               type="button"
             >
               Clear Filters
@@ -3920,7 +5065,10 @@ const StatusManagementModal = () => {
         <div className={styles.prFilterInfo}>
           Showing {filteredActiveData.length} of {trulyActivePersonnel.length}{" "}
           active personnel
-          {search || filterRank || filterStation ? " (filtered)" : ""}
+          {activeSearch || activeFilterRank || activeFilterStation
+            ? " (filtered)"
+            : ""}{" "}
+          {/* Update conditions */}
         </div>
       </div>
     );
@@ -3992,7 +5140,6 @@ const StatusManagementModal = () => {
       <Title>Personnel Register | BFP Villanueva</Title>
       <Meta name="robots" content="noindex, nofollow" />
       <AdminGearIcon />
-      <FloatingNotificationBell userId={userId} />
       <Hamburger />
       <ToastContainer
         position="top-right"
@@ -4007,12 +5154,13 @@ const StatusManagementModal = () => {
         theme="light"
       />
       <Sidebar />
-      <StatusManagementModal />
-      <PasswordModal /> {/* ADD THIS */}
-      <UsernameModal /> {/* ADD THIS */}
+
       <div className={`main-content ${isSidebarCollapsed ? "collapsed" : ""}`}>
         <h1>Personnel Registration</h1>
-
+        <TransferModal />
+        <StatusManagementModal />
+        <PasswordModal /> 
+        <UsernameModal /> 
         {error && <div className={styles.prErrorMessage}>{error}</div>}
         <div className={styles.prCard}>
           <h2>Register New Personnel</h2>
@@ -4456,31 +5604,19 @@ const StatusManagementModal = () => {
             </div>
           </form>
         </div>
-
         {/* ========== FIRST TABLE: ACTIVE PERSONNEL ONLY ========== */}
         <div className={styles.prTableHeaderSection}>
           <h2>Active Personnel</h2>
           <div className={styles.prTopControls}>
-            <button
-              className={styles.prShowFiltersBtn}
-              onClick={() => setShowFilters(!showFilters)}
-              type="button"
-            >
-              <FaFilter /> {showFilters ? "Hide Filters" : "Show Filters"}
-            </button>
             {renderPaginationButtons(
               activeCurrentPage,
               setActiveCurrentPage,
-              applyFilters(activePersonnel).length,
+              applyActiveFilters(activePersonnel).length,
               "active"
             )}
           </div>
         </div>
-
-        {showFilters && renderFilterPanel()}
-
         {renderActivePersonnelTable()}
-
         {/* ========== SECOND TABLE: ALL PERSONNEL ========== */}
         <div
           className={styles.prTableHeaderSection}
@@ -4491,26 +5627,25 @@ const StatusManagementModal = () => {
             {renderPaginationButtons(
               allCurrentPage,
               setAllCurrentPage,
-              allPersonnelTable.length,
+              applyAllFilters(allPersonnelTable).length,
               "all"
             )}
           </div>
         </div>
-
         {renderAllPersonnelTable()}
       </div>
       {/* Edit Modal - Fixed version */}
       {showEditModal && (
         <div
-          className={`${styles.modal} ${styles.show} ${
-            isSidebarCollapsed ? styles.sidebarCollapsed : ""
-          }`}
+          className={`${styles.modal} ${styles.show}`}
+          style={{
+            left: isSidebarCollapsed ? "80px" : "250px", // Match sidebar widths
+            width: isSidebarCollapsed
+              ? "calc(100vw - 80px)"
+              : "calc(100vw - 250px)",
+          }}
         >
-          <div
-            className={`${styles.modalContent} ${
-              isSidebarCollapsed ? styles.modalContentCollapsed : ""
-            }`}
-          >
+          <div className={styles.modalContent}>
             <div className={styles.modalHeader}>
               <h2>
                 Edit Personnel -{" "}
@@ -5471,13 +6606,30 @@ const StatusManagementModal = () => {
           className={`${styles.preModalDelete} ${
             isSidebarCollapsed ? styles.sidebarCollapsed : ""
           }`}
-          style={{ display: "flex" }}
+          style={{
+            left: isSidebarCollapsed ? "80px" : "250px",
+            width: isSidebarCollapsed
+              ? "calc(100vw - 80px)"
+              : "calc(100vw - 250px)",
+            position: "fixed",
+            top: "0",
+            height: "100%",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            backgroundColor: "rgba(0, 0, 0, 0.6)",
+          }}
         >
           <div
             className={`${styles.preModalContentDelete} ${
               isSidebarCollapsed ? styles.deleteModalContentCollapsed : ""
             }`}
-            style={{ maxWidth: "450px" }}
+            style={{
+              maxWidth: "450px",
+              width: "90%",
+              margin: "0",
+              position: "relative",
+            }}
           >
             <div className={styles.preModalHeaderDelete}>
               <h2 style={{ marginLeft: "30px" }}>Confirm Deletion</h2>
@@ -5488,13 +6640,53 @@ const StatusManagementModal = () => {
 
             <div className={styles.preModalBody}>
               <div className={styles.deleteConfirmationContent}>
+                {/* Find the personnel object being deleted */}
+                {personnel.find((p) => p.id === deleteId) && (
+                  <div className={styles.personnelInfoPreview}>
+                    {/* Rank Image and Text */}
+                    <div className={styles.personnelRankInfo}>
+                      {personnel.find((p) => p.id === deleteId)?.rank_image && (
+                        <img
+                          src={
+                            personnel.find((p) => p.id === deleteId)?.rank_image
+                          }
+                          alt={
+                            personnel.find((p) => p.id === deleteId)?.rank ||
+                            "Rank"
+                          }
+                          className={styles.personnelRankImage}
+                          onError={(e) => {
+                            e.target.onerror = null;
+                            // Fallback to rank text if image fails
+                            e.target.style.display = "none";
+                          }}
+                        />
+                      )}
+                      <div className={styles.personnelRankText}>
+                        {personnel.find((p) => p.id === deleteId)?.rank ||
+                          "No Rank"}
+                      </div>
+                    </div>
+
+                    {/* Full Name */}
+                    <div className={styles.personnelFullName}>{deleteName}</div>
+
+                    {/* Badge Number */}
+                    <div className={styles.personnelBadgeNumber}>
+                      Badge No:{" "}
+                      {personnel.find((p) => p.id === deleteId)?.badge_number ||
+                        "Not assigned"}
+                    </div>
+                  </div>
+                )}
+
                 <div className={styles.deleteWarningIcon}>⚠️</div>
                 <p className={styles.deleteConfirmationText}>
-                  Are you sure you want to delete the personnel record for
+                  Are you sure you want to delete this personnel record?
                 </p>
-                <p className={styles.documentNameHighlight}>"{deleteName}"?</p>
                 <p className={styles.deleteWarning}>
-                  This action cannot be undone.
+                  This action cannot be undone. All associated data will be
+                  permanently removed.
                 </p>
               </div>
             </div>
@@ -5519,7 +6711,7 @@ const StatusManagementModal = () => {
                     Deleting...
                   </>
                 ) : (
-                  "Delete"
+                  "Delete Personnel"
                 )}
               </button>
             </div>

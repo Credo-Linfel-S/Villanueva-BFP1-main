@@ -570,9 +570,7 @@ export default function InspectionControl() {
           className={`main-content ${isSidebarCollapsed ? "collapsed" : ""}`}
         >
           <h1>Inspection Control</h1>
-
           {/* Removed Add Inspection Button */}
-
           <div className={styles.inspectionTopControls}>
             <div className={styles.inspectionTableHeader}>
               <select
@@ -621,7 +619,6 @@ export default function InspectionControl() {
               />
             </div>
           </div>
-
           <div
             id={styles.inspectionSummary}
             style={{ display: "flex", gap: 20, margin: 20 }}
@@ -675,7 +672,6 @@ export default function InspectionControl() {
               </p>
             </button>
           </div>
-
           {/* Table Header Section - Matching InspectorEquipmentInspection */}
           <div className={styles.inspectionTableHeaderSection}>
             <h2 className={styles.sheaders}>Inspection Records</h2>
@@ -685,7 +681,6 @@ export default function InspectionControl() {
           >
             {renderPaginationButtons()}
           </div>
-
           {/* Scrollable Table Container - Matching InspectorEquipmentInspection */}
           <div className={styles.inspectionTableScrollContainer}>
             {/* Top Pagination */}
@@ -703,7 +698,7 @@ export default function InspectionControl() {
                   <th>Inspector Name</th>
                   <th>Scheduled Date</th>
                   <th>Inspection Result</th>
-                  <th>Findings</th>
+
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -711,7 +706,7 @@ export default function InspectionControl() {
                 {paginated.length === 0 ? (
                   <tr>
                     <td
-                      colSpan="11"
+                      colSpan="10"
                       style={{ textAlign: "center", padding: "40px" }}
                     >
                       <div style={{ fontSize: "48px", marginBottom: "16px" }}>
@@ -764,18 +759,7 @@ export default function InspectionControl() {
                           {getStatusDisplay(inspection.status)}
                         </span>
                       </td>
-                      <td>
-                        {inspection.findings ? (
-                          <button
-                            className={styles.viewDetailsBtn}
-                            onClick={() => openViewModal(inspection)}
-                          >
-                            View Details
-                          </button>
-                        ) : (
-                          "No findings"
-                        )}
-                      </td>
+
                       <td>
                         <button
                           className={styles.inspectionDeleteBtn}
@@ -800,21 +784,27 @@ export default function InspectionControl() {
           >
             {renderPaginationButtons()}
           </div>
-          {/* View Details Modal */}
+
           {isViewModalOpen && selectedInspection && (
             <div
               className={styles.inspectionViewModalOverlay}
-              style={{ display: "flex" }}
               onClick={closeViewModal}
             >
               <div
                 className={styles.inspectionViewModalContent}
                 onClick={(e) => e.stopPropagation()}
               >
+                {/* Header */}
                 <div className={styles.inspectionViewModalHeader}>
-                  <h3 className={styles.inspectionViewModalTitle}>
-                    Inspection Details
-                  </h3>
+                  <div className={styles.inspectionViewModalTitleSection}>
+                    <h3 className={styles.inspectionViewModalTitle}>
+                      Equipment Details
+                    </h3>
+                    <div className={styles.inspectionViewModalSubtitle}>
+                      Detailed information for{" "}
+                      {selectedInspection.equipment_name}
+                    </div>
+                  </div>
                   <button
                     className={styles.inspectionViewModalCloseBtn}
                     onClick={closeViewModal}
@@ -823,44 +813,55 @@ export default function InspectionControl() {
                   </button>
                 </div>
 
+                {/* Main Content */}
                 <div className={styles.inspectionViewModalBody}>
-                  {/* Equipment Information Section */}
+                  {/* Equipment Identification Section */}
                   <div className={styles.viewModalSection}>
                     <h4 className={styles.viewModalSectionTitle}>
-                      Equipment Information
+                      <span className={styles.sectionIcon}>📋</span>
+                      Equipment Identification
                     </h4>
-                    <div className={styles.viewModalGrid}>
-                      <div className={styles.viewModalField}>
-                        <label>Item Code:</label>
-                        <span>{selectedInspection.item_code}</span>
+                    <div className={styles.viewModalInfoGrid}>
+                      <div className={styles.viewModalInfoItem}>
+                        <div className={styles.viewModalInfoLabel}>
+                          Equipment Name:
+                        </div>
+                        <div className={styles.viewModalInfoValue}>
+                          {selectedInspection.equipment_name || "N/A"}
+                        </div>
                       </div>
-                      <div className={styles.viewModalField}>
-                        <label>Equipment Name:</label>
-                        <span>{selectedInspection.equipment_name}</span>
+                      <div className={styles.viewModalInfoItem}>
+                        <div className={styles.viewModalInfoLabel}>
+                          Category:
+                        </div>
+                        <div className={styles.viewModalInfoValue}>
+                          {selectedInspection.category || "N/A"}
+                        </div>
                       </div>
-                      <div className={styles.viewModalField}>
-                        <label>Category:</label>
-                        <span>{selectedInspection.category}</span>
+                      <div className={styles.viewModalInfoItem}>
+                        <div className={styles.viewModalInfoLabel}>
+                          Item Code:
+                        </div>
+                        <div className={styles.viewModalInfoValue}>
+                          {selectedInspection.item_code || "N/A"}
+                        </div>
                       </div>
-                      <div className={styles.viewModalField}>
-                        <label>Equipment Status:</label>
-                        <span
-                          className={`${styles.equipmentStatusBadge} ${
-                            styles[
-                              getEquipmentStatusClass(
-                                selectedInspection.equipment_status
-                              )
-                            ]
-                          }`}
-                        >
-                          {selectedInspection.equipment_status}
-                        </span>
-                      </div>
-                      <div className={styles.viewModalField}>
-                        <label>Purchase Date:</label>
-                        <span>
-                          {formatDate(selectedInspection.purchase_date)}
-                        </span>
+                      <div className={styles.viewModalInfoItem}>
+                        <div className={styles.viewModalInfoLabel}>
+                          Barcode:
+                        </div>
+                        <div className={styles.viewModalInfoValue}>
+                          {selectedInspection.item_code || "N/A"}
+                          {selectedInspection.barcode_image_url && (
+                            <div className={styles.barcodePreview}>
+                              <img
+                                src={selectedInspection.barcode_image_url}
+                                alt="Barcode"
+                                className={styles.barcodeImage}
+                              />
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -868,144 +869,182 @@ export default function InspectionControl() {
                   {/* Assignment Information Section */}
                   <div className={styles.viewModalSection}>
                     <h4 className={styles.viewModalSectionTitle}>
+                      <span className={styles.sectionIcon}>👤</span>
                       Assignment Information
                     </h4>
-                    <div className={styles.viewModalGrid}>
-                      <div className={styles.viewModalField}>
-                        <label>Assigned To:</label>
-                        <span>{selectedInspection.assigned_to}</span>
+                    <div className={styles.viewModalInfoGrid}>
+                      <div className={styles.viewModalInfoItem}>
+                        <div className={styles.viewModalInfoLabel}>
+                          Assigned To:
+                        </div>
+                        <div className={styles.viewModalInfoValue}>
+                          {selectedInspection.assigned_to || "Unassigned"}
+                        </div>
                       </div>
-                      <div className={styles.viewModalField}>
-                        <label>Assigned Date:</label>
-                        <span>
-                          {formatDate(selectedInspection.assigned_date)}
-                        </span>
+                      <div className={styles.viewModalInfoItem}>
+                        <div className={styles.viewModalInfoLabel}>
+                          Assigned Date:
+                        </div>
+                        <div className={styles.viewModalInfoValue}>
+                          {formatDate(selectedInspection.assigned_date) ||
+                            "Not assigned"}
+                        </div>
                       </div>
-                      <div className={styles.viewModalField}>
-                        <label>Last Checked:</label>
-                        <span>
-                          {formatDate(selectedInspection.last_checked)}
-                        </span>
+                      <div className={styles.viewModalInfoItem}>
+                        <div className={styles.viewModalInfoLabel}>
+                          Last Assigned:
+                        </div>
+                        <div className={styles.viewModalInfoValue}>
+                          {selectedInspection.last_assigned || "N/A"}
+                        </div>
                       </div>
-                      <div className={styles.viewModalField}>
-                        <label>Next Maintenance:</label>
-                        <span>
-                          {formatDate(selectedInspection.next_maintenance_date)}
-                        </span>
+                      <div className={styles.viewModalInfoItem}>
+                        <div className={styles.viewModalInfoLabel}>
+                          Unassigned Date:
+                        </div>
+                        <div className={styles.viewModalInfoValue}>
+                          {formatDate(selectedInspection.unassigned_date) ||
+                            "N/A"}
+                        </div>
                       </div>
                     </div>
                   </div>
 
-                  {/* Inspection Details Section */}
+                  {/* Purchase & Maintenance Section */}
                   <div className={styles.viewModalSection}>
                     <h4 className={styles.viewModalSectionTitle}>
-                      Inspection Details
+                      <span className={styles.sectionIcon}>📅</span>
+                      Purchase & Maintenance
                     </h4>
-                    <div className={styles.viewModalGrid}>
-                      <div className={styles.viewModalField}>
-                        <label>Inspector:</label>
-                        <span>{selectedInspection.inspector_name}</span>
+                    <div className={styles.viewModalInfoGrid}>
+                      <div className={styles.viewModalInfoItem}>
+                        <div className={styles.viewModalInfoLabel}>
+                          Purchase Date:
+                        </div>
+                        <div className={styles.viewModalInfoValue}>
+                          {formatDate(selectedInspection.purchase_date) ||
+                            "Not recorded"}
+                        </div>
                       </div>
-                      <div className={styles.viewModalField}>
-                        <label>Inspector Badge:</label>
-                        <span>{selectedInspection.inspector_badge}</span>
+                      <div className={styles.viewModalInfoItem}>
+                        <div className={styles.viewModalInfoLabel}>
+                          Last Checked:
+                        </div>
+                        <div className={styles.viewModalInfoValue}>
+                          {formatDate(selectedInspection.last_checked) ||
+                            "Never"}
+                        </div>
                       </div>
-                      <div className={styles.viewModalField}>
-                        <label>Inspector Rank:</label>
-                        <span>{selectedInspection.inspector_rank}</span>
-                      </div>
-                      <div className={styles.viewModalField}>
-                        <label>Scheduled Date:</label>
-                        <span>
+                      <div className={styles.viewModalInfoItem}>
+                        <div className={styles.viewModalInfoLabel}>
+                          Next Maintenance:
+                        </div>
+                        <div className={styles.viewModalInfoValue}>
                           {formatDate(
-                            selectedInspection.schedule_inspection_date
-                          )}
-                        </span>
-                      </div>
-                      <div className={styles.viewModalField}>
-                        <label>Reschedule Date:</label>
-                        <span>
-                          {formatDate(
-                            selectedInspection.reschedule_inspection_date
-                          )}
-                        </span>
-                      </div>
-                      <div className={styles.viewModalField}>
-                        <label>Inspection Status:</label>
-                        <span
-                          className={`${styles.inspectionStatusBadge} ${
-                            styles[getStatusClass(selectedInspection.status)]
-                          }`}
-                        >
-                          {getStatusDisplay(selectedInspection.status)}
-                        </span>
-                      </div>
-                      <div className={styles.viewModalField}>
-                        <label>Schedule Status:</label>
-                        <span>{selectedInspection.schedule_status}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Findings & Notes Section */}
-                  <div className={styles.viewModalSection}>
-                    <h4 className={styles.viewModalSectionTitle}>
-                      Findings & Notes
-                    </h4>
-                    <div className={styles.viewModalFullWidth}>
-                      <div className={styles.viewModalField}>
-                        <label>Findings:</label>
-                        <div className={styles.viewModalTextContent}>
-                          {formatFindings(selectedInspection.findings)}
+                            selectedInspection.next_maintenance_date
+                          ) || "Not scheduled"}
                         </div>
                       </div>
-                      <div className={styles.viewModalField}>
-                        <label>Recommendations:</label>
-                        <div className={styles.viewModalTextContent}>
-                          {selectedInspection.recommendations ||
-                            "No recommendations"}
+                      <div className={styles.viewModalInfoItem}>
+                        <div className={styles.viewModalInfoLabel}>
+                          Equipment Status:
                         </div>
-                      </div>
-                      <div className={styles.viewModalField}>
-                        <label>Additional Notes:</label>
-                        <div className={styles.viewModalTextContent}>
-                          {selectedInspection.notes || "No additional notes"}
+                        <div className={styles.viewModalInfoValue}>
+                          <span
+                            className={`${styles.equipmentStatusBadge} ${
+                              styles[
+                                getEquipmentStatusClass(
+                                  selectedInspection.equipment_status
+                                )
+                              ]
+                            }`}
+                          >
+                            {selectedInspection.equipment_status || "Unknown"}
+                          </span>
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  {/* System Information Section */}
-                  <div className={styles.viewModalSection}>
-                    <h4 className={styles.viewModalSectionTitle}>
-                      System Information
-                    </h4>
-                    <div className={styles.viewModalGrid}>
-                      <div className={styles.viewModalField}>
-                        <label>Record Created:</label>
-                        <span>
-                          {formatDateTime(selectedInspection.created_at)}
-                        </span>
-                      </div>
-                      <div className={styles.viewModalField}>
-                        <label>Last Updated:</label>
-                        <span>
-                          {formatDateTime(selectedInspection.updated_at)}
-                        </span>
-                      </div>
-                      <div className={styles.viewModalField}>
-                        <label>Clearance Request ID:</label>
-                        <span>
-                          {selectedInspection.clearance_request_id || "N/A"}
-                        </span>
+                  {/* Additional Information Section (Collapsible) */}
+                  <details className={styles.viewModalDetails}>
+                    <summary className={styles.viewModalDetailsSummary}>
+                      <span className={styles.sectionIcon}>📊</span>
+                      Additional Information
+                    </summary>
+                    <div className={styles.viewModalDetailsContent}>
+                      <div className={styles.viewModalInfoGrid}>
+                        <div className={styles.viewModalInfoItem}>
+                          <div className={styles.viewModalInfoLabel}>
+                            Manufacturer:
+                          </div>
+                          <div className={styles.viewModalInfoValue}>
+                            {selectedInspection.manufacturer || "N/A"}
+                          </div>
+                        </div>
+                        <div className={styles.viewModalInfoItem}>
+                          <div className={styles.viewModalInfoLabel}>
+                            Model Number:
+                          </div>
+                          <div className={styles.viewModalInfoValue}>
+                            {selectedInspection.model_number || "N/A"}
+                          </div>
+                        </div>
+                        <div className={styles.viewModalInfoItem}>
+                          <div className={styles.viewModalInfoLabel}>
+                            Serial Number:
+                          </div>
+                          <div className={styles.viewModalInfoValue}>
+                            {selectedInspection.serial_number || "N/A"}
+                          </div>
+                        </div>
+                        <div className={styles.viewModalInfoItem}>
+                          <div className={styles.viewModalInfoLabel}>
+                            Current Location:
+                          </div>
+                          <div className={styles.viewModalInfoValue}>
+                            {selectedInspection.current_location || "N/A"}
+                          </div>
+                        </div>
+                        <div className={styles.viewModalInfoItem}>
+                          <div className={styles.viewModalInfoLabel}>
+                            Storage Location:
+                          </div>
+                          <div className={styles.viewModalInfoValue}>
+                            {selectedInspection.storage_location || "N/A"}
+                          </div>
+                        </div>
+                        <div className={styles.viewModalInfoItem}>
+                          <div className={styles.viewModalInfoLabel}>
+                            Department:
+                          </div>
+                          <div className={styles.viewModalInfoValue}>
+                            {selectedInspection.department || "N/A"}
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  </details>
+                </div>
+
+                {/* Footer Actions */}
+                <div className={styles.inspectionViewModalActions}>
+                  <button
+                    className={styles.inspectionViewModalPrintBtn}
+                    onClick={() => window.print()}
+                  >
+                    Print Details
+                  </button>
+                  <button
+                    className={styles.inspectionViewModalCloseActionBtn}
+                    onClick={closeViewModal}
+                  >
+                    Close
+                  </button>
                 </div>
               </div>
             </div>
           )}
-
           {/* Delete Modal */}
           {isDeleteOpen && (
             <div

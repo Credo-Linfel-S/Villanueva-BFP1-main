@@ -1245,7 +1245,7 @@ transition: all 0.25s ease;
  
 
 .clearanceModalContentDetails {
-max-width: 80vh;
+
  
   overflow-y: auto; /* Changed from hidden to auto */
   overflow-x: hidden;
@@ -1707,7 +1707,11 @@ padding-top: 8px;
   display: flex;
   flex-direction: column;
   box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+  /* REMOVE THIS: margin-left: 200px; */
+  position: relative; /* Change from absolute/fixed if needed */
+  margin: 0 auto; /* Center the modal */
 }
+
 
 .equipmentModalHeader {
   display: flex;
@@ -2007,7 +2011,7 @@ padding-top: 8px;
 .equipmentModalOverlay {
   position: fixed;
   top: 0;
-  left: 0;
+  left: 250px; /* Default sidebar width */
   right: 0;
   bottom: 0;
   background-color: rgba(0, 0, 0, 0.5);
@@ -2015,8 +2019,13 @@ padding-top: 8px;
   justify-content: center;
   align-items: center;
   z-index: 1000;
+  transition: left 0.3s ease, width 0.3s ease;
+  width: calc(100vw - 250px); /* Default width */
 }
-
+.equipmentModalOverlay.collapsed {
+  left: 80px;
+  width: calc(100vw - 80px);
+}
 .equipmentModal {
   background-color: white;
   border-radius: 8px;
@@ -2026,6 +2035,8 @@ padding-top: 8px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
+    margin: 0 auto !important;
+  position: relative;
 }
 
 .equipmentModalHeader {
@@ -2036,7 +2047,17 @@ padding-top: 8px;
   justify-content: space-between;
   align-items: center;
 }
-
+.equipmentModalHeader .clearanceCloseBtn {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  background: transparent;
+  border: none;
+  font-size: 28px;
+  cursor: pointer;
+  color: #666;
+  z-index: 2;
+}
 .equipmentModalHeader h3 {
   margin: 0;
   color: #333;
@@ -4031,15 +4052,19 @@ background: linear-gradient(135deg, #f59e0b, #d97706) !important;
 .clearanceModalOverlay {
   position: fixed;
   top: 0;
-  left: 0;
-  right: 0;
+  left:250px; /* Default sidebar width */
+  right: 250px;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background-color: rgba(0, 0, 0, 0.5);
   display: flex;
   justify-content: center;
-  align-items: center;
+  align-items:center;
   z-index: 1000;
+  transition: left 0.3s ease, width 0.3s ease;
+  width: calc(100vw - 250px); /* Default width */
+  animation: clearanceFadeIn 0.3s ease;
 }
+
 
 .clearanceModal {
   background: white;
@@ -4813,4 +4838,1065 @@ position: relative;
   color: #666;
   margin-top: 2px;
   font-style: italic;
+}
+
+/* No Equipment Modal Styles */
+.noEquipmentModalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 10000;
+  backdrop-filter: blur(3px);
+}
+
+.noEquipmentModal {
+  background: white;
+  border-radius: 12px;
+  width: 500px;
+  max-width: 90%;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  animation: slideIn 0.3s ease;
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+}
+
+.noEquipmentModalHeader {
+  padding: 20px;
+  border-bottom: 1px solid #e5e7eb;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+}
+
+.noEquipmentModalHeader h3 {
+  margin: 0;
+  color: #92400e;
+  font-size: 18px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.noEquipmentModalHeader h3::before {
+  content: "⚠️";
+  font-size: 20px;
+}
+
+.closeButton {
+  background: #f3f4f6;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  color: #666;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+
+.closeButton:hover {
+  background: #e5e7eb;
+  color: #333;
+}
+
+.noEquipmentModalBody {
+  padding: 30px;
+  text-align: left;
+}
+
+.warningIcon {
+  font-size: 48px;
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.noEquipmentModalBody p {
+  margin: 12px 0;
+  line-height: 1.6;
+  color: #374151;
+}
+
+.noEquipmentModalBody strong {
+  color: #111827;
+}
+
+.warningText {
+  color: #dc2626;
+  font-weight: 500;
+  margin-top: 20px !important;
+  padding: 16px;
+  background: #fef2f2;
+  border-radius: 8px;
+  border-left: 4px solid #dc2626;
+  font-size: 14px;
+}
+
+.helpText {
+  margin-top: 20px;
+  padding: 16px;
+  background: #f9fafb;
+  border-radius: 8px;
+  border-left: 4px solid #3b82f6;
+}
+
+.helpText p {
+  margin: 0 0 10px 0;
+  font-weight: 500;
+  color: #1f2937;
+}
+
+.helpText ul {
+  margin: 8px 0 0 0;
+  padding-left: 20px;
+}
+
+.helpText li {
+  margin: 6px 0;
+  color: #4b5563;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.noEquipmentModalFooter {
+  padding: 20px;
+  border-top: 1px solid #e5e7eb;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  background: #f9fafb;
+}
+
+.cancelButton {
+  padding: 10px 24px;
+  background: #f3f4f6;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 500;
+  color: #374151;
+  transition: all 0.2s;
+  min-width: 100px;
+}
+
+.cancelButton:hover {
+  background: #e5e7eb;
+  border-color: #9ca3af;
+}
+
+.continueButton {
+  padding: 10px 24px;
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s;
+  min-width: 140px;
+}
+
+.continueButton:hover {
+  background: linear-gradient(135deg, #2563eb, #1e40af);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-30px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Update inspection status styles to remove "Not Yet Added" */
+.inspectionStatus.notyetadded {
+  background-color: #f3f4f6;
+  color: #6b7280;
+  border: 1px solid #d1d5db;
+}
+
+.inspectionStatus.pending {
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  color: #92400e;
+  border: 1px solid #fbbf24;
+}
+
+.inspectionStatus.inprogress {
+  background: linear-gradient(135deg, #dbeafe, #93c5fd);
+  color: #1e40af;
+  border: 1px solid #3b82f6;
+}
+
+
+/* Equipment Table Container with Scroll */
+.equipmentModalContent {
+  padding: 20px;
+  overflow-y: auto;
+  flex: 1;
+  max-height: 60vh; /* Limit height for scroll */
+  
+  /* Custom scrollbar */
+  scrollbar-width: thin;
+  scrollbar-color: #529ae1 #f1f1f1;
+}
+
+.equipmentModalContent::-webkit-scrollbar {
+  width: 8px;
+}
+
+.equipmentModalContent::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.equipmentModalContent::-webkit-scrollbar-thumb {
+  background: #529ae1;
+  border-radius: 8px;
+}
+
+.equipmentModalContent::-webkit-scrollbar-thumb:hover {
+  background: #085CB1;
+}
+
+/* Equipment Table with Main Table Style */
+.equipmentTable {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 14px;
+  background: #fff;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 5px 4px rgba(16, 95, 175, 0.597);
+  min-width: 800px; /* Ensure table is wide enough */
+}
+
+.equipmentTable thead tr {
+  background: #529ae1;
+}
+
+.equipmentTable th {
+  padding: 14px 16px;
+  text-align: center;
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.5px;
+  color: white;
+  position: sticky;
+  top: 0;
+  background: #529ae1;
+  border-bottom: 3px solid rgba(255, 255, 255, 0.3);
+}
+
+.equipmentTable tbody td {
+  padding: 14px 16px;
+  text-align: left;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  transition: background 0.25s ease;
+}
+
+/* Alternate row colors like main table */
+.equipmentTable tbody tr:nth-child(odd) td {
+  background: #ffffff;
+}
+
+.equipmentTable tbody tr:nth-child(even) td {
+  background: #f8f9fa;
+}
+
+/* Row hover effects (same as main table) */
+.equipmentTable tbody tr {
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.equipmentTable tbody tr:hover {
+  background: #549ee9 !important;
+  color: #fff !important;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(33, 17, 17, 0.2);
+}
+
+.equipmentTable tbody tr:hover td {
+  background: #549ee9 !important;
+  color: #fff;
+}
+
+/* Table container for scroll */
+.equipmentTableContainer {
+  max-height: 400px;
+  overflow-y: auto;
+  overflow-x: auto;
+  margin-bottom: 15px;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.equipmentTableContainer::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.equipmentTableContainer::-webkit-scrollbar-track {
+  background: #f5f5f5;
+  border-radius: 4px;
+}
+
+.equipmentTableContainer::-webkit-scrollbar-thumb {
+  background: #529AE1;
+  border-radius: 4px;
+}
+
+.equipmentTableContainer::-webkit-scrollbar-thumb:hover {
+  background: #085CB1;
+}
+
+/* For Firefox */
+.equipmentTableContainer {
+  scrollbar-width: thin;
+  scrollbar-color: #529AE1 #f5f5f5;
+}
+
+/* Make sure table headers stay visible when scrolling */
+.equipmentTable thead {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: #529ae1;
+}
+
+/* Status badges matching main table */
+.statusBadge {
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  display: inline-block;
+  min-width: 80px;
+  text-align: center;
+}
+
+.statusBadge.cleared {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: white;
+}
+
+.statusBadge.pending {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: white;
+}
+
+.statusBadge.damaged {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  color: white;
+}
+
+.statusBadge.lost {
+  background: linear-gradient(135deg, #7a7a79, #aca8a8);
+  color: white;
+}
+
+/* Lost Equipment Table Styling */
+.lostEquipmentTable {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 14px;
+  background: #fff;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 5px 4px rgba(16, 95, 175, 0.597);
+  min-width: 800px;
+}
+
+.lostEquipmentTable thead tr {
+  background: #ffedd5;
+}
+
+.lostEquipmentTable th {
+  padding: 14px 16px;
+  text-align: left;
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.5px;
+  color: #9a3412;
+  position: sticky;
+  top: 0;
+  background: #ffedd5;
+  border-bottom: 3px solid #fdba74;
+}
+
+.lostEquipmentTable tbody td {
+  padding: 14px 16px;
+  text-align: left;
+  border-bottom: 1px solid #fed7aa;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .equipmentModal {
+    width: 95%;
+    max-width: none;
+    margin-left: 0;
+  }
+  
+  .equipmentTableContainer {
+    max-height: 300px;
+  }
+  
+  .equipmentTable,
+  .lostEquipmentTable {
+    min-width: 600px;
+    font-size: 12px;
+  }
+}
+
+/* Modal overlay base styles */
+.equipmentModalOverlay,
+.clearanceModalOverlay,
+.approveRejectModalOverlay,
+.clearanceConfirmationModalOverlay,
+.pdfProgressOverlay,
+.officerModalOverlay,
+.noEquipmentModalOverlay {
+  position: fixed;
+  top: 0;
+  left: 250px; /* Default sidebar width */
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  transition: left 0.3s ease, width 0.3s ease;
+  width: calc(100vw - 250px); /* Default width */
+}
+
+/* For the compact modal variant */
+.compactModal.clearanceModalOverlay {
+  left: 250px;
+  width: calc(100vw - 250px);
+}
+
+.compactModal.clearanceModalOverlay {
+  left: 250px;
+  width: calc(100vw - 250px);
+}
+.compactModal.clearanceModalOverlay.collapsed {
+  left: 80px !important;
+  width: calc(100vw - 80px) !important;
+}
+
+.clearanceModal {
+  background-color: white;
+  border-radius: 12px;
+  overflow: hidden;
+  
+  animation: clearanceModalSlideIn 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  position: relative;
+  z-index: 1001;
+  margin-left: 150px!important;
+   /* Center horizontally */
+}
+
+/* Compact modal dimensions */
+.compactView.clearanceModal {
+  width: 800px;
+  max-width: 90vw;
+  max-height: 85vh;
+}
+/* When sidebar is collapsed */
+.equipmentModalOverlay.collapsed,
+.clearanceModalOverlay.collapsed,
+.approveRejectModalOverlay.collapsed,
+.clearanceConfirmationModalOverlay.collapsed,
+.pdfProgressOverlay.collapsed,
+.officerModalOverlay.collapsed,
+.noEquipmentModalOverlay.collapsed {
+  left: 80px;
+  width: calc(100vw - 80px);
+}
+
+/* Center the modal content */
+.equipmentModal,
+.clearanceModal,
+.approveRejectModal,
+.clearanceConfirmationModal,
+.pdfProgressModal,
+.officerModal,
+.noEquipmentModal {
+  background-color: white;
+  border-radius: 8px;
+  max-height: 85vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  margin: 0 auto; /* Center the modal */
+  position: relative;
+}
+
+/* Specific modal width adjustments if needed */
+.equipmentModal {
+  width: 90%;
+  max-width: 1200px;
+}
+
+.clearanceModal {
+  width: 90%;
+  max-width: 500px;
+}
+
+.clearanceConfirmationModal {
+  width: 90%;
+  max-width: 500px;
+}
+
+.approveRejectModal {
+  width: 90%;
+  max-width: 500px;
+}
+/* ================================
+   COMPACT MODAL STYLES
+=============================== */
+
+/* Compact Modal Container */
+.compactModal .clearanceModal {
+  width: 800px;
+  max-width: 90vw;
+  max-height: 85vh;
+  margin: 0 auto;
+
+}
+
+.compactView .clearanceModalContentDetails {
+  width: 100%;
+  height: 100%;
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: white;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+}
+
+.clearanceModalHeaderDetails {
+  background: linear-gradient(135deg, #1060af, #529ae1);
+  color: white;
+  padding: 15px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Compact Header */
+.modalHeaderCompact {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.headerLeftCompact h2 {
+  margin: 0 0 8px 0;
+  font-size: 18px;
+  color: white;
+  font-weight: 600;
+}
+
+.headerInfoCompact {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.requestStatusCompact {
+  padding: 4px 10px;
+  border-radius: 16px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: white;
+}
+
+.requestStatusCompact.pending {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+}
+
+.requestStatusCompact.in-progress {
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+}
+
+.requestStatusCompact.completed {
+  background: linear-gradient(135deg, #10b981, #059669);
+}
+
+.requestStatusCompact.approved {
+  background: linear-gradient(135deg, #10b981, #059669);
+}
+
+.requestStatusCompact.rejected {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+}
+
+.requestTypeCompact {
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-size: 10px;
+  font-weight: 600;
+  color: white;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.headerRightCompact {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.dateCompact {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.clearanceCloseBtnCompact {
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  color: white;
+  font-size: 22px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  line-height: 1;
+  padding: 0;
+}
+
+.clearanceCloseBtnCompact:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: scale(1.1);
+}
+
+/* Compact Body Layout */
+.clearanceModalBodyDetails {
+  flex: 1;
+  overflow: auto;
+  padding: 20px;
+}
+
+.compactLayout {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+.leftColumnCompact {
+  flex: 1;
+  min-width: 0;
+}
+
+.rightColumnCompact {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Info Sections */
+.infoSectionCompact {
+  margin-bottom: 20px;
+  padding: 15px;
+  background: #f8fafc;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+}
+
+.infoSectionCompact:last-child {
+  margin-bottom: 0;
+}
+
+.sectionTitleCompact {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sectionIconCompact {
+  font-size: 16px;
+}
+
+/* Personnel Info */
+.personnelInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.personnelNameCompact {
+  font-size: 16px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.personnelDetails {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.detailItemCompact {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.detailLabelCompact {
+  font-size: 10px;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 500;
+}
+
+.detailValueCompact {
+  font-size: 13px;
+  color: #374151;
+  font-weight: 500;
+}
+
+/* Timeline */
+.timelineCompact {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.timelineItemCompact {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.timelineLabelCompact {
+  font-size: 11px;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.timelineValueCompact {
+  font-size: 11px;
+  color: #374151;
+  font-weight: 500;
+  font-family: 'Monaco', 'Consolas', monospace;
+}
+
+/* Equipment Status */
+.equipmentStatusCompact {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.equipmentStatsRow {
+  display: flex;
+  gap: 15px;
+}
+
+.statBoxCompact {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px;
+  background: white;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+}
+
+.statNumberCompact {
+  font-size: 20px;
+  font-weight: 700;
+  color: #1f2937;
+  margin-bottom: 4px;
+}
+
+.inspectionStatusCompact {
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: white;
+  margin-bottom: 4px;
+  text-align: center;
+  min-width: 100px;
+}
+
+.inspectionStatusCompact.pass {
+  background: linear-gradient(135deg, #10b981, #059669);
+}
+
+.inspectionStatusCompact.fail {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+}
+
+.inspectionStatusCompact.pending {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+}
+
+.inspectionStatusCompact.in-progress {
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+}
+
+.inspectionStatusCompact.no-equipment {
+  background: linear-gradient(135deg, #6b7280, #4b5563);
+}
+
+.inspectionStatusCompact.not-applicable {
+  background: linear-gradient(135deg, #9ca3af, #6b7280);
+}
+
+/* Lost Equipment */
+.lostEquipmentAlert {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #fffbeb;
+  border: 1px solid #fbbf24;
+  border-radius: 6px;
+  font-size: 12px;
+  color: #92400e;
+}
+
+.lostIcon {
+  font-size: 14px;
+}
+
+.lostText {
+  flex: 1;
+  font-weight: 500;
+}
+
+/* Actions */
+.actionsContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.documentActionsContainer {
+  display: flex;
+  gap: 10px;
+}
+
+.actionBtnPrimary,
+.actionBtnSecondary {
+  padding: 8px 12px;
+  border: none;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  justify-content: center;
+  width: 100%;
+}
+
+.actionBtnPrimary {
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  color: white;
+}
+
+.actionBtnPrimary:hover:not(:disabled) {
+  background: linear-gradient(135deg, #2563eb, #1e40af);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+}
+
+.actionBtnPrimary:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.actionBtnSecondary {
+  background: #f3f4f6;
+  color: #374151;
+  border: 1px solid #d1d5db;
+}
+
+.actionBtnSecondary:hover {
+  background: #e5e7eb;
+  border-color: #9ca3af;
+}
+
+.approveRejectButtons {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.approveBtnCompact,
+.rejectBtnCompact {
+  flex: 1;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 12px;
+}
+
+.approveBtnCompact {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: white;
+}
+
+.approveBtnCompact:hover:not(:disabled) {
+  background: linear-gradient(135deg, #059669, #047857);
+  transform: translateY(-1px);
+}
+
+.approveBtnCompact:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.rejectBtnCompact {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  color: white;
+}
+
+.rejectBtnCompact:hover:not(:disabled) {
+  background: linear-gradient(135deg, #dc2626, #b91c1c);
+  transform: translateY(-1px);
+}
+
+.rejectBtnCompact:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Remarks Section */
+.remarksSectionCompact {
+  padding: 15px;
+  background: #f8fafc;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  margin-top: 10px;
+}
+
+.remarksTextCompact {
+  font-size: 13px;
+  color: #374151;
+  line-height: 1.5;
+  margin: 8px 0 0 0;
+  padding: 10px;
+  background: white;
+  border-radius: 6px;
+  border: 1px solid #e5e7eb;
+}
+
+/* Spinner */
+.spinnerSmall {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: white;
+  animation: spin 1s ease-in-out infinite;
+  margin-right: 6px;
+}
+
+.btnIcon {
+  font-size: 14px;
+}
+
+/* Scrollbar */
+.clearanceModalBodyDetails::-webkit-scrollbar {
+  width: 6px;
+}
+
+.clearanceModalBodyDetails::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 3px;
+}
+
+.clearanceModalBodyDetails::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+/* Responsive */
+@media (max-width: 900px) {
+  .compactLayout {
+    flex-direction: column;
+  }
+  
+  .compactModal .clearanceModal {
+    width: 95vw;
+    max-width: 95vw;
+  }
+  
+  .modalHeaderCompact {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  
+  .headerRightCompact {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+
+@media (max-width: 600px) {
+  .compactModal .clearanceModal {
+    width: 98vw;
+    height: 95vh;
+    max-height: 95vh;
+    margin: 10px;
+  }
+  
+  .personnelDetails {
+    grid-template-columns: 1fr;
+  }
+  
+  .equipmentStatsRow {
+    flex-direction: column;
+  }
+  
+  .approveRejectButtons {
+    flex-direction: column;
+  }
 }

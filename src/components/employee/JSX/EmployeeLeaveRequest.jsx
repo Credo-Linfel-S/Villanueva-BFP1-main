@@ -45,21 +45,54 @@ const EmployeeLeaveRequest = () => {
     useState(false);
   const [leaveRequestData, setLeaveRequestData] = useState(null);
   const [isWithoutPay, setIsWithoutPay] = useState(false);
-  const [showImportantNotice, setShowImportantNotice] = useState(true); // NEW: Control important notice visibility
+  const [showImportantNotice, setShowImportantNotice] = useState(true);
 
   // Separate state for location details
   const [abroadLocation, setAbroadLocation] = useState("");
   const [philippinesLocation, setPhilippinesLocation] = useState("");
 
-  // Format date as YYYY-MM-DD
-  const formatDate = (date) => date.toISOString().split("T")[0];
+  // PH Timezone constants and functions
+  const PH_TIMEZONE_OFFSET = 8 * 60 * 60 * 1000; // 8 hours in milliseconds
 
-  // Calculate days between dates (simple calendar days)
+  // Convert any date to PH time
+  const toPHTime = (date) => {
+    const dateObj = date instanceof Date ? date : new Date(date);
+    return new Date(dateObj.getTime() + PH_TIMEZONE_OFFSET);
+  };
+
+  // Format date as YYYY-MM-DD in PH time
+  const formatPHDate = (date) => {
+    const phDate = toPHTime(date);
+    const year = phDate.getUTCFullYear();
+    const month = String(phDate.getUTCMonth() + 1).padStart(2, "0");
+    const day = String(phDate.getUTCDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+
+  // Get current date in PH time
+  const getCurrentPHDate = () => {
+    return toPHTime(new Date());
+  };
+
+  // Get PH timestamp for database (ISO string)
+  const getPHTimestamp = () => {
+    return toPHTime(new Date()).toISOString();
+  };
+
+  // Calculate days between dates (using PH time for accuracy)
   const calculateDays = (start, end) => {
     if (!start || !end) return 0;
-    const startDate = new Date(start);
-    const endDate = new Date(end);
+
+    // Convert to PH time for accurate day calculation
+    const startDate = toPHTime(start);
+    const endDate = toPHTime(end);
+
     if (isNaN(startDate) || isNaN(endDate) || endDate < startDate) return 0;
+
+    // Reset to midnight for accurate day count
+    startDate.setUTCHours(0, 0, 0, 0);
+    endDate.setUTCHours(0, 0, 0, 0);
+
     const timeDiff = endDate - startDate;
     return Math.floor(timeDiff / (1000 * 60 * 60 * 24)) + 1;
   };
@@ -126,8 +159,8 @@ const EmployeeLeaveRequest = () => {
           initial_vacation_credits: initialVacation,
           initial_sick_credits: initialSick,
           initial_emergency_credits: initialEmergency,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
+          created_at: getPHTimestamp(),
+          updated_at: getPHTimestamp(),
         };
 
         const { data: created, error: createError } = await supabase
@@ -171,7 +204,7 @@ const EmployeeLeaveRequest = () => {
           .update({
             vacation_balance: newVacation.toFixed(2),
             sick_balance: newSick.toFixed(2),
-            updated_at: new Date().toISOString(),
+            updated_at: getPHTimestamp(),
           })
           .eq("id", balance.id);
 
@@ -224,44 +257,70 @@ const EmployeeLeaveRequest = () => {
     return balance >= requestedDays;
   };
 
-  // NEW: Update leave balance in database
-  const updateLeaveBalanceInDatabase = async (leaveType, daysToDeduct) => {
+  // NEW FUNCTION: Deduct leave balance ONLY when approved
+  const deductLeaveBalanceOnApproval = async (leaveRequestId) => {
     try {
-      if (!leaveBalanceId) return;
-
-      const fieldToUpdate = leaveType.toLowerCase() + "_balance";
-      const usedField = leaveType.toLowerCase() + "_used";
-
-      // Get current balance
-      const { data: currentBalance, error: fetchError } = await supabase
-        .from("leave_balances")
+      // First, get the leave request details
+      const { data: leaveRequest, error: fetchError } = await supabase
+        .from("leave_requests")
         .select("*")
-        .eq("id", leaveBalanceId)
+        .eq("id", leaveRequestId)
         .single();
 
       if (fetchError) throw fetchError;
 
-      const currentValue = parseFloat(currentBalance[fieldToUpdate]) || 0;
-      const currentUsed = parseFloat(currentBalance[usedField]) || 0;
+      // Skip if it's leave without pay
+      if (leaveRequest.approve_for === "without_pay") {
+        console.log("Leave without pay - no balance deduction needed");
+        return;
+      }
 
-      const newBalance = Math.max(0, currentValue - daysToDeduct);
-      const newUsed = currentUsed + daysToDeduct;
+      // Get current balance
+      const { data: balance, error: balanceError } = await supabase
+        .from("leave_balances")
+        .select("*")
+        .eq("id", leaveRequest.leave_balance_id)
+        .single();
 
-      // Update in database
+      if (balanceError) throw balanceError;
+
+      // Calculate new balance
+      const fieldToUpdate = leaveRequest.leave_type.toLowerCase() + "_balance";
+      const usedField = leaveRequest.leave_type.toLowerCase() + "_used";
+
+      const currentBalance = parseFloat(balance[fieldToUpdate]) || 0;
+      const currentUsed = parseFloat(balance[usedField]) || 0;
+
+      const newBalance = Math.max(0, currentBalance - leaveRequest.num_days);
+      const newUsed = currentUsed + leaveRequest.num_days;
+
+      // Update balance in database
       const { error: updateError } = await supabase
         .from("leave_balances")
         .update({
           [fieldToUpdate]: newBalance.toFixed(2),
           [usedField]: newUsed.toFixed(2),
-          updated_at: new Date().toISOString(),
+          updated_at: getPHTimestamp(),
         })
-        .eq("id", leaveBalanceId);
+        .eq("id", leaveRequest.leave_balance_id);
 
       if (updateError) throw updateError;
 
-      return newBalance;
+      // Update leave request with final balance info
+      const { error: updateRequestError } = await supabase
+        .from("leave_requests")
+        .update({
+          balance_before: currentBalance,
+          balance_after: newBalance,
+          approved_at: getPHTimestamp(),
+        })
+        .eq("id", leaveRequestId);
+
+      if (updateRequestError) throw updateRequestError;
+
+      console.log(`Balance deducted for leave request ${leaveRequestId}`);
     } catch (error) {
-      console.error("Error updating leave balance:", error);
+      console.error("Error deducting leave balance on approval:", error);
       throw error;
     }
   };
@@ -317,10 +376,13 @@ const EmployeeLeaveRequest = () => {
     if (!authLoading && user) {
       loadEmployeeData();
 
-      const today = formatDate(new Date());
-      const minStartDate = new Date();
+      // Get current PH date
+      const today = formatPHDate(new Date());
+
+      // Calculate min start date (5 days from now in PH time)
+      const minStartDate = getCurrentPHDate();
       minStartDate.setDate(minStartDate.getDate() + 5);
-      const minStart = formatDate(minStartDate);
+      const minStart = formatPHDate(minStartDate);
 
       setFormData((prev) => ({
         ...prev,
@@ -466,59 +528,38 @@ const EmployeeLeaveRequest = () => {
     setShowInsufficientBalanceModal(false);
   };
 
-  // Submit leave request to Supabase
+  // Submit leave request to Supabase - DO NOT deduct balance here
   const submitLeaveRequest = async (leaveRequestData) => {
     try {
-      const { error } = await supabase
+      // Set initial balance info but don't deduct yet
+      const balanceBefore = getLeaveBalanceForType(leaveRequestData.leave_type);
+
+      // Store balance before but don't calculate balance after yet
+      leaveRequestData.balance_before = balanceBefore;
+      leaveRequestData.balance_after = balanceBefore; // Same until approved
+
+      const { data, error } = await supabase
         .from("leave_requests")
-        .insert([leaveRequestData]);
+        .insert([leaveRequestData])
+        .select()
+        .single();
 
       if (error) throw error;
 
-      return { success: true };
+      return { success: true, data };
     } catch (error) {
       console.error("Error submitting leave request:", error);
       throw error;
     }
   };
 
-  // NEW: Final submission function with proper balance deduction
+  // NEW: Final submission function WITHOUT balance deduction
   const submitLeaveRequestFinal = async (data, isWithoutPay = false) => {
     try {
-      // If it's without pay, don't deduct from balance
-      if (isWithoutPay) {
-        // For leave without pay, set appropriate fields
-        data.approve_for = "without_pay";
-        data.paid_days = 0;
-        data.unpaid_days = data.num_days;
-        // Don't update balance_before and balance_after for without pay leaves
-        data.balance_before = 0;
-        data.balance_after = 0;
-
-        // Hide the important notice after submission
-        setShowImportantNotice(false);
-      } else {
-        // For with pay, deduct from balance
-        const balanceBefore = getLeaveBalanceForType(data.leave_type);
-
-        // Update balance in database
-        const newBalance = await updateLeaveBalanceInDatabase(
-          data.leave_type,
-          data.num_days
-        );
-
-        data.balance_before = balanceBefore;
-        data.balance_after = newBalance;
-        data.approve_for = "with_pay";
-        data.paid_days = data.num_days;
-        data.unpaid_days = 0;
-
-        // Update local leave balance
-        setLeaveBalance((prev) => ({
-          ...prev,
-          [data.leave_type.toLowerCase()]: parseFloat(newBalance.toFixed(2)),
-        }));
-      }
+      // Store whether it's with or without pay
+      data.approve_for = isWithoutPay ? "without_pay" : "with_pay";
+      data.paid_days = isWithoutPay ? 0 : data.num_days;
+      data.unpaid_days = isWithoutPay ? data.num_days : 0;
 
       const result = await submitLeaveRequest(data);
 
@@ -527,11 +568,11 @@ const EmployeeLeaveRequest = () => {
         setShowToast(true);
         setTimeout(() => setShowToast(false), 3000);
 
-        // Reset form
-        const today = formatDate(new Date());
-        const minStartDate = new Date();
+        // Reset form with PH dates
+        const today = formatPHDate(new Date());
+        const minStartDate = getCurrentPHDate();
         minStartDate.setDate(minStartDate.getDate() + 5);
-        const minStart = formatDate(minStartDate);
+        const minStart = formatPHDate(minStartDate);
 
         setFormData({
           employeeName: formData.employeeName,
@@ -601,8 +642,6 @@ const EmployeeLeaveRequest = () => {
     }
 
     // Prepare leave request data
-    const balanceBefore = getLeaveBalanceForType(formData.leaveType);
-
     const leaveRequestData = {
       personnel_id: employeeId,
       username: user.username,
@@ -619,7 +658,7 @@ const EmployeeLeaveRequest = () => {
       start_date: formData.startDate,
       end_date: formData.endDate,
       num_days: parseFloat(formData.numDays),
-      status: "Pending",
+      status: "Pending", // Initial status
       reason:
         formData.leaveType === "Sick"
           ? `${
@@ -628,21 +667,16 @@ const EmployeeLeaveRequest = () => {
                 : "Out patient"
             }: ${sickLeaveDetails.illness}`
           : `Leave request for ${formData.leaveType.toLowerCase()} leave`,
-      submitted_at: new Date().toISOString(),
+      submitted_at: getPHTimestamp(), // Use PH timestamp
       leave_balance_id: leaveBalanceId,
-      balance_before: balanceBefore,
-      // balance_after will be set based on with/without pay
       illness_type:
         formData.leaveType === "Sick" ? sickLeaveDetails.type : null,
       illness_details:
         formData.leaveType === "Sick" ? sickLeaveDetails.illness : null,
-      // Default to "with_pay" - will be updated if insufficient balance
-      approve_for: "with_pay",
-      paid_days: parseFloat(formData.numDays),
-      unpaid_days: 0,
     };
 
-    // NEW: Check balance and show warning if insufficient
+    // NEW: Check balance for informational purposes only
+    // Balance will only be deducted when approved
     if (!hasSufficientBalance(formData.leaveType, formData.numDays)) {
       // Store the request data and show modal
       setLeaveRequestData(leaveRequestData);
@@ -656,10 +690,10 @@ const EmployeeLeaveRequest = () => {
 
   // Handle form reset
   const handleReset = () => {
-    const today = formatDate(new Date());
-    const minStartDate = new Date();
+    const today = formatPHDate(new Date());
+    const minStartDate = getCurrentPHDate();
     minStartDate.setDate(minStartDate.getDate() + 5);
-    const minStart = formatDate(minStartDate);
+    const minStart = formatPHDate(minStartDate);
 
     setFormData({
       employeeName: formData.employeeName,
@@ -760,9 +794,12 @@ const EmployeeLeaveRequest = () => {
                   borderRadius: "4px",
                 }}
               >
-                ⚠️ <strong>Important Notice:</strong> You can still apply for
-                leave even with insufficient credits, but it will be considered
-                as leave without pay.
+                ⚠️ <strong>Important Notice:</strong>
+                1. Leave credits will only be deducted when your leave is
+                approved.
+                <br />
+                2. You can still apply for leave even with insufficient credits,
+                but it will be considered as leave without pay.
               </p>
             )}
           </div>
@@ -866,7 +903,7 @@ const EmployeeLeaveRequest = () => {
                     value={formData.dateOfFiling}
                     onChange={handleInputChange}
                     required
-                    max={formatDate(new Date())}
+                    max={formatPHDate(new Date())}
                   />
                   <label>Date of Filing</label>
                 </div>
@@ -918,7 +955,7 @@ const EmployeeLeaveRequest = () => {
                     value={formData.startDate}
                     onChange={handleInputChange}
                     required
-                    min={formatDate(
+                    min={formatPHDate(
                       new Date(new Date().setDate(new Date().getDate() + 5))
                     )}
                     disabled={submitLoading}
@@ -959,7 +996,7 @@ const EmployeeLeaveRequest = () => {
                         </span>
                       ) : (
                         <span className={styles.okText}>
-                          ✓ Balance sufficient (will be leave with pay)
+                          ✓ Balance will be deducted upon approval
                         </span>
                       )}
                     </div>
@@ -1198,10 +1235,9 @@ const EmployeeLeaveRequest = () => {
                   ⚠️ <strong>This will be leave without pay.</strong>
                 </p>
                 <p style={{ marginTop: "10px" }}>
-                  Your leave request will still be submitted for approval, but
-                  it will be marked as
+                  Your leave request will be submitted as
                   <strong> leave without pay</strong>. No leave credits will be
-                  deducted.
+                  deducted, and this will be unpaid leave.
                 </p>
               </div>
 
@@ -1245,7 +1281,8 @@ const EmployeeLeaveRequest = () => {
             className={styles.toast}
             style={{ opacity: 1, transform: "translateY(0)" }}
           >
-            ✅ Leave request submitted successfully!
+            ✅ Leave request submitted successfully! Balance will be deducted
+            upon approval.
           </div>
         )}
       </div>

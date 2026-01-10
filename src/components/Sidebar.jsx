@@ -1,5 +1,5 @@
 // hooks/Sidebar.jsx - Updated to show tooltips in both states
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useLocation } from "react-router-dom";
 import { useSidebar } from "./SidebarContext";
 import logo from "../assets/background.png";
@@ -13,14 +13,19 @@ const Sidebar = () => {
   const location = useLocation();
   const [hoverTimeout, setHoverTimeout] = useState(null);
   const [activeDropdown, setActiveDropdown] = useState(null);
-  // Add this to your hamburger menu click handler
-  const hamburger = document.querySelector(".hamburger");
-  const sidebar = document.querySelector(".sidebar");
-  const mainContent = document.querySelector(".main-content");
 
-  if (hamburger) {
-    hamburger.addEventListener("click", function () {
-      this.classList.toggle("active");
+  // Use refs instead of querySelector
+  const hamburgerRef = useRef(null);
+  const sidebarRef = useRef(null);
+
+  useEffect(() => {
+    const hamburger = hamburgerRef.current;
+    const sidebar = sidebarRef.current;
+
+    if (!hamburger || !sidebar) return;
+
+    const handleHamburgerClick = () => {
+      hamburger.classList.toggle("active");
       sidebar.classList.toggle("active");
 
       // Optional: Prevent body scroll when sidebar is open on mobile
@@ -29,12 +34,9 @@ const Sidebar = () => {
           ? "hidden"
           : "";
       }
-    });
-  }
+    };
 
-  // Close sidebar when clicking outside on mobile
-  if (sidebar) {
-    document.addEventListener("click", function (event) {
+    const handleDocumentClick = (event) => {
       if (
         window.innerWidth <= 768 &&
         sidebar.classList.contains("active") &&
@@ -45,18 +47,30 @@ const Sidebar = () => {
         hamburger.classList.remove("active");
         document.body.style.overflow = "";
       }
-    });
-  }
+    };
 
-  // Handle window resize
-  window.addEventListener("resize", function () {
-    if (window.innerWidth > 768) {
-      // Reset mobile styles when above mobile breakpoint
-      sidebar.classList.remove("active");
-      if (hamburger) hamburger.classList.remove("active");
-      document.body.style.overflow = "";
-    }
-  });
+    const handleResize = () => {
+      if (window.innerWidth > 768 && sidebar) {
+        // Reset mobile styles when above mobile breakpoint
+        sidebar.classList.remove("active");
+        if (hamburger) hamburger.classList.remove("active");
+        document.body.style.overflow = "";
+      }
+    };
+
+    // Add event listeners
+    hamburger.addEventListener("click", handleHamburgerClick);
+    document.addEventListener("click", handleDocumentClick);
+    window.addEventListener("resize", handleResize);
+
+    // Cleanup function
+    return () => {
+      hamburger.removeEventListener("click", handleHamburgerClick);
+      document.removeEventListener("click", handleDocumentClick);
+      window.removeEventListener("resize", handleResize);
+    };
+  }, []); // Empty dependency array means this runs once on mount
+
   const dropdownSections = [
     {
       id: "personnel",
@@ -69,7 +83,11 @@ const Sidebar = () => {
           text: "Personnel Profile (201 Files)",
         },
         { href: "/leaveRecords", icon: "🗄️", text: "Leave Request Records" },
-        { href: "/clearanceRecords", icon: "💾", text: "Clearance Request Records" },
+        {
+          href: "/clearanceRecords",
+          icon: "💾",
+          text: "Clearance Request Records",
+        },
       ],
     },
     {
@@ -183,7 +201,10 @@ const Sidebar = () => {
   };
 
   return (
-    <div className={`sidebar ${isSidebarCollapsed ? "collapsed" : ""}`}>
+    <div
+      ref={sidebarRef}
+      className={`sidebar ${isSidebarCollapsed ? "collapsed" : ""}`}
+    >
       <div className="sidebar-inner">
         <h2>Admin</h2>
         <a
@@ -272,9 +293,7 @@ const Sidebar = () => {
           🚪 <span>Logout</span>
         </a>
       </div>
-      {/* Tooltip for BOTH collapsed and expanded states */}
-      // hooks/Sidebar.jsx - Updated section
-      {/* Tooltip for BOTH collapsed and expanded states */}
+
       {tooltipContent && (
         <div
           className={`dropdown-tooltip ${tooltipContent.id}-records`}

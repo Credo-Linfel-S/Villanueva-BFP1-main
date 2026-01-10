@@ -17,14 +17,25 @@ import {
   filterActivePersonnel,
   isPersonnelActive,
 } from "../../filterActivePersonnel.js";
-import FloatingNotificationBell from "../../FloatingNotificationBell.jsx";
+
 import { useUserId } from "../../hooks/useUserId.js";
+
 export default function InventoryControl() {
   // ========== PRELOADER STATES ==========
   const [isInitializing, setIsInitializing] = useState(true);
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [showContent, setShowContent] = useState(false);
-const { userId, isAuthenticated, userRole } = useUserId();
+  const { userId, isAuthenticated, userRole } = useUserId();
+
+  // ========== NEW: Scan Result Modal State ==========
+  const [showScanResultModal, setShowScanResultModal] = useState(false);
+  const [scanResult, setScanResult] = useState({
+    type: "", // 'found' or 'not_found'
+    message: "",
+    equipmentData: null,
+    barcode: "",
+  });
+
   // ========== NEW: Update loading phases to include clearance requests ==========
   const loadingPhasesRef = useRef([
     { name: "Checking Authentication", progress: 20, completed: false },
@@ -53,7 +64,11 @@ const { userId, isAuthenticated, userRole } = useUserId();
   const qrScannerRef = useRef(null);
   const [isProcessingAdd, setIsProcessingAdd] = useState(false);
   const [isProcessingEdit, setIsProcessingEdit] = useState(false);
-
+  // ========== EDIT MODAL SCANNER STATE ==========
+  const [showEditScanner, setShowEditScanner] = useState(false);
+  const [isRequestingEditPermission, setIsRequestingEditPermission] =
+    useState(false);
+  const editScannerRef = useRef(null);
   // Update the emptyNew object to include price
   // Update the emptyNew object to include assignedDate
   const emptyNew = {
@@ -220,6 +235,140 @@ const { userId, isAuthenticated, userRole } = useUserId();
       { autoClose: 8000, closeButton: true, position: "top-center" }
     );
   };
+
+  // ========== NEW: Scan Result Modal Functions ==========
+  const showScanResult = (
+    type,
+    message,
+    equipmentData = null,
+    barcode = ""
+  ) => {
+    setScanResult({
+      type,
+      message,
+      equipmentData,
+      barcode,
+    });
+    setShowScanResultModal(true);
+  };
+
+  const closeScanResultModal = () => {
+    setShowScanResultModal(false);
+    setScanResult({
+      type: "",
+      message: "",
+      equipmentData: null,
+      barcode: "",
+    });
+  };
+
+const applyScannedData = (equipmentData, barcode, applyAllFields = false) => {
+  // For edit mode: if scanning a different equipment, only allow barcode update
+  const isDifferentEquipment =
+    isEditOpen && equipmentData && equipmentData.id !== editId;
+
+  if (isDifferentEquipment && applyAllFields) {
+    toast.error(
+      <div style={{ padding: "10px" }}>
+        <div
+          style={{ display: "flex", alignItems: "center", marginBottom: "8px" }}
+        >
+          <span style={{ fontSize: "20px", marginRight: "10px" }}>🚫</span>
+          <strong style={{ fontSize: "16px" }}>Restricted Operation</strong>
+        </div>
+        <div style={{ fontSize: "14px", lineHeight: "1.4" }}>
+          Cannot copy data from a different equipment while editing.
+          <br />
+          You can only update the barcode field.
+        </div>
+      </div>,
+      { autoClose: 5000, closeButton: true }
+    );
+    return;
+  }
+
+  if (equipmentData) {
+    if (isAddSidebarOpen) {
+      // Add mode - apply all data
+      setNewItem({
+        itemName: equipmentData.item_name || "",
+        itemCode: equipmentData.item_code || "",
+        category: equipmentData.category || "",
+        status: equipmentData.status || "",
+        assignedTo: equipmentData.assigned_personnel_id || "unassigned",
+        purchaseDate: equipmentData.purchase_date || "",
+        lastChecked: equipmentData.last_checked || "",
+        price: equipmentData.price || "",
+        assignedDate: equipmentData.assigned_date || "",
+        lastAssigned: equipmentData.last_assigned || "",
+        unassignedDate: equipmentData.unassigned_date || "",
+      });
+
+      setFloatingLabels({
+        category: !!equipmentData.category,
+        status: !!equipmentData.status,
+        assignedTo: !!equipmentData.assigned_personnel_id,
+        assignedDate: !!equipmentData.assigned_date,
+      });
+
+      toast.success("Equipment data loaded from scan!");
+    } else if (isEditOpen) {
+      if (isDifferentEquipment) {
+        // Different equipment in edit mode - only update barcode
+        setEditItem((prev) => ({
+          ...prev,
+          itemCode: barcode,
+        }));
+        toast.info(`Barcode updated to: ${barcode}`);
+      } else if (equipmentData.id === editId) {
+        // Same equipment in edit mode - user can choose what to update
+        if (applyAllFields) {
+          // Update all fields (for same equipment)
+          setEditItem({
+            itemName: equipmentData.item_name || "",
+            itemCode: equipmentData.item_code || "",
+            category: equipmentData.category || "",
+            status: equipmentData.status || "",
+            assignedTo: equipmentData.assigned_personnel_id || "unassigned",
+            purchaseDate: equipmentData.purchase_date || "",
+            lastChecked: equipmentData.last_checked || "",
+            price: equipmentData.price || "",
+            assignedDate: equipmentData.assigned_date || "",
+            lastAssigned: equipmentData.last_assigned || "",
+            unassignedDate: equipmentData.unassigned_date || "",
+          });
+
+          setEditFloatingLabels({
+            category: !!equipmentData.category,
+            status: !!equipmentData.status,
+            assignedTo: !!equipmentData.assigned_personnel_id,
+            assignedDate: !!equipmentData.assigned_date,
+          });
+
+          toast.success("All fields updated from scan!");
+        } else {
+          // Only update barcode (default)
+          setEditItem((prev) => ({
+            ...prev,
+            itemCode: equipmentData.item_code || prev.itemCode,
+          }));
+          toast.success("Barcode updated!");
+        }
+      }
+    }
+  } else {
+    // No equipment found - just update barcode
+    if (isAddSidebarOpen) {
+      setNewItem((prev) => ({ ...prev, itemCode: barcode }));
+      toast.info(`New barcode set: ${barcode}`);
+    } else if (isEditOpen) {
+      setEditItem((prev) => ({ ...prev, itemCode: barcode }));
+      toast.info(`Barcode updated to: ${barcode}`);
+    }
+  }
+
+  closeScanResultModal();
+};
 
   // ========== INSPECTION CHECK FUNCTIONS ==========
 
@@ -636,165 +785,259 @@ const { userId, isAuthenticated, userRole } = useUserId();
   };
 
   // Generate barcode image - FIXED VERSION
-  const generateBarcodeImage = (
-    itemCode,
-    itemName,
-    equipmentDetails = null
-  ) => {
-    return new Promise((resolve, reject) => {
+const generateBarcodeImage = (itemCode, itemName, equipmentDetails = null) => {
+  return new Promise((resolve, reject) => {
+    try {
+      // Create responsive container
+      const container = document.createElement("div");
+      container.style.width = "100%";
+      container.style.maxWidth = "400px";
+      container.style.padding = "15px";
+      container.style.backgroundColor = "white";
+      container.style.boxSizing = "border-box";
+      container.style.fontFamily = "Arial, sans-serif";
+      container.style.wordWrap = "break-word";
+
+      // Title
+      const title = document.createElement("h3");
+      title.textContent = "BFP Villanueva - Equipment Barcode";
+      title.style.margin = "0 0 10px 0";
+      title.style.fontSize = "14px";
+      title.style.fontWeight = "bold";
+      title.style.color = "#2b2b2b";
+      title.style.textAlign = "center";
+      title.style.wordBreak = "break-word";
+      container.appendChild(title);
+
+      // Equipment details
+      const detailsDiv = document.createElement("div");
+      detailsDiv.style.marginBottom = "10px";
+      detailsDiv.style.fontSize = "11px";
+      detailsDiv.style.lineHeight = "1.4";
+
+      let detailsHTML = `
+        <div><strong>Equipment:</strong> ${itemName || "N/A"}</div>
+        <div><strong>Barcode:</strong> <span class="barcode-text">${itemCode}</span></div>
+      `;
+
+      if (equipmentDetails) {
+        detailsHTML += `
+          <div><strong>Category:</strong> ${
+            equipmentDetails.category || "N/A"
+          }</div>
+          <div><strong>Status:</strong> ${
+            equipmentDetails.status || "N/A"
+          }</div>
+          <div><strong>Assigned To:</strong> ${
+            equipmentDetails.assigned_to || "Unassigned"
+          }</div>
+          <div><strong>Price:</strong> ${
+            equipmentDetails.price
+              ? new Intl.NumberFormat("en-PH", {
+                  style: "currency",
+                  currency: "PHP",
+                }).format(equipmentDetails.price)
+              : "₱0.00"
+          }</div>
+        `;
+      }
+
+      detailsDiv.innerHTML = detailsHTML;
+      container.appendChild(detailsDiv);
+
+      // Create canvas for barcode
+      const canvas = document.createElement("canvas");
+
+      // Adjust canvas size based on barcode length
+      const barcodeLength = itemCode.length;
+      let canvasWidth = 350;
+      let canvasHeight = 80;
+
+      if (barcodeLength > 20) {
+        canvasWidth = 400;
+        canvasHeight = 100;
+      } else if (barcodeLength > 30) {
+        canvasWidth = 450;
+        canvasHeight = 120;
+      }
+
+      canvas.width = canvasWidth;
+      canvas.height = canvasHeight;
+      canvas.style.display = "block";
+      canvas.style.margin = "10px auto";
+      canvas.style.maxWidth = "100%";
+      canvas.style.height = "auto";
+
       try {
-        const container = document.createElement("div");
-        container.style.width = "400px";
-        container.style.height = "250px";
-        container.style.padding = "20px";
-        container.style.backgroundColor = "white";
-        container.style.boxSizing = "border-box";
-        container.style.fontFamily = "Arial, sans-serif";
+        // Configure barcode based on length
+        const barcodeConfig = {
+          format: "CODE128",
+          displayValue: true,
+          fontSize: barcodeLength > 25 ? 12 : 14,
+          textMargin: 5,
+          margin: barcodeLength > 20 ? 10 : 5,
+          width: barcodeLength > 20 ? 1.5 : 2,
+          height: barcodeLength > 20 ? 60 : 50,
+          background: "#ffffff",
+        };
 
-        const title = document.createElement("h3");
-        title.textContent = "BFP Villanueva - Equipment Barcode";
-        title.style.margin = "0 0 15px 0";
-        title.style.fontSize = "16px";
-        title.style.fontWeight = "bold";
-        title.style.color = "#2b2b2b";
-        title.style.textAlign = "center";
-        container.appendChild(title);
+        jsbarcode(canvas, itemCode, barcodeConfig);
 
-        const detailsDiv = document.createElement("div");
-        detailsDiv.style.marginBottom = "15px";
-        detailsDiv.style.fontSize = "12px";
+        container.appendChild(canvas);
 
-        // In the generateBarcodeImage function, update the detailsHTML:
-        let detailsHTML = `
-  <div><strong>Equipment:</strong> ${itemName}</div>
-  <div><strong>Barcode:</strong> ${itemCode}</div>
-`;
+        // Footer
+        const footer = document.createElement("div");
+        footer.textContent = `Generated: ${new Date().toLocaleDateString()}`;
+        footer.style.fontSize = "10px";
+        footer.style.color = "#666";
+        footer.style.textAlign = "center";
+        footer.style.marginTop = "5px";
+        container.appendChild(footer);
 
-        if (equipmentDetails) {
-          detailsHTML += `
-    <div><strong>Category:</strong> ${equipmentDetails.category || "N/A"}</div>
-    <div><strong>Status:</strong> ${equipmentDetails.status || "N/A"}</div>
-    <div><strong>Assigned To:</strong> ${
-      equipmentDetails.assigned_to || "Unassigned"
-    }</div>
-    <div><strong>Price:</strong> ${
-      equipmentDetails.price
-        ? new Intl.NumberFormat("en-PH", {
-            style: "currency",
-            currency: "PHP",
-          }).format(equipmentDetails.price)
-        : "₱0.00"
-    }</div>
-  `;
-        }
+        // Convert to image
+        const tempImg = new Image();
+        tempImg.onload = () => {
+          const finalCanvas = document.createElement("canvas");
+          finalCanvas.width = 400;
+          finalCanvas.height = 300; // Increased height for long content
+          const ctx = finalCanvas.getContext("2d");
 
-        detailsDiv.innerHTML = detailsHTML;
-        container.appendChild(detailsDiv);
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(0, 0, 400, 300);
 
-        const canvas = document.createElement("canvas");
-        canvas.width = 350;
-        canvas.height = 80;
-        canvas.style.display = "block";
-        canvas.style.margin = "0 auto";
+          // Draw title
+          ctx.fillStyle = "#000000";
+          ctx.font = "bold 14px Arial";
+          ctx.fillText("BFP Villanueva - Equipment Barcode", 20, 30);
 
-        try {
-          jsbarcode(canvas, itemCode, {
-            format: "CODE128",
-            displayValue: true,
-            fontSize: 14,
-            textMargin: 5,
-            margin: 5,
-            width: 2,
-            height: 50,
-            background: "#ffffff",
-          });
+          // Draw equipment info with word wrap
+          ctx.font = "11px Arial";
 
-          container.appendChild(canvas);
+          // Function to wrap text
+          const wrapText = (context, text, x, y, maxWidth, lineHeight) => {
+            const words = text.split(" ");
+            let line = "";
+            let testLine = "";
+            let lineCount = 0;
+            const maxLines = 5;
 
-          const footer = document.createElement("div");
-          footer.textContent = `Generated: ${new Date().toLocaleDateString()}`;
-          footer.style.fontSize = "10px";
-          footer.style.color = "#666";
-          footer.style.textAlign = "center";
-          footer.style.marginTop = "10px";
-          container.appendChild(footer);
+            for (let n = 0; n < words.length; n++) {
+              testLine = line + words[n] + " ";
+              const metrics = context.measureText(testLine);
+              const testWidth = metrics.width;
 
-          const tempImg = new Image();
-          tempImg.onload = () => {
-            const finalCanvas = document.createElement("canvas");
-            finalCanvas.width = 400;
-            finalCanvas.height = 250;
-            const ctx = finalCanvas.getContext("2d");
-
-            ctx.fillStyle = "#ffffff";
-            ctx.fillRect(0, 0, 400, 250);
-
-            ctx.fillStyle = "#000000";
-            ctx.font = "bold 16px Arial";
-            ctx.fillText("BFP Villanueva - Equipment Barcode", 20, 30);
-
-            ctx.font = "12px Arial";
-            ctx.fillText(`Equipment: ${itemName}`, 20, 60);
-            ctx.fillText(`Barcode: ${itemCode}`, 20, 80);
-
-            if (equipmentDetails) {
-              ctx.fillText(
-                `Category: ${equipmentDetails.category || "N/A"}`,
-                20,
-                100
-              );
-              ctx.fillText(
-                `Status: ${equipmentDetails.status || "N/A"}`,
-                20,
-                120
-              );
-              ctx.fillText(
-                `Assigned To: ${equipmentDetails.assigned_to || "Unassigned"}`,
-                20,
-                140
-              );
+              if (testWidth > maxWidth && n > 0 && lineCount < maxLines - 1) {
+                context.fillText(line, x, y);
+                line = words[n] + " ";
+                y += lineHeight;
+                lineCount++;
+              } else {
+                line = testLine;
+              }
             }
-
-            const barcodeCanvas = document.createElement("canvas");
-            barcodeCanvas.width = 350;
-            barcodeCanvas.height = 80;
-
-            jsbarcode(barcodeCanvas, itemCode, {
-              format: "CODE128",
-              displayValue: true,
-              fontSize: 14,
-              textMargin: 5,
-              margin: 5,
-              width: 2,
-              height: 50,
-            });
-
-            ctx.drawImage(barcodeCanvas, 25, 150);
-
-            ctx.font = "10px Arial";
-            ctx.fillStyle = "#666";
-            ctx.fillText(
-              `Generated: ${new Date().toLocaleDateString()}`,
-              20,
-              240
-            );
-
-            const dataUrl = finalCanvas.toDataURL("image/png");
-            resolve(dataUrl);
+            context.fillText(line, x, y);
+            return y + lineHeight;
           };
 
-          tempImg.src = canvas.toDataURL("image/png");
-        } catch (barcodeError) {
-          console.error("Barcode generation error:", barcodeError);
+          let yPosition = 60;
+          yPosition = wrapText(
+            ctx,
+            `Equipment: ${itemName}`,
+            20,
+            yPosition,
+            360,
+            14
+          );
+          yPosition = wrapText(
+            ctx,
+            `Barcode: ${itemCode}`,
+            20,
+            yPosition,
+            360,
+            14
+          );
+
+          if (equipmentDetails) {
+            yPosition += 5;
+            yPosition = wrapText(
+              ctx,
+              `Category: ${equipmentDetails.category || "N/A"}`,
+              20,
+              yPosition,
+              360,
+              14
+            );
+            yPosition = wrapText(
+              ctx,
+              `Status: ${equipmentDetails.status || "N/A"}`,
+              20,
+              yPosition,
+              360,
+              14
+            );
+            yPosition = wrapText(
+              ctx,
+              `Assigned To: ${equipmentDetails.assigned_to || "Unassigned"}`,
+              20,
+              yPosition,
+              360,
+              14
+            );
+          }
+
+          // Draw barcode
+          const barcodeCanvas = document.createElement("canvas");
+          barcodeCanvas.width = canvasWidth;
+          barcodeCanvas.height = canvasHeight;
+
+          jsbarcode(barcodeCanvas, itemCode, barcodeConfig);
+
+          ctx.drawImage(barcodeCanvas, 20, yPosition + 10);
+
+          // Footer
+          ctx.font = "10px Arial";
+          ctx.fillStyle = "#666";
+          ctx.fillText(
+            `Generated: ${new Date().toLocaleDateString()}`,
+            20,
+            290
+          );
+
+          const dataUrl = finalCanvas.toDataURL("image/png", 1.0);
+          resolve(dataUrl);
+        };
+
+        tempImg.src = canvas.toDataURL("image/png");
+      } catch (barcodeError) {
+        console.error("Barcode generation error:", barcodeError);
+
+        // Fallback for very long barcodes
+        if (barcodeError.message.includes("width") || itemCode.length > 50) {
+          // Create a simpler barcode for very long codes
+          const fallbackCanvas = document.createElement("canvas");
+          fallbackCanvas.width = 450;
+          fallbackCanvas.height = 100;
+
+          jsbarcode(fallbackCanvas, itemCode.substring(0, 50), {
+            format: "CODE128",
+            displayValue: false, // Hide text for very long codes
+            margin: 10,
+            width: 1,
+            height: 60,
+          });
+
+          const dataUrl = fallbackCanvas.toDataURL("image/png");
+          resolve(dataUrl);
+        } else {
           reject(barcodeError);
         }
-      } catch (error) {
-        console.error("Error in generateBarcodeImage:", error);
-        reject(error);
       }
-    });
-  };
-
+    } catch (error) {
+      console.error("Error in generateBarcodeImage:", error);
+      reject(error);
+    }
+  });
+};
   // Simple barcode generation (just the barcode)
   const generateSimpleBarcode = (itemCode) => {
     return new Promise((resolve, reject) => {
@@ -1428,7 +1671,162 @@ const { userId, isAuthenticated, userRole } = useUserId();
     }
     setCurrentPage(1);
   }
+  // ========== EDIT MODAL SCANNER FUNCTIONS ==========
 
+  const startEditScanner = async () => {
+    setIsRequestingEditPermission(true);
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment" },
+      });
+
+      stream.getTracks().forEach((track) => track.stop());
+
+      setShowEditScanner(true);
+
+      if (!editScannerRef.current?.html5QrcodeScanner) {
+        editScannerRef.current = {
+          html5QrcodeScanner: new Html5QrcodeScanner(
+            "editModalQrReader",
+            {
+              fps: 10,
+              qrbox: { width: 250, height: 150 },
+            },
+            false
+          ),
+        };
+
+        editScannerRef.current.html5QrcodeScanner.render(
+          async (decodedText) => {
+            console.log("Edit Modal - Scanned barcode:", decodedText);
+
+            try {
+              const { data, error } = await supabase
+                .from("inventory")
+                .select("*")
+                .eq("item_code", decodedText)
+                .single();
+
+              if (error && error.code !== "PGRST116") throw error;
+
+              if (data) {
+                // CRITICAL: Check if scanned equipment is the SAME as the one being edited
+                if (data.id === editId) {
+                  // Same equipment - just update the barcode
+                  setEditItem((prev) => ({
+                    ...prev,
+                    itemCode: decodedText,
+                  }));
+                  toast.success("Barcode updated for current equipment!");
+                } else {
+                  // Different equipment - show error
+                  toast.error(
+                    <div style={{ padding: "10px" }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          marginBottom: "8px",
+                        }}
+                      >
+                        <span style={{ fontSize: "20px", marginRight: "10px" }}>
+                          ⚠️
+                        </span>
+                        <strong style={{ fontSize: "16px" }}>
+                          Different Equipment Scanned
+                        </strong>
+                      </div>
+                      <div style={{ fontSize: "14px", lineHeight: "1.4" }}>
+                        You scanned equipment: <strong>{data.item_name}</strong>{" "}
+                        (ID: {data.id})<br />
+                        Currently editing: <strong>
+                          {editItem.itemName}
+                        </strong>{" "}
+                        (ID: {editId})
+                      </div>
+                      <div
+                        style={{
+                          fontSize: "12px",
+                          marginTop: "10px",
+                          color: "#666",
+                        }}
+                      >
+                        Cannot apply data from a different equipment in edit
+                        mode.
+                      </div>
+                    </div>,
+                    { autoClose: 5000, closeButton: true }
+                  );
+
+                  // Optional: Show the scan result modal with limited options
+                  setScanResult({
+                    type: "different",
+                    message: `Scanned equipment "${data.item_name}" is different from "${editItem.itemName}"`,
+                    equipmentData: data,
+                    barcode: decodedText,
+                  });
+                  setShowScanResultModal(true);
+                }
+              } else {
+                // New barcode - not in system
+                setEditItem((prev) => ({
+                  ...prev,
+                  itemCode: decodedText,
+                }));
+                toast.success(`New barcode set: ${decodedText}`);
+              }
+
+              stopEditScanner();
+            } catch (err) {
+              console.error("Error fetching equipment:", err);
+              // Just update the barcode field
+              setEditItem((prev) => ({
+                ...prev,
+                itemCode: decodedText,
+              }));
+              toast.info(`Barcode updated to: ${decodedText}`);
+              stopEditScanner();
+            }
+          },
+          (errorMessage) => {
+            if (
+              !errorMessage.includes("NotFoundException") &&
+              !errorMessage.includes("No MultiFormat Readers")
+            ) {
+              console.log("Edit scanner status:", errorMessage);
+            }
+          }
+        );
+      }
+    } catch (error) {
+      console.error("Edit modal camera permission denied:", error);
+      toast.error("Camera access denied. Please allow camera permissions.");
+    } finally {
+      setIsRequestingEditPermission(false);
+    }
+  };
+
+  const stopEditScanner = () => {
+    if (editScannerRef.current?.html5QrcodeScanner) {
+      try {
+        editScannerRef.current.html5QrcodeScanner.clear().catch((error) => {
+          console.error("Failed to clear edit scanner:", error);
+        });
+        editScannerRef.current.html5QrcodeScanner = null;
+      } catch (error) {
+        console.error("Error stopping edit scanner:", error);
+      }
+    }
+    setShowEditScanner(false);
+  };
+
+  // Cleanup edit scanner when component unmounts or edit modal closes
+  useEffect(() => {
+    return () => {
+      stopEditScanner();
+    };
+  }, []);
   const startScanner = async () => {
     setIsRequestingPermission(true);
     try {
@@ -1479,73 +1877,30 @@ const { userId, isAuthenticated, userRole } = useUserId();
               if (error && error.code !== "PGRST116") throw error;
 
               if (data) {
-                toast.success(
-                  `Equipment Found!\n\n` +
-                    `Equipment Name: ${data.item_name || "N/A"}\n` +
-                    `Category: ${data.category || "N/A"}\n` +
-                    `Status: ${data.status || "N/A"}\n` +
-                    `Assigned To: ${data.assigned_to || "Unassigned"}\n\n` +
-                    `Details have been filled in the form.`
-                );
-
-                if (isAddSidebarOpen) {
-                  setNewItem({
-                    itemName: data.item_name || "",
-                    itemCode: data.item_code || "",
-                    category: data.category || "",
-                    status: data.status || "",
-                    assignedTo: data.assigned_personnel_id || "unassigned", // CHANGED: Use ID
-                    purchaseDate: data.purchase_date || "",
-                    lastChecked: data.last_checked || "",
-                  });
-
-                  setFloatingLabels({
-                    category: !!data.category,
-                    status: !!data.status,
-                    assignedTo: !!data.assigned_personnel_id,
-                  });
-                } else if (isEditOpen) {
-                  setEditItem({
-                    itemName: data.item_name || "",
-                    itemCode: data.item_code || "",
-                    category: data.category || "",
-                    status: data.status || "",
-                    assignedTo: data.assigned_personnel_id || "unassigned", // CHANGED: Use ID
-                    purchaseDate: data.purchase_date || "",
-                    lastChecked: data.last_checked || "",
-                  });
-
-                  setEditFloatingLabels({
-                    category: !!data.category,
-                    status: !!data.status,
-                    assignedTo: !!data.assigned_personnel_id,
-                  });
-                }
+                // Show modal instead of toast
+                showScanResult("found", `Equipment Found!`, data, decodedText);
               } else {
-                if (isAddSidebarOpen) {
-                  setNewItem((prev) => ({ ...prev, itemCode: decodedText }));
-                } else if (isEditOpen) {
-                  setEditItem((prev) => ({ ...prev, itemCode: decodedText }));
-                }
-                toast.info(
-                  "No existing equipment found with this barcode. Please enter details manually."
+                // Show modal for not found
+                showScanResult(
+                  "not_found",
+                  `No existing equipment found with barcode: ${decodedText}`,
+                  null,
+                  decodedText
                 );
               }
+
+              stopScanner();
             } catch (err) {
               console.error("Error fetching equipment:", err);
-              if (isAddSidebarOpen) {
-                setNewItem((prev) => ({ ...prev, itemCode: decodedText }));
-              } else if (isEditOpen) {
-                setEditItem((prev) => ({ ...prev, itemCode: decodedText }));
-              }
-              toast.info(
-                "Scanned barcode: " +
-                  decodedText +
-                  "\n\nEnter equipment details manually."
+              // Show modal for error
+              showScanResult(
+                "not_found",
+                `Scanned barcode: ${decodedText}\n\nEnter equipment details manually.`,
+                null,
+                decodedText
               );
+              stopScanner();
             }
-
-            stopScanner();
           },
           (errorMessage) => {
             if (
@@ -1803,7 +2158,7 @@ const { userId, isAuthenticated, userRole } = useUserId();
     <div className={styles.inventoryAppContainer}>
       <Title>Inventory Control | BFP Villanueva</Title>
       <Meta name="robots" content="noindex, nofollow" />
-   
+
       <Hamburger />
       <Sidebar />
 
@@ -2693,330 +3048,488 @@ const { userId, isAuthenticated, userRole } = useUserId();
 
         {/* Edit Modal */}
         {isEditOpen && (
-          <div
-            id={styles.inventoryEditModal}
-            className={styles.inventoryEditModalOverlay}
-            style={{ display: "flex" }}
-            onClick={(e) => {
-              if (e.target.id === styles.inventoryEditModal) closeEditModal();
-            }}
-          >
-            <div className={styles.inventoryModalContainer}>
-              <div className={styles.inventoryModalHeader}>
-                <h3 className={styles.inventoryModalTitle}>Edit Equipment</h3>
-                <button
-                  className={styles.inventoryModalCloseBtn}
-                  onClick={closeEditModal}
-                >
-                  &times;
-                </button>
-              </div>
-
-              <form
-                id={styles.inventoryEditEquipmentForm}
-                className={styles.inventoryModalForm}
-                onSubmit={handleEditSubmit}
+          <div className={styles.modalContainer}>
+            <div
+              className={`${styles.inventoryEditModalOverlay} ${styles.show}`}
+              onClick={closeEditModal}
+            >
+              <div
+                className={styles.inventoryModalWrapper}
+                style={{
+                  marginLeft: isSidebarCollapsed ? "80px" : "250px",
+                  width: isSidebarCollapsed
+                    ? "calc(100% -190px)"
+                    : "calc(100% - 750px)",
+                }}
               >
-                <div className={styles.inventoryModalSection}>
-                  <h3 className={styles.inventoryModalSectionTitle}>
-                    Equipment Details
-                  </h3>
-
-                  <div className={styles.inventoryModalInputRow}>
-                    <div
-                      className={`${styles.inventoryModalInputGroup} ${styles.fullWidth}`}
+                <div
+                  className={styles.inventoryModalContainer}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className={styles.inventoryModalHeader}>
+                    <h3 className={styles.inventoryModalTitle}>
+                      Edit Equipment
+                    </h3>
+                    <button
+                      className={styles.inventoryModalCloseBtn}
+                      onClick={closeEditModal}
                     >
-                      <input
-                        id={styles.inventoryEditItemName}
-                        type="text"
-                        required
-                        value={editItem.itemName}
-                        onChange={(e) =>
-                          setEditItem((s) => ({
-                            ...s,
-                            itemName: e.target.value,
-                          }))
-                        }
-                        placeholder=" "
-                        className={styles.inventoryModalInput}
-                      />
-                      <h4 className={styles.inventoryModalInputLabel}>
-                        Equipment Name
-                      </h4>
-                    </div>
-                    <div className={styles.inventoryModalBarcodeGroup}>
-                      <div className={styles.inventoryModalBarcodeContainer}>
-                        <input
-                          id={styles.inventoryEditItemCode}
-                          type="text"
-                          required
-                          value={editItem.itemCode}
-                          onChange={(e) =>
-                            setEditItem((s) => ({
-                              ...s,
-                              itemCode: e.target.value,
-                            }))
-                          }
-                          placeholder=" "
-                          className={styles.inventoryModalInput}
-                        />
-                        <h4 className={styles.inventoryModalInputLabelBarCode}>
-                          Barcode
-                        </h4>
-                        <button
-                          type="button"
-                          className={styles.inventoryModalScanBtn}
-                          onClick={() => {
-                            setShowScanner(true);
-                            startScanner();
-                          }}
+                      &times;
+                    </button>
+                  </div>
+
+                  <form
+                    id={styles.inventoryEditEquipmentForm}
+                    className={styles.inventoryModalForm}
+                    onSubmit={handleEditSubmit}
+                  >
+                    <div className={styles.inventoryModalSection}>
+                      <h3 className={styles.inventoryModalSectionTitle}>
+                        Equipment Details
+                      </h3>
+
+                      <div className={styles.inventoryModalInputRow}>
+                        <div
+                          className={`${styles.inventoryModalInputGroup} ${styles.fullWidth}`}
                         >
-                          📷 Scan
-                        </button>
+                          <input
+                            id={styles.inventoryEditItemName}
+                            type="text"
+                            required
+                            value={editItem.itemName}
+                            onChange={(e) =>
+                              setEditItem((s) => ({
+                                ...s,
+                                itemName: e.target.value,
+                              }))
+                            }
+                            placeholder=" "
+                            className={styles.inventoryModalInput}
+                          />
+                          <h4 className={styles.inventoryModalInputLabel}>
+                            Equipment Name
+                          </h4>
+                        </div>
+                        <div className={styles.inventoryModalBarcodeGroup}>
+                          <div
+                            className={styles.inventoryModalBarcodeContainer}
+                          >
+                            <input
+                              id={styles.inventoryEditItemCode}
+                              type="text"
+                              required
+                              value={editItem.itemCode}
+                              onChange={(e) =>
+                                setEditItem((s) => ({
+                                  ...s,
+                                  itemCode: e.target.value,
+                                }))
+                              }
+                              placeholder=" "
+                              className={styles.inventoryModalInput}
+                            />
+                            <h4
+                              className={styles.inventoryModalInputLabelBarCode}
+                            >
+                              Barcode
+                            </h4>
+
+                            <button
+                              type="button"
+                              className={styles.inventoryModalScanBtn}
+                              onClick={() => {
+                                startEditScanner();
+                              }}
+                            >
+                              📷 Scan
+                            </button>
+                          </div>
+                        </div>
+                        <div className={styles.inventoryModalInputGroup}>
+                          <select
+                            id={styles.inventoryEditCategory}
+                            required
+                            value={editItem.category}
+                            onChange={(e) =>
+                              handleEditSelectChange("category", e.target.value)
+                            }
+                            className={`${styles.inventoryModalSelect} ${
+                              editFloatingLabels.category ? styles.floating : ""
+                            }`}
+                          >
+                            <option value="" disabled hidden>
+                              Select Category
+                            </option>
+                            <option value="Firefighting Equipment">
+                              Firefighting Equipment
+                            </option>
+                            <option value="Protective Gear">
+                              Protective Gear
+                            </option>
+                            <option value="Vehicle Equipment">
+                              Vehicle Equipment
+                            </option>
+                            <option value="Communication Equipment">
+                              Communication Equipment
+                            </option>
+                            <option value="Medical Equipment">
+                              Medical Equipment
+                            </option>
+                            <option value="Tools">Tools</option>
+                          </select>
+                          <h4 className={styles.inventoryModalInputLabel}>
+                            Category
+                          </h4>
+                        </div>
+                        <div className={styles.inventoryModalInputGroup}>
+                          <select
+                            id={styles.inventoryEditStatus}
+                            required
+                            value={editItem.status}
+                            onChange={(e) =>
+                              handleEditSelectChange("status", e.target.value)
+                            }
+                            className={`${styles.inventoryModalSelect} ${
+                              editFloatingLabels.status ? styles.floating : ""
+                            }`}
+                          >
+                            <option value="" disabled hidden>
+                              Select Status
+                            </option>
+                            <option value="Good">Good</option>
+                            <option value="Needs Maintenance">
+                              Needs Maintenance
+                            </option>
+                            <option value="Damaged">Damaged</option>
+                            <option value="Lost">Lost</option>
+                          </select>
+                          <h4 className={styles.inventoryModalInputLabel}>
+                            Status
+                          </h4>
+                        </div>
+                        <div className={styles.inventoryModalInputGroup}>
+                          <input
+                            id={styles.inventoryEditPrice}
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={editItem.price}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              // Allow empty string or valid number
+                              if (value === "" || /^\d*\.?\d*$/.test(value)) {
+                                setEditItem((s) => ({ ...s, price: value }));
+                              }
+                            }}
+                            placeholder="0.00"
+                            className={styles.inventoryModalInput}
+                          />
+                          <h4 className={styles.inventoryModalInputLabel}>
+                            Price (₱)
+                          </h4>
+                          {editItem.price &&
+                            isNaN(parseFloat(editItem.price)) && (
+                              <small
+                                style={{
+                                  color: "#dc3545",
+                                  fontSize: "12px",
+                                  marginTop: "4px",
+                                }}
+                              >
+                                Please enter a valid number
+                              </small>
+                            )}
+                        </div>
                       </div>
                     </div>
-                    <div className={styles.inventoryModalInputGroup}>
-                      <select
-                        id={styles.inventoryEditCategory}
-                        required
-                        value={editItem.category}
-                        onChange={(e) =>
-                          handleEditSelectChange("category", e.target.value)
-                        }
-                        className={`${styles.inventoryModalSelect} ${
-                          editFloatingLabels.category ? styles.floating : ""
-                        }`}
-                      >
-                        <option value="" disabled hidden>
-                          Select Category
-                        </option>
-                        <option value="Firefighting Equipment">
-                          Firefighting Equipment
-                        </option>
-                        <option value="Protective Gear">Protective Gear</option>
-                        <option value="Vehicle Equipment">
-                          Vehicle Equipment
-                        </option>
-                        <option value="Communication Equipment">
-                          Communication Equipment
-                        </option>
-                        <option value="Medical Equipment">
-                          Medical Equipment
-                        </option>
-                        <option value="Tools">Tools</option>
-                      </select>
-                      <h4 className={styles.inventoryModalInputLabel}>
-                        Category
-                      </h4>
-                    </div>
-                    <div className={styles.inventoryModalInputGroup}>
-                      <select
-                        id={styles.inventoryEditStatus}
-                        required
-                        value={editItem.status}
-                        onChange={(e) =>
-                          handleEditSelectChange("status", e.target.value)
-                        }
-                        className={`${styles.inventoryModalSelect} ${
-                          editFloatingLabels.status ? styles.floating : ""
-                        }`}
-                      >
-                        <option value="" disabled hidden>
-                          Select Status
-                        </option>
-                        <option value="Good">Good</option>
-                        <option value="Needs Maintenance">
-                          Needs Maintenance
-                        </option>
-                        <option value="Damaged">Damaged</option>
-                        <option value="Lost">Lost</option>
-                      </select>
-                      <h4 className={styles.inventoryModalInputLabel}>
-                        Status
-                      </h4>
-                    </div>
-                    <div className={styles.inventoryModalInputGroup}>
-                      <input
-                        id={styles.inventoryEditPrice}
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={editItem.price}
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          // Allow empty string or valid number
-                          if (value === "" || /^\d*\.?\d*$/.test(value)) {
-                            setEditItem((s) => ({ ...s, price: value }));
-                          }
-                        }}
-                        placeholder="0.00"
-                        className={styles.inventoryModalInput}
-                      />
-                      <h4 className={styles.inventoryModalInputLabel}>
-                        Price (₱)
-                      </h4>
-                      {editItem.price && isNaN(parseFloat(editItem.price)) && (
-                        <small
-                          style={{
-                            color: "#dc3545",
-                            fontSize: "12px",
-                            marginTop: "4px",
-                          }}
-                        >
-                          Please enter a valid number
-                        </small>
-                      )}
-                    </div>
-                  </div>
-                </div>
 
-                {/* ========== CHANGED: Assignment section in Edit Modal ========== */}
-                <div className={styles.inventoryModalSection}>
-                  <h3 className={styles.inventoryModalSectionTitle}>
-                    Assignment
-                    {isUnderInspection && (
-                      <span
-                        style={{
-                          fontSize: "12px",
-                          color: "#dc3545",
-                          marginLeft: "10px",
-                          fontWeight: "normal",
-                        }}
-                      >
-                        (Locked - Equipment Under Inspection)
-                      </span>
-                    )}
-                  </h3>
-
-                  <div className={styles.inventoryModalInputRow}>
-                    <div
-                      className={`${styles.inventoryModalInputGroup} ${
-                        styles.fullWidth
-                      } ${isUnderInspection ? styles.disabledField : ""}`}
-                      title={
-                        isUnderInspection
-                          ? "Cannot change assignment while equipment is under inspection"
-                          : ""
-                      }
-                    >
-                      <select
-                        id={styles.inventoryEditAssignedTo}
-                        required
-                        value={editItem.assignedTo}
-                        onChange={(e) =>
-                          handleEditSelectChange("assignedTo", e.target.value)
-                        }
-                        className={`${styles.inventoryModalSelect} ${
-                          editFloatingLabels.assignedTo ? styles.floating : ""
-                        } ${isUnderInspection ? styles.disabledSelect : ""}`}
-                        disabled={isUnderInspection}
-                      >
-                        <option value="" disabled hidden>
-                          Assign to Personnel
-                        </option>
-                        <option value="unassigned">Unassigned</option>{" "}
-                        {/* CHANGED: lowercase */}
-                        {personnel.map((person) => {
-                          const hasActiveClearance =
-                            checkPersonnelHasActiveClearance(person.id);
-                          const isCurrentlyAssigned =
-                            editItem.assignedTo === person.id; // CHANGED: Compare by ID
-
-                          return (
-                            <option
-                              key={person.id}
-                              value={person.id} // CHANGED: Use ID instead of name
-                              disabled={
-                                hasActiveClearance && !isCurrentlyAssigned
-                              }
-                              title={
-                                hasActiveClearance && !isCurrentlyAssigned
-                                  ? "Personnel has active clearance request - Cannot assign equipment"
-                                  : hasActiveClearance
-                                  ? "Currently assigned but has active clearance request"
-                                  : ""
-                              }
-                            >
-                              {person.first_name} {person.last_name}
-                              {person.badge_number
-                                ? ` (${person.badge_number})`
-                                : ""}
-                              {hasActiveClearance && !isCurrentlyAssigned
-                                ? " - Has active clearance request"
-                                : ""}
-                              {hasActiveClearance && isCurrentlyAssigned
-                                ? " - Currently assigned (has clearance)"
-                                : ""}
-                            </option>
-                          );
-                        })}
-                      </select>
-                      <h4 className={styles.inventoryModalInputLabel}>
-                        Assign to Personnel
+                    {/* ========== CHANGED: Assignment section in Edit Modal ========== */}
+                    <div className={styles.inventoryModalSection}>
+                      <h3 className={styles.inventoryModalSectionTitle}>
+                        Assignment
                         {isUnderInspection && (
                           <span
                             style={{
+                              fontSize: "12px",
                               color: "#dc3545",
-                              fontSize: "11px",
-                              marginLeft: "5px",
+                              marginLeft: "10px",
+                              fontWeight: "normal",
                             }}
                           >
-                            🔒 Locked
+                            (Locked - Equipment Under Inspection)
                           </span>
                         )}
-                      </h4>
-                      {editItem.assignedTo &&
-                        editItem.assignedTo !== "unassigned" &&
-                        checkPersonnelHasActiveClearance(
-                          editItem.assignedTo
-                        ) && ( // CHANGED: Use ID directly
-                          <div className={styles.clearanceNotice}>
-                            ⚠️ This personnel has an active clearance request.
-                            Equipment assignment changes are not allowed.
+                      </h3>
+
+                      <div className={styles.inventoryModalInputRow}>
+                        <div
+                          className={`${styles.inventoryModalInputGroup} ${
+                            styles.fullWidth
+                          } ${isUnderInspection ? styles.disabledField : ""}`}
+                          title={
+                            isUnderInspection
+                              ? "Cannot change assignment while equipment is under inspection"
+                              : ""
+                          }
+                        >
+                          <select
+                            id={styles.inventoryEditAssignedTo}
+                            required
+                            value={editItem.assignedTo}
+                            onChange={(e) =>
+                              handleEditSelectChange(
+                                "assignedTo",
+                                e.target.value
+                              )
+                            }
+                            className={`${styles.inventoryModalSelect} ${
+                              editFloatingLabels.assignedTo
+                                ? styles.floating
+                                : ""
+                            } ${
+                              isUnderInspection ? styles.disabledSelect : ""
+                            }`}
+                            disabled={isUnderInspection}
+                          >
+                            <option value="" disabled hidden>
+                              Assign to Personnel
+                            </option>
+                            <option value="unassigned">Unassigned</option>{" "}
+                            {/* CHANGED: lowercase */}
+                            {personnel.map((person) => {
+                              const hasActiveClearance =
+                                checkPersonnelHasActiveClearance(person.id);
+                              const isCurrentlyAssigned =
+                                editItem.assignedTo === person.id; // CHANGED: Compare by ID
+
+                              return (
+                                <option
+                                  key={person.id}
+                                  value={person.id} // CHANGED: Use ID instead of name
+                                  disabled={
+                                    hasActiveClearance && !isCurrentlyAssigned
+                                  }
+                                  title={
+                                    hasActiveClearance && !isCurrentlyAssigned
+                                      ? "Personnel has active clearance request - Cannot assign equipment"
+                                      : hasActiveClearance
+                                      ? "Currently assigned but has active clearance request"
+                                      : ""
+                                  }
+                                >
+                                  {person.first_name} {person.last_name}
+                                  {person.badge_number
+                                    ? ` (${person.badge_number})`
+                                    : ""}
+                                  {hasActiveClearance && !isCurrentlyAssigned
+                                    ? " - Has active clearance request"
+                                    : ""}
+                                  {hasActiveClearance && isCurrentlyAssigned
+                                    ? " - Currently assigned (has clearance)"
+                                    : ""}
+                                </option>
+                              );
+                            })}
+                          </select>
+                          <h4 className={styles.inventoryModalInputLabel}>
+                            Assign to Personnel
+                            {isUnderInspection && (
+                              <span
+                                style={{
+                                  color: "#dc3545",
+                                  fontSize: "11px",
+                                  marginLeft: "5px",
+                                }}
+                              >
+                                🔒 Locked
+                              </span>
+                            )}
+                          </h4>
+                          {editItem.assignedTo &&
+                            editItem.assignedTo !== "unassigned" &&
+                            checkPersonnelHasActiveClearance(
+                              editItem.assignedTo
+                            ) && ( // CHANGED: Use ID directly
+                              <div className={styles.clearanceNotice}>
+                                ⚠️ This personnel has an active clearance
+                                request. Equipment assignment changes are not
+                                allowed.
+                              </div>
+                            )}
+                        </div>
+                      </div>
+                    </div>
+                    <div className={styles.inventoryModalSection}>
+                      <h3 className={styles.inventoryModalSectionTitle}>
+                        Additional Information
+                      </h3>
+
+                      <div className={styles.inventoryModalInputRow}>
+                        <div className={styles.inventoryModalInputGroup}>
+                          <input
+                            id={styles.inventoryEditLastAssigned}
+                            type="text"
+                            value={editItem.lastAssigned}
+                            onChange={(e) =>
+                              setEditItem((s) => ({
+                                ...s,
+                                lastAssigned: e.target.value,
+                              }))
+                            }
+                            placeholder=" "
+                            className={styles.inventoryModalInput}
+                          />
+                          <h4 className={styles.inventoryModalInputLabel}>
+                            Last Assigned Personnel (Optional)
+                          </h4>
+                        </div>
+                      </div>
+                    </div>
+                    {/* Edit Modal - Dates Section */}
+                    <div className={styles.inventoryModalSection}>
+                      <h3 className={styles.inventoryModalSectionTitle}>
+                        Dates
+                      </h3>
+
+                      <div className={styles.inventoryModalInputRow}>
+                        {/* NEW: Assigned Date field */}
+                        {editItem.assignedTo &&
+                          editItem.assignedTo !== "unassigned" && (
+                            <div className={styles.inventoryModalInputGroup}>
+                              <Flatpickr
+                                id={styles.inventoryEditAssignedDate}
+                                type="date"
+                                value={editItem.assignedDate}
+                                onChange={(dates) => {
+                                  if (dates && dates[0]) {
+                                    // FIX: Use local date format instead of ISO string
+                                    const date = dates[0];
+                                    const year = date.getFullYear();
+                                    const month = String(
+                                      date.getMonth() + 1
+                                    ).padStart(2, "0");
+                                    const day = String(date.getDate()).padStart(
+                                      2,
+                                      "0"
+                                    );
+                                    const dateStr = `${year}-${month}-${day}`;
+                                    setEditItem((s) => ({
+                                      ...s,
+                                      assignedDate: dateStr,
+                                    }));
+                                  } else {
+                                    setEditItem((s) => ({
+                                      ...s,
+                                      assignedDate: "",
+                                    }));
+                                  }
+                                }}
+                                options={{
+                                  dateFormat: "Y-m-d",
+                                  maxDate: "today",
+                                  defaultDate: editItem.assignedDate || null,
+                                }}
+                                placeholder="Select date"
+                                className={styles.inventoryModalInput}
+                              />
+                              <h4 className={styles.inventoryModalInputLabel}>
+                                Assigned Date (Optional)
+                              </h4>
+                            </div>
+                          )}
+                        {(!editItem.assignedTo ||
+                          editItem.assignedTo === "unassigned") && (
+                          <div className={styles.inventoryModalInputGroup}>
+                            <Flatpickr
+                              id={styles.inventoryEditUnassignedDate}
+                              type="date"
+                              value={editItem.unassignedDate}
+                              onChange={(dates) => {
+                                if (dates && dates[0]) {
+                                  // FIX: Use local date format instead of ISO string
+                                  const date = dates[0];
+                                  const year = date.getFullYear();
+                                  const month = String(
+                                    date.getMonth() + 1
+                                  ).padStart(2, "0");
+                                  const day = String(date.getDate()).padStart(
+                                    2,
+                                    "0"
+                                  );
+                                  const dateStr = `${year}-${month}-${day}`;
+                                  setEditItem((s) => ({
+                                    ...s,
+                                    unassignedDate: dateStr,
+                                  }));
+                                } else {
+                                  setEditItem((s) => ({
+                                    ...s,
+                                    unassignedDate: "",
+                                  }));
+                                }
+                              }}
+                              options={{
+                                dateFormat: "Y-m-d",
+                                maxDate: "today",
+                                defaultDate: editItem.unassignedDate || null,
+                              }}
+                              placeholder="Select date"
+                              className={styles.inventoryModalInput}
+                            />
+                            <h4 className={styles.inventoryModalInputLabel}>
+                              Unassigned Date (Optional)
+                            </h4>
+                            <p className={styles.dateHint}>
+                              Date when equipment was returned to storage
+                            </p>
                           </div>
                         )}
-                    </div>
-                  </div>
-                </div>
-                <div className={styles.inventoryModalSection}>
-                  <h3 className={styles.inventoryModalSectionTitle}>
-                    Additional Information
-                  </h3>
-
-                  <div className={styles.inventoryModalInputRow}>
-                    <div className={styles.inventoryModalInputGroup}>
-                      <input
-                        id={styles.inventoryEditLastAssigned}
-                        type="text"
-                        value={editItem.lastAssigned}
-                        onChange={(e) =>
-                          setEditItem((s) => ({
-                            ...s,
-                            lastAssigned: e.target.value,
-                          }))
-                        }
-                        placeholder=" "
-                        className={styles.inventoryModalInput}
-                      />
-                      <h4 className={styles.inventoryModalInputLabel}>
-                        Last Assigned Personnel (Optional)
-                      </h4>
-                    </div>
-                  </div>
-                </div>
-                {/* Edit Modal - Dates Section */}
-                <div className={styles.inventoryModalSection}>
-                  <h3 className={styles.inventoryModalSectionTitle}>Dates</h3>
-
-                  <div className={styles.inventoryModalInputRow}>
-                    {/* NEW: Assigned Date field */}
-                    {editItem.assignedTo &&
-                      editItem.assignedTo !== "unassigned" && (
                         <div className={styles.inventoryModalInputGroup}>
                           <Flatpickr
-                            id={styles.inventoryEditAssignedDate}
+                            id={styles.inventoryAddPurchaseDate}
                             type="date"
-                            value={editItem.assignedDate}
+                            required
+                            value={newItem.purchaseDate}
+                            onChange={(dates) => {
+                              if (dates && dates[0]) {
+                                // FIX: Use local date format instead of ISO string
+                                const date = dates[0];
+                                const year = date.getFullYear();
+                                const month = String(
+                                  date.getMonth() + 1
+                                ).padStart(2, "0");
+                                const day = String(date.getDate()).padStart(
+                                  2,
+                                  "0"
+                                );
+                                const dateStr = `${year}-${month}-${day}`;
+                                setNewItem((s) => ({
+                                  ...s,
+                                  purchaseDate: dateStr,
+                                }));
+                              } else {
+                                setNewItem((s) => ({ ...s, purchaseDate: "" }));
+                              }
+                            }}
+                            options={{
+                              dateFormat: "Y-m-d",
+                              maxDate: "today",
+                              defaultDate: newItem.purchaseDate || null,
+                            }}
+                            placeholder="Select date"
+                            className={styles.inventoryModalInput}
+                          />
+                          <h4 className={styles.inventoryModalInputLabel}>
+                            Purchase Date
+                          </h4>
+                        </div>
+
+                        <div className={styles.inventoryModalInputGroup}>
+                          <Flatpickr
+                            id={styles.inventoryEditLastChecked}
+                            type="date"
+                            required
+                            value={editItem.lastChecked}
                             onChange={(dates) => {
                               if (dates && dates[0]) {
                                 // FIX: Use local date format instead of ISO string
@@ -3032,177 +3545,53 @@ const { userId, isAuthenticated, userRole } = useUserId();
                                 const dateStr = `${year}-${month}-${day}`;
                                 setEditItem((s) => ({
                                   ...s,
-                                  assignedDate: dateStr,
+                                  lastChecked: dateStr,
                                 }));
                               } else {
-                                setEditItem((s) => ({
-                                  ...s,
-                                  assignedDate: "",
-                                }));
+                                setEditItem((s) => ({ ...s, lastChecked: "" }));
                               }
                             }}
                             options={{
                               dateFormat: "Y-m-d",
                               maxDate: "today",
-                              defaultDate: editItem.assignedDate || null,
+                              defaultDate: editItem.lastChecked || null,
                             }}
                             placeholder="Select date"
                             className={styles.inventoryModalInput}
                           />
                           <h4 className={styles.inventoryModalInputLabel}>
-                            Assigned Date (Optional)
+                            Last Checked
                           </h4>
                         </div>
-                      )}
-                    {(!editItem.assignedTo ||
-                      editItem.assignedTo === "unassigned") && (
-                      <div className={styles.inventoryModalInputGroup}>
-                        <Flatpickr
-                          id={styles.inventoryEditUnassignedDate}
-                          type="date"
-                          value={editItem.unassignedDate}
-                          onChange={(dates) => {
-                            if (dates && dates[0]) {
-                              // FIX: Use local date format instead of ISO string
-                              const date = dates[0];
-                              const year = date.getFullYear();
-                              const month = String(
-                                date.getMonth() + 1
-                              ).padStart(2, "0");
-                              const day = String(date.getDate()).padStart(
-                                2,
-                                "0"
-                              );
-                              const dateStr = `${year}-${month}-${day}`;
-                              setEditItem((s) => ({
-                                ...s,
-                                unassignedDate: dateStr,
-                              }));
-                            } else {
-                              setEditItem((s) => ({
-                                ...s,
-                                unassignedDate: "",
-                              }));
-                            }
-                          }}
-                          options={{
-                            dateFormat: "Y-m-d",
-                            maxDate: "today",
-                            defaultDate: editItem.unassignedDate || null,
-                          }}
-                          placeholder="Select date"
-                          className={styles.inventoryModalInput}
-                        />
-                        <h4 className={styles.inventoryModalInputLabel}>
-                          Unassigned Date (Optional)
-                        </h4>
-                        <p className={styles.dateHint}>
-                          Date when equipment was returned to storage
-                        </p>
                       </div>
-                    )}
-                    <div className={styles.inventoryModalInputGroup}>
-                      <Flatpickr
-                        id={styles.inventoryAddPurchaseDate}
-                        type="date"
-                        required
-                        value={newItem.purchaseDate}
-                        onChange={(dates) => {
-                          if (dates && dates[0]) {
-                            // FIX: Use local date format instead of ISO string
-                            const date = dates[0];
-                            const year = date.getFullYear();
-                            const month = String(date.getMonth() + 1).padStart(
-                              2,
-                              "0"
-                            );
-                            const day = String(date.getDate()).padStart(2, "0");
-                            const dateStr = `${year}-${month}-${day}`;
-                            setNewItem((s) => ({
-                              ...s,
-                              purchaseDate: dateStr,
-                            }));
-                          } else {
-                            setNewItem((s) => ({ ...s, purchaseDate: "" }));
-                          }
-                        }}
-                        options={{
-                          dateFormat: "Y-m-d",
-                          maxDate: "today",
-                          defaultDate: newItem.purchaseDate || null,
-                        }}
-                        placeholder="Select date"
-                        className={styles.inventoryModalInput}
-                      />
-                      <h4 className={styles.inventoryModalInputLabel}>
-                        Purchase Date
-                      </h4>
                     </div>
-
-                    <div className={styles.inventoryModalInputGroup}>
-                      <Flatpickr
-                        id={styles.inventoryEditLastChecked}
-                        type="date"
-                        required
-                        value={editItem.lastChecked}
-                        onChange={(dates) => {
-                          if (dates && dates[0]) {
-                            // FIX: Use local date format instead of ISO string
-                            const date = dates[0];
-                            const year = date.getFullYear();
-                            const month = String(date.getMonth() + 1).padStart(
-                              2,
-                              "0"
-                            );
-                            const day = String(date.getDate()).padStart(2, "0");
-                            const dateStr = `${year}-${month}-${day}`;
-                            setEditItem((s) => ({
-                              ...s,
-                              lastChecked: dateStr,
-                            }));
-                          } else {
-                            setEditItem((s) => ({ ...s, lastChecked: "" }));
-                          }
-                        }}
-                        options={{
-                          dateFormat: "Y-m-d",
-                          maxDate: "today",
-                          defaultDate: editItem.lastChecked || null,
-                        }}
-                        placeholder="Select date"
-                        className={styles.inventoryModalInput}
-                      />
-                      <h4 className={styles.inventoryModalInputLabel}>
-                        Last Checked
-                      </h4>
+                    <div className={styles.inventoryModalActions}>
+                      <button
+                        type="submit"
+                        className={styles.inventoryModalSubmitBtn}
+                        disabled={isProcessingEdit}
+                      >
+                        {isProcessingEdit ? (
+                          <>
+                            <span className={styles.inventorySpinner}></span>
+                            Saving Changes...
+                          </>
+                        ) : (
+                          "Save Changes"
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.inventoryModalCancelBtn}
+                        onClick={closeEditModal}
+                        disabled={isProcessingEdit}
+                      >
+                        Cancel
+                      </button>
                     </div>
-                  </div>
+                  </form>
                 </div>
-                <div className={styles.inventoryModalActions}>
-                  <button
-                    type="submit"
-                    className={styles.inventoryModalSubmitBtn}
-                    disabled={isProcessingEdit}
-                  >
-                    {isProcessingEdit ? (
-                      <>
-                        <span className={styles.inventorySpinner}></span>
-                        Saving Changes...
-                      </>
-                    ) : (
-                      "Save Changes"
-                    )}
-                  </button>
-                  <button
-                    type="button"
-                    className={styles.inventoryModalCancelBtn}
-                    onClick={closeEditModal}
-                    disabled={isProcessingEdit}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </form>
+              </div>
             </div>
           </div>
         )}
@@ -3272,6 +3661,228 @@ const { userId, isAuthenticated, userRole } = useUserId();
           </div>
         )}
 
+        {/* ========== NEW: Scan Result Modal ========== */}
+        {showScanResultModal && (
+          <div
+            className={styles.inventoryScanResultModalOverlay}
+            onClick={closeScanResultModal}
+          >
+            <div
+              className={styles.inventoryScanResultModal}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className={styles.inventoryScanResultModalHeader}>
+                <h3>Scan Result</h3>
+                <button
+                  className={styles.inventoryScanResultModalCloseBtn}
+                  onClick={closeScanResultModal}
+                >
+                  &times;
+                </button>
+              </div>
+
+              <div className={styles.inventoryScanResultModalContent}>
+                <div
+                  className={`${styles.inventoryScanResultIcon} ${
+                    scanResult.type === "found"
+                      ? styles.successIcon
+                      : styles.infoIcon
+                  }`}
+                >
+                  {scanResult.type === "found" ? "✅" : "ℹ️"}
+                </div>
+
+                <h4 className={styles.inventoryScanResultTitle}>
+                  {scanResult.type === "found"
+                    ? "Equipment Found!"
+                    : "Scan Result"}
+                </h4>
+
+                <div className={styles.inventoryScanResultDetails}>
+                  <p className={styles.inventoryScanResultMessage}>
+                    {scanResult.message}
+                  </p>
+
+                  {scanResult.type === "found" && scanResult.equipmentData && (
+                    <div className={styles.inventoryScanResultEquipmentInfo}>
+                      <div className={styles.inventoryScanResultInfoRow}>
+                        <strong>Equipment Name:</strong>{" "}
+                        {scanResult.equipmentData.item_name || "N/A"}
+                      </div>
+                      <div className={styles.inventoryScanResultInfoRow}>
+                        <strong>Category:</strong>{" "}
+                        {scanResult.equipmentData.category || "N/A"}
+                      </div>
+                      <div className={styles.inventoryScanResultInfoRow}>
+                        <strong>Status:</strong>{" "}
+                        {scanResult.equipmentData.status || "N/A"}
+                      </div>
+                      <div className={styles.inventoryScanResultInfoRow}>
+                        <strong>Assigned To:</strong>{" "}
+                        {scanResult.equipmentData.assigned_to || "Unassigned"}
+                      </div>
+                      <div className={styles.inventoryScanResultInfoRow}>
+                        <strong>Scanned Barcode:</strong> {scanResult.barcode}
+                      </div>
+                    </div>
+                  )}
+
+                  {scanResult.type === "not_found" && (
+                    <div className={styles.inventoryScanResultNotice}>
+                      <p>
+                        <strong>Scanned Barcode:</strong> {scanResult.barcode}
+                      </p>
+                      <p>
+                        This barcode does not exist in the system. You can
+                        manually enter the equipment details.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                <div className={styles.inventoryScanResultModalActions}>
+                  {scanResult.type === "found" ? (
+                    <>
+                      {isEditOpen && scanResult.equipmentData?.id === editId ? (
+                        <>
+                          <button
+                            className={styles.inventoryScanResultApplyBtn}
+                            onClick={() =>
+                              applyScannedData(
+                                scanResult.equipmentData,
+                                scanResult.barcode,
+                                true
+                              )
+                            }
+                          >
+                            Apply All Fields
+                          </button>
+                          <button
+                            className={styles.inventoryScanResultApplyBtn}
+                            onClick={() =>
+                              applyScannedData(
+                                scanResult.equipmentData,
+                                scanResult.barcode,
+                                false
+                              )
+                            }
+                          >
+                            Update Barcode Only
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          className={styles.inventoryScanResultApplyBtn}
+                          onClick={() =>
+                            applyScannedData(
+                              scanResult.equipmentData,
+                              scanResult.barcode
+                            )
+                          }
+                        >
+                          Apply to Form
+                        </button>
+                      )}
+                      <button
+                        className={styles.inventoryScanResultCancelBtn}
+                        onClick={closeScanResultModal}
+                      >
+                        Cancel
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        className={styles.inventoryScanResultApplyBtn}
+                        onClick={() =>
+                          applyScannedData(null, scanResult.barcode)
+                        }
+                      >
+                        Use Barcode Only
+                      </button>
+                      <button
+                        className={styles.inventoryScanResultCancelBtn}
+                        onClick={closeScanResultModal}
+                      >
+                        Close
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        {/* Edit Modal Scanner */}
+        {showEditScanner && (
+          <div
+            className={styles.inventoryQrScannerModalOverlay}
+            onClick={stopEditScanner}
+          >
+            <div
+              className={styles.inventoryQrScannerModal}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className={styles.inventoryQrScannerHeader}>
+                <h3>
+                  <span style={{ color: "#1060af", marginRight: "8px" }}>
+                    ✏️
+                  </span>
+                  Edit Mode - Scan Barcode
+                </h3>
+                <button
+                  className={styles.inventoryCloseBtn}
+                  onClick={stopEditScanner}
+                >
+                  &times;
+                </button>
+              </div>
+              <div className={styles.inventoryQrScannerContent}>
+                <div className={styles.inventoryEditScannerInfo}>
+                  <p style={{ color: "#1060af", fontWeight: "bold" }}>
+                    Currently editing: {editItem.itemName}
+                  </p>
+                  <p style={{ fontSize: "12px", color: "#666" }}>
+                    ⚠️ Only scan the SAME equipment's barcode or a NEW barcode
+                  </p>
+                </div>
+
+                <div
+                  className={styles.inventoryCameraPermissionRequest}
+                  style={{
+                    display: isRequestingEditPermission ? "block" : "none",
+                  }}
+                >
+                  <div className={styles.inventoryPermissionIcon}>📷</div>
+                  <h4>Requesting Camera Access...</h4>
+                  <p>Please wait while we access your camera.</p>
+                </div>
+
+                <div
+                  id="editModalQrReader"
+                  className={styles.inventoryQrReader}
+                  style={{
+                    display: !isRequestingEditPermission ? "block" : "none",
+                    height: "300px",
+                  }}
+                ></div>
+
+                <p className={styles.inventoryQrScannerHint}>
+                  Point camera at the <strong>same equipment's</strong> barcode
+                </p>
+
+                <div className={styles.inventoryQrScannerActions}>
+                  <button
+                    className={styles.inventoryCancelScanBtn}
+                    onClick={stopEditScanner}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
         {/* Barcode Display Modal */}
         {showBarcodeModal && selectedBarcode && (
           <div
@@ -3295,9 +3906,9 @@ const { userId, isAuthenticated, userRole } = useUserId();
                 <div className={styles.barcodeContainer}>
                   <div className={styles.barcodeInfo}>
                     <h4>{selectedBarcode.name}</h4>
-                    <p>
+                    <div className={styles.barcodeCode}>
                       <strong>Barcode:</strong> {selectedBarcode.code}
-                    </p>
+                    </div>
 
                     {selectedBarcode.details && (
                       <div className={styles.equipmentDetails}>
@@ -3337,7 +3948,14 @@ const { userId, isAuthenticated, userRole } = useUserId();
                     id="barcode-canvas"
                     width="300"
                     height="100"
-                    style={{ marginTop: "20px" }}
+                    className={
+                      selectedBarcode.code.length > 20 ? styles.longBarcode : ""
+                    }
+                    style={{
+                      marginTop: "20px",
+                      maxWidth: "100%",
+                      height: "auto",
+                    }}
                   />
                 </div>
                 <div className={styles.barcodeModalActions}>

@@ -18,7 +18,7 @@ const FloatingNotificationBell = () => {
   const [dropdownPosition, setDropdownPosition] = useState({
     right: "30px",
     top: "10px",
-    direction: "below", // 'below', 'above', 'left', 'right'
+    direction: "above", // 'below', 'above', 'left', 'right'
   });
 
   const bellRef = useRef(null);
@@ -48,8 +48,8 @@ const FloatingNotificationBell = () => {
   const calculateSmartDropdownPosition = useCallback((bellPosition) => {
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
-    const dropdownWidth = 350;
-    const dropdownHeight = 400; // Approximate max height
+    const dropdownWidth = 30;
+    const dropdownHeight = 300; // Approximate max height
     const bellSize = 60;
 
     // Parse bell position

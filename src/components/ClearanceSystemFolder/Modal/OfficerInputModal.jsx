@@ -52,7 +52,23 @@ const OfficerInputModal = ({
   if (!isOpen) return null;
 
   return (
-    <div className={styles.officerModalOverlay}>
+    <div
+      className={`${styles.officerModalOverlay} ${
+        isSidebarCollapsed ? "collapsed" : ""
+      }`}
+      style={{
+        left: isSidebarCollapsed ? "80px" : "250px",
+        width: isSidebarCollapsed
+          ? "calc(100vw - 80px)"
+          : "calc(100vw - 250px)",
+        transition: "left 0.3s ease, width 0.3s ease",
+      }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          setShowOfficerModal(false);
+        }
+      }}
+    >
       <div className={styles.officerModal}>
         <div className={styles.officerModalHeader}>
           <h3>Enter Officer Names for Clearance Form</h3>

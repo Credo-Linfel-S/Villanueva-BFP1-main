@@ -33,6 +33,7 @@ import {
 import {
   checkLostEquipment,
   getDetailedLostEquipment,
+  linkLostEquipmentToClearance,
 } from "./Utility/clearanceLostEquipmentUtils.js";
 import {
   filterActivePersonnel,
@@ -40,6 +41,7 @@ import {
 } from "../filterActivePersonnel.js";
 
 import { useUserId } from "../hooks/useUserId.js";
+
 const ClearanceSystem = () => {
   const { isSidebarCollapsed } = useSidebar();
   const [clearanceRequests, setClearanceRequests] = useState([]);
@@ -62,7 +64,12 @@ const ClearanceSystem = () => {
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [selectedRequestForAction, setSelectedRequestForAction] =
     useState(null);
-    const { userId, isAuthenticated, userRole } = useUserId();
+  const [showNoEquipmentModal, setShowNoEquipmentModal] = useState({
+    show: false,
+    personnelName: "",
+    clearanceType: "",
+  });
+  const { userId, isAuthenticated, userRole } = useUserId();
   const [showOfficerModal, setShowOfficerModal] = useState(false);
   const [selectedRequestForPdf, setSelectedRequestForPdf] = useState(null);
   const [officerNames, setOfficerNames] = useState({});
@@ -70,8 +77,8 @@ const ClearanceSystem = () => {
   const [rejectReason, setRejectReason] = useState("");
   const [existingPdfs, setExistingPdfs] = useState({});
   const [selectedEquipment, setSelectedEquipment] = useState([]);
-  // NEW: State for lost equipment
   const [lostEquipment, setLostEquipment] = useState([]);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const [filters, setFilters] = useState({
     status: "All",
@@ -91,9 +98,28 @@ const ClearanceSystem = () => {
 
   const rowsPerPage = 5;
 
+  // Helper function with mapping
+  const getInspectionStatusClass = (status) => {
+    const statusMap = {
+      "In Progress": "inprogress",
+      "No Equipment": "noequipment",
+      "Not Applicable": "notapplicable",
+      Pending: "pending",
+      PASS: "pass",
+      FAIL: "fail",
+      "PASS (Settled)": "passsettled",
+      "FAIL (Accountability Pending)": "failaccountability",
+    };
+
+    return (
+      statusMap[status] ||
+      status?.toLowerCase().replace(/[^a-z]/g, "") ||
+      "pending"
+    );
+  };
+
   // Helper function to create organized folder names
   const createPersonnelFolderName = (personnel) => {
-    // Format: "FullName_Rank_BadgeNumber"
     const fullName =
       personnel?.employee
         ?.replace(/[^a-zA-Z0-9\s]/g, "")
@@ -106,27 +132,6 @@ const ClearanceSystem = () => {
 
     return `${fullName}_${rank}_${badgeNumber}`;
   };
-
-  // Add this useEffect in your ClearanceSystem component
-
-  // Add this near your other useEffect hooks
-  useEffect(() => {
-    // Sync status when clearanceRequests changes
-    const checkAndUpdateButtonVisibility = async () => {
-      if (clearanceRequests.length > 0) {
-        console.log("🔄 Checking button visibility for all requests...");
-
-        clearanceRequests.forEach((req) => {
-          const shouldShow = shouldShowApproveRejectButtons(req);
-          console.log(
-            `Request ${req.id} (${req.employee}): status=${req.status}, showButtons=${shouldShow}`
-          );
-        });
-      }
-    };
-
-    checkAndUpdateButtonVisibility();
-  }, [clearanceRequests]);
 
   const formatPHP = (amount) => {
     return new Intl.NumberFormat("en-PH", {
@@ -169,7 +174,7 @@ const ClearanceSystem = () => {
     initializeData();
   }, []);
 
-  // Load existing PDFs with organized folder structure
+  // Load existing PDFs
   useEffect(() => {
     const loadExistingPdfs = async () => {
       try {
@@ -193,13 +198,6 @@ const ClearanceSystem = () => {
             pdfsMap[doc.clearance_request_id].push(doc);
           });
           setExistingPdfs(pdfsMap);
-
-          // Log folder structure for debugging
-          data.forEach((doc) => {
-            if (doc.file_path) {
-              console.log(`📁 PDF stored in: ${doc.file_path}`);
-            }
-          });
         }
       } catch (err) {
         console.error("Error loading existing PDFs:", err);
@@ -223,19 +221,18 @@ const ClearanceSystem = () => {
     loadPersonnel();
   };
 
-  // UPDATED: loadClearanceRequests with lost equipment detection
-  const loadClearanceRequests = async () => {
-    try {
-      setLoading(true);
+const loadClearanceRequests = async () => {
+  try {
+    setLoading(true);
 
-      if (showPreloader) {
-        setPreloaderProgress(40);
-      }
+    if (showPreloader) {
+      setPreloaderProgress(40);
+    }
 
-      const { data, error } = await supabase
-        .from("clearance_requests")
-        .select(
-          `
+    const { data, error } = await supabase
+      .from("clearance_requests")
+      .select(
+        `
         *,
         personnel:personnel_id (
           first_name,
@@ -248,436 +245,457 @@ const ClearanceSystem = () => {
           station
         )
         `
-        )
-        .order("created_at", { ascending: false });
+      )
+      .order("created_at", { ascending: false });
 
-      if (error) throw error;
+    if (error) throw error;
 
-      // Format the data and fetch equipment separately
-      const formattedData = await Promise.all(
-        (data || []).map(async (request, index) => {
-          if (showPreloader && index % 5 === 0) {
-            setPreloaderProgress((prev) => Math.min(prev + 2, 80));
-            console.log(
-              `📋 Request ${request.id}: DB Status = ${request.status}, Type = ${request.type}`
-            );
+    // Format the data
+    const formattedData = await Promise.all(
+      (data || []).map(async (request, index) => {
+        const personnel = request.personnel || {};
+        const employeeName = `${personnel.first_name || ""} ${
+          personnel.middle_name || ""
+        } ${personnel.last_name || ""}`
+          .replace(/\s+/g, " ")
+          .trim();
+
+        let rankImageUrl = "";
+        if (personnel.rank_image) {
+          try {
+            if (personnel.rank_image.startsWith("http")) {
+              rankImageUrl = personnel.rank_image;
+            } else {
+              const { data: imageData } = supabase.storage
+                .from("rank_images")
+                .getPublicUrl(personnel.rank_image);
+              rankImageUrl = imageData?.publicUrl || "";
+            }
+          } catch (imgError) {
+            console.warn("Error loading rank image:", imgError);
+            rankImageUrl = "";
           }
+        }
 
-          const personnel = request.personnel || {};
-          const employeeName = `${personnel.first_name || ""} ${
-            personnel.middle_name || ""
-          } ${personnel.last_name || ""}`
-            .replace(/\s+/g, " ")
-            .trim();
-          let rankImageUrl = "";
-          if (personnel.rank_image) {
-            try {
-              // Check if it's already a full URL
-              if (personnel.rank_image.startsWith("http")) {
-                rankImageUrl = personnel.rank_image;
-              } else {
-                // Get public URL from rank_images bucket
-                const { data: imageData } = supabase.storage
-                  .from("rank_images")
-                  .getPublicUrl(personnel.rank_image);
-                rankImageUrl = imageData?.publicUrl || "";
-              }
-            } catch (imgError) {
-              console.warn("Error loading rank image:", imgError);
-              rankImageUrl = "";
+        const folderName = createPersonnelFolderName({
+          employee: employeeName,
+          rank: personnel.rank,
+          badge_number: personnel.badge_number,
+        });
+
+        let equipmentCount = 0;
+        let equipmentDisplay = "Not Applicable";
+        let inspectionStatus = "Not Applicable";
+        let lostEquipmentCount = 0;
+        let lostEquipmentStatus = "None";
+        let newStatus = request.status; // Start with current status
+        let isAccountabilitySettled = false; // DECLARE IT HERE FIRST
+
+        // Check if request type qualifies for inspection
+        const requiresInspection =
+          request.type === "Retirement" ||
+          request.type === "Resignation" ||
+          request.type === "Equipment Completion";
+
+        if (requiresInspection) {
+          inspectionStatus = "Pending";
+          equipmentDisplay = "No Equipment";
+
+          const equipmentItems = await loadPersonnelEquipment(
+            request.personnel_id
+          );
+          equipmentCount = equipmentItems.length || 0;
+
+          // Check for lost equipment SPECIFIC to this clearance request
+          const { data: lostRecords, error: lostError } = await supabase
+            .from("accountability_records")
+            .select("id, is_settled, equipment_returned")
+            .eq("personnel_id", request.personnel_id)
+            .eq("record_type", "LOST")
+            .eq("clearance_request_id", request.id); // SPECIFIC to this request
+
+          if (!lostError && lostRecords) {
+            lostEquipmentCount = lostRecords.length;
+            const unsettledLostEquipment = lostRecords.filter(
+              (record) => !record.is_settled
+            );
+
+            if (unsettledLostEquipment.length > 0) {
+              lostEquipmentStatus = `⚠️ ${unsettledLostEquipment.length} Unsettled`;
+              inspectionStatus = "FAIL (Unsettled Lost Equipment)";
+              newStatus = "In Progress";
+            } else {
+              lostEquipmentStatus = `✅ ${lostRecords.length} Settled`;
             }
           }
 
-          // Create folder name for this request
-          const folderName = createPersonnelFolderName({
-            employee: employeeName,
-            rank: personnel.rank,
-            badge_number: personnel.badge_number,
-          });
+          if (equipmentCount > 0) {
+            equipmentDisplay = `${equipmentCount} item(s)`;
 
-          let equipmentCount = 0;
-          let equipmentDisplay = "Not Applicable";
-          let inspectionStatus = "Not Applicable";
-          let lostEquipmentCount = 0;
-          let lostEquipmentStatus = "None";
-
-          // Check if request type qualifies for inspection
-          const requiresInspection =
-            request.type === "Retirement" ||
-            request.type === "Resignation" ||
-            request.type === "Equipment Completion";
-
-          // Determine the new status based on equipment inspection
-          let newStatus = request.status;
-
-          if (requiresInspection) {
-            inspectionStatus = "Pending";
-            equipmentDisplay = "No Equipment";
-
-            const equipmentItems = await loadPersonnelEquipment(
-              request.personnel_id
-            );
-            equipmentCount = equipmentItems.length || 0;
-
-            // NEW: Check for lost equipment
-            const { data: lostRecords, error: lostError } = await supabase
-              .from("accountability_records")
-              .select("id, is_settled, equipment_returned")
-              .eq("personnel_id", request.personnel_id)
-              .eq("record_type", "LOST")
+            const { data: clearanceItems, error: countError } = await supabase
+              .from("clearance_inventory")
+              .select("status, inspection_id, inventory_id")
               .eq("clearance_request_id", request.id);
 
-            if (!lostError && lostRecords) {
-              lostEquipmentCount = lostRecords.length;
-              const unsettledLostEquipment = lostRecords.filter(
-                (record) => !record.is_settled
-              );
+            if (!countError && clearanceItems && clearanceItems.length > 0) {
+              const totalItems = clearanceItems.length;
+              const clearedItems = clearanceItems.filter(
+                (item) => item.status === "Cleared"
+              ).length;
+              const pendingItems = clearanceItems.filter(
+                (item) => item.status === "Pending"
+              ).length;
+              const damagedItems = clearanceItems.filter(
+                (item) => item.status === "Damaged"
+              ).length;
+              const lostItems = clearanceItems.filter(
+                (item) => item.status === "Lost"
+              ).length;
 
-              if (unsettledLostEquipment.length > 0) {
-                lostEquipmentStatus = `⚠️ ${unsettledLostEquipment.length} Unsettled`;
-                inspectionStatus = "FAIL (Unsettled Lost Equipment)";
-                newStatus = "In Progress";
-              } else {
-                lostEquipmentStatus = `✅ ${lostRecords.length} Settled`;
-              }
-            }
+              // FIXED: Check accountability status for THIS SPECIFIC clearance request
+              const { data: accountabilityData, error: accountabilityError } =
+                await supabase
+                  .from("personnel_equipment_accountability_table")
+                  .select("accountability_status")
+                  .eq("personnel_id", request.personnel_id)
+                  .eq("clearance_request_id", request.id) // SPECIFIC to this request
+                  .maybeSingle();
 
-            if (equipmentCount > 0) {
-              equipmentDisplay = `${equipmentCount} item(s)`;
+              // DEFINE isAccountabilitySettled HERE
+              isAccountabilitySettled =
+                !accountabilityError &&
+                accountabilityData?.accountability_status === "SETTLED";
 
-              const { data: clearanceItems, error: countError } = await supabase
-                .from("clearance_inventory")
-                .select("status, inspection_id, inventory_id")
-                .eq("clearance_request_id", request.id);
+              console.log(`Clearance ${request.id} accountability check:`, {
+                personnelId: request.personnel_id,
+                requestId: request.id,
+                isAccountabilitySettled,
+                damagedItems,
+                lostItems,
+              });
 
-              if (!countError && clearanceItems && clearanceItems.length > 0) {
-                // Count items by status
-                const totalItems = clearanceItems.length;
-                const clearedItems = clearanceItems.filter(
-                  (item) => item.status === "Cleared"
-                ).length;
-                const pendingItems = clearanceItems.filter(
-                  (item) => item.status === "Pending"
-                ).length;
-                const damagedItems = clearanceItems.filter(
-                  (item) => item.status === "Damaged"
-                ).length;
-                const lostItems = clearanceItems.filter(
-                  (item) => item.status === "Lost"
-                ).length;
-
-                // Check accountability status
-                const { data: accountabilityData, error: accountabilityError } =
+              // DETERMINE INSPECTION STATUS
+              if (damagedItems > 0 || lostItems > 0) {
+                // Check if accountability has been created for THIS request
+                const { data: accountabilityRecord, error: accError } =
                   await supabase
-                    .from("personnel_equipment_accountability_table")
-                    .select("accountability_status")
+                    .from("accountability_records")
+                    .select("id, is_settled")
                     .eq("personnel_id", request.personnel_id)
-                    .eq("clearance_request_id", request.id)
-                    .maybeSingle();
+                    .eq("clearance_request_id", request.id) // SPECIFIC to this request
+                    .in("record_type", ["DAMAGED", "LOST"])
+                    .limit(1);
 
-                const isAccountabilitySettled =
-                  accountabilityData?.accountability_status === "SETTLED";
-
-                // ====== DETERMINE INSPECTION STATUS ======
-                console.log(
-                  `🔍 Inspection analysis for request ${request.id}:`,
-                  {
-                    totalItems,
-                    clearedItems,
-                    pendingItems,
-                    damagedItems,
-                    lostItems,
-                    isAccountabilitySettled,
-                    lostEquipmentCount,
-                  }
-                );
-
-                // LOGIC FLOW for inspection status:
-                // 1. Check if FAIL condition (damaged/lost equipment)
-                if (damagedItems > 0 || lostItems > 0) {
-                  // Check if accountability has been created
-                  const { data: accountabilityRecord, error: accError } =
-                    await supabase
-                      .from("accountability_records")
-                      .select("id, is_settled")
-                      .eq("personnel_id", request.personnel_id)
-                      .eq("clearance_request_id", request.id)
-                      .in("record_type", ["DAMAGED", "LOST"])
-                      .limit(1);
-
-                  if (
-                    !accError &&
-                    accountabilityRecord &&
-                    accountabilityRecord.length > 0
-                  ) {
-                    // Accountability record exists
-                    const isAccountabilitySettled =
-                      accountabilityRecord[0].is_settled === true;
-
-                    if (isAccountabilitySettled) {
-                      inspectionStatus = "PASS (Settled)";
-                    } else {
-                      inspectionStatus = "FAIL (Accountability Pending)";
-                    }
-                  } else {
-                    // No accountability record yet for damaged/lost equipment
-                    inspectionStatus = "FAIL (Needs Accountability)";
-                  }
-                }
-                // 2. Check if all equipment is cleared
-                else if (clearedItems === totalItems) {
-                  inspectionStatus = "PASS";
-                }
-                // 3. Check if some items are pending
-                else if (pendingItems > 0) {
-                  // Check if inspections are scheduled
-                  const inventoryIds = clearanceItems
-                    .filter((item) => item.status === "Pending")
-                    .map((item) => item.inventory_id);
-
-                  const { data: scheduledInspections, error: scheduleError } =
-                    await supabase
-                      .from("inspections")
-                      .select("id")
-                      .in("equipment_id", inventoryIds)
-                      .in("status", ["PENDING", "IN_PROGRESS"]);
-
-                  const hasScheduledInspections =
-                    !scheduleError &&
-                    scheduledInspections &&
-                    scheduledInspections.length > 0;
-
-                  inspectionStatus = hasScheduledInspections
-                    ? "In Progress"
-                    : "Pending";
-                }
-                // 4. Default fallback
-                else {
-                  inspectionStatus = "In Progress";
-                }
-
-                // ====== DETERMINE CLEARANCE REQUEST STATUS ======
                 if (
-                  pendingItems === 0 &&
-                  damagedItems === 0 &&
-                  lostItems === 0
+                  !accError &&
+                  accountabilityRecord &&
+                  accountabilityRecord.length > 0
                 ) {
-                  // All items cleared
+                  // Accountability record exists for THIS request
+                  const recordIsSettled =
+                    accountabilityRecord[0].is_settled === true;
+
+                  if (recordIsSettled) {
+                    inspectionStatus = "PASS (Settled)";
+                  } else {
+                    inspectionStatus = "FAIL (Accountability Pending)";
+                  }
+                } else {
+                  // No accountability record yet for damaged/lost equipment for THIS request
+                  inspectionStatus = "FAIL (Needs Accountability)";
+                }
+              } else if (clearedItems === totalItems) {
+                // All items cleared - no damaged/lost
+                inspectionStatus = "PASS";
+              } else if (pendingItems > 0) {
+                // Check if inspections are scheduled
+                const inventoryIds = clearanceItems
+                  .filter((item) => item.status === "Pending")
+                  .map((item) => item.inventory_id);
+
+                const { data: scheduledInspections, error: scheduleError } =
+                  await supabase
+                    .from("inspections")
+                    .select("id")
+                    .in("equipment_id", inventoryIds)
+                    .in("status", ["PENDING", "IN_PROGRESS"]);
+
+                const hasScheduledInspections =
+                  !scheduleError &&
+                  scheduledInspections &&
+                  scheduledInspections.length > 0;
+
+                inspectionStatus = hasScheduledInspections
+                  ? "In Progress"
+                  : "Pending";
+              } else {
+                inspectionStatus = "In Progress";
+              }
+
+              // DETERMINE CLEARANCE REQUEST STATUS
+              if (pendingItems === 0 && damagedItems === 0 && lostItems === 0) {
+                // All items cleared
+                newStatus = "Pending for Approval";
+                console.log(
+                  `✅ Request ${request.id}: All items cleared, status = Pending for Approval`
+                );
+              } else if (damagedItems > 0 || lostItems > 0) {
+                // Has damaged/lost equipment
+                if (isAccountabilitySettled) {
                   newStatus = "Pending for Approval";
                   console.log(
-                    `✅ Request ${request.id}: All items cleared, status = Pending for Approval`
+                    `✅ Request ${request.id}: Accountability settled, status = Pending for Approval`
                   );
-                } else if (damagedItems > 0 || lostItems > 0) {
-                  // Has damaged/lost equipment
-                  if (isAccountabilitySettled) {
-                    newStatus = "Pending for Approval";
-                    console.log(
-                      `✅ Request ${request.id}: Accountability settled, status = Pending for Approval`
-                    );
-                  } else {
-                    newStatus = "In Progress";
-                    console.log(
-                      `⏳ Request ${request.id}: Needs accountability, status = In Progress`
-                    );
-                  }
-                } else if (pendingItems > 0) {
-                  // Still pending items
+                } else {
                   newStatus = "In Progress";
                   console.log(
-                    `⏳ Request ${request.id}: Has pending items, status = In Progress`
+                    `⏳ Request ${request.id}: Needs accountability, status = In Progress`
                   );
                 }
+              } else if (pendingItems > 0) {
+                // Still pending items
+                newStatus = "In Progress";
+                console.log(
+                  `⏳ Request ${request.id}: Has pending items, status = In Progress`
+                );
+              }
 
-                // ====== TRIPLE-CHECK: If FAIL status but accountability exists and is settled ======
-                if (
-                  inspectionStatus.startsWith("FAIL") &&
-                  isAccountabilitySettled
-                ) {
-                  inspectionStatus = "PASS (Settled)";
-                  newStatus = "Pending for Approval";
-                }
-              } else {
-                // No clearance items added yet
-                inspectionStatus = "Not Yet Added";
-                newStatus = "Pending";
+              // TRIPLE-CHECK: If FAIL status but accountability exists and is settled
+              // FIXED: Now isAccountabilitySettled is defined and accessible here
+              if (
+                inspectionStatus.startsWith("FAIL") &&
+                isAccountabilitySettled
+              ) {
+                inspectionStatus = "PASS (Settled)";
+                newStatus = "Pending for Approval";
+                console.log(
+                  `🔄 Request ${request.id}: Override FAIL to PASS (Settled)`
+                );
               }
             } else {
-              equipmentDisplay = "No Equipment";
-              inspectionStatus = "No Equipment";
-              // No equipment means it can be approved
-              newStatus = "Pending for Approval";
+              // No clearance items added yet
+              inspectionStatus = "Not Yet Added";
+              newStatus = "Pending";
               console.log(
-                `✅ Request ${request.id}: No equipment, status = Pending for Approval`
+                `ℹ️ Request ${request.id}: No clearance items added yet`
               );
             }
           } else {
-            // For non-inspection clearance types
-            const { data: clearanceItems, error: countError } = await supabase
-              .from("clearance_inventory")
-              .select("id")
-              .eq("clearance_request_id", request.id);
-
-            if (!countError && clearanceItems) {
-              equipmentCount = clearanceItems.length || 0;
-              if (equipmentCount > 0) {
-                equipmentDisplay = `${equipmentCount} item(s)`;
-              }
-            }
-            inspectionStatus = "Not Applicable";
-            // For non-equipment clearances, they can be approved if pending
-            if (request.status === "Pending") {
-              newStatus = "Pending for Approval";
-            }
-          }
-
-          // NEW: Override status if there's unsettled lost equipment
-          if (
-            lostEquipmentCount > 0 &&
-            lostEquipmentStatus.includes("Unsettled")
-          ) {
-            newStatus = "In Progress";
+            // No equipment assigned to this personnel
+            equipmentDisplay = "No Equipment";
+            inspectionStatus = "No Equipment";
+            // No equipment means it can be approved
+            newStatus = "Pending for Approval";
             console.log(
-              `⚠️ Request ${request.id}: Has unsettled lost equipment, status = In Progress`
+              `✅ Request ${request.id}: No equipment, status = Pending for Approval`
             );
           }
+        } else {
+          // For non-inspection clearance types (Transfer, Promotion, Administrative, etc.)
+          const { data: clearanceItems, error: countError } = await supabase
+            .from("clearance_inventory")
+            .select("id")
+            .eq("clearance_request_id", request.id);
 
-          if (
-            newStatus !== request.status &&
-            request.status !== "Completed" &&
-            request.status !== "Rejected" &&
-            newStatus !== "Completed" && // Don't auto-update to "Completed"
-            newStatus !== "Rejected" // Don't auto-update to "Rejected"
-          ) {
+          if (!countError && clearanceItems) {
+            equipmentCount = clearanceItems.length || 0;
+            if (equipmentCount > 0) {
+              equipmentDisplay = `${equipmentCount} item(s)`;
+            }
+          }
+          inspectionStatus = "Not Applicable";
+
+          // For non-equipment clearances, they can be approved if pending
+          if (request.status === "Pending") {
+            newStatus = "Pending for Approval";
             console.log(
-              `🔄 Updating clearance ${request.id} from ${request.status} to ${newStatus}`
+              `✅ Request ${request.id}: Non-equipment clearance, status = Pending for Approval`
             );
+          }
+        }
 
-            // Update in database
-            const { error: updateError } = await supabase
-              .from("clearance_requests")
-              .update({
-                status: newStatus,
-                updated_at: new Date().toISOString(),
+        // Override status if there's unsettled lost equipment SPECIFIC to this request
+        if (
+          lostEquipmentCount > 0 &&
+          lostEquipmentStatus.includes("Unsettled")
+        ) {
+          newStatus = "In Progress";
+          console.log(
+            `⚠️ Request ${request.id}: Has unsettled lost equipment, status = In Progress`
+          );
+        }
+
+        // IMPORTANT: Update database if status changed
+        if (
+          newStatus !== request.status &&
+          request.status !== "Completed" &&
+          request.status !== "Rejected" &&
+          newStatus !== "Completed" &&
+          newStatus !== "Rejected"
+        ) {
+          console.log(
+            `🔄 Updating clearance ${request.id} from ${request.status} to ${newStatus}`
+          );
+
+          const { error: updateError } = await supabase
+            .from("clearance_requests")
+            .update({
+              status: newStatus,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", request.id);
+
+          if (updateError) {
+            console.error("Error updating clearance status:", updateError);
+          } else {
+            console.log(
+              `✅ Successfully updated clearance ${request.id} to ${newStatus}`
+            );
+          }
+        }
+
+        // Return the formatted request with UPDATED status
+        return {
+          id: request.id,
+          personnel_id: request.personnel_id,
+          employee: employeeName || "Unknown",
+          username: personnel.username || "",
+          rank: personnel.rank || "",
+          rank_image: rankImageUrl,
+          badge_number: personnel.badge_number || "",
+          type: request.type,
+          status: newStatus, // Use the UPDATED status here
+          calculated_status: newStatus, // Same as status
+          inspection_status: inspectionStatus,
+          equipment_display: equipmentDisplay,
+          equipment_count: equipmentCount,
+          lost_equipment_count: lostEquipmentCount,
+          lost_equipment_status: lostEquipmentStatus,
+          date: request.created_at
+            ? new Date(request.created_at).toLocaleDateString("en-US", {
+                year: "numeric",
+                month: "long",
+                day: "numeric",
               })
-              .eq("id", request.id);
+            : "",
+          effective_date: request.effective_date,
+          expected_completion_date: request.expected_completion_date,
+          actual_completion_date: request.actual_completion_date,
+          remarks: request.remarks,
+          approved_by: request.approved_by,
+          approved_at: request.approved_at,
+          rejection_reason: request.rejection_reason,
+          missing_amount: request.missing_amount,
+          created_at: request.created_at,
+          updated_at: request.updated_at,
+          folder_name: folderName,
+          accountability_settled: isAccountabilitySettled || false,
+          accountability_status: isAccountabilitySettled
+            ? "SETTLED"
+            : "UNSETTLED",
+        };
+      })
+    );
 
-            if (updateError) {
-              console.error("Error updating clearance status:", updateError);
-            } else {
-              console.log(
-                `✅ Successfully updated clearance ${request.id} to ${newStatus}`
-              );
-            }
-          }
+    // Log the results for debugging
+    console.log(
+      "Loaded clearance requests:",
+      formattedData.map((req) => ({
+        id: req.id,
+        type: req.type,
+        status: req.status,
+        inspection_status: req.inspection_status,
+        accountability_settled: req.accountability_settled,
+        accountability_status: req.accountability_status,
+      }))
+    );
 
-          return {
-            id: request.id,
-            personnel_id: request.personnel_id,
-            employee: employeeName || "Unknown",
-            username: personnel.username || "",
-            rank: personnel.rank || "",
-            rank_image: rankImageUrl,
-            badge_number: personnel.badge_number || "",
-            type: request.type,
-            status: request.status, // Database status - this controls button visibility
-            calculated_status: newStatus,
-            inspection_status: inspectionStatus,
-            equipment_display: equipmentDisplay,
-            equipment_count: equipmentCount,
-            // NEW: Lost equipment data
-            lost_equipment_count: lostEquipmentCount,
-            lost_equipment_status: lostEquipmentStatus,
-            date: request.created_at
-              ? new Date(request.created_at).toLocaleDateString("en-US", {
-                  year: "numeric",
-                  month: "long",
-                  day: "numeric",
-                })
-              : "",
-            effective_date: request.effective_date,
-            expected_completion_date: request.expected_completion_date,
-            actual_completion_date: request.actual_completion_date,
-            remarks: request.remarks,
-            approved_by: request.approved_by,
-            approved_at: request.approved_at,
-            rejection_reason: request.rejection_reason,
-            missing_amount: request.missing_amount,
-            created_at: request.created_at,
-            updated_at: request.updated_at,
-            // Add folder name for reference
-            folder_name: folderName,
-            // Notice me!!
-            accountability_settled:
-              inspectionStatus === "PASS" && requiresInspection,
-          };
-        })
-      );
+    setClearanceRequests(formattedData);
+  } catch (err) {
+    console.error("Error loading clearance requests:", err);
+    toast.error("Failed to load clearance requests", {
+      position: "top-right",
+      autoClose: 3000,
+    });
+  } finally {
+    setLoading(false);
+  }
+};
 
-      setClearanceRequests(formattedData);
-    } catch (err) {
-      console.error("Error loading clearance requests:", err);
-      toast.error("Failed to load clearance requests", {
-        position: "top-right",
-        autoClose: 3000,
-      });
-    } finally {
-      setLoading(false);
+  // FIXED: CORRECTED shouldShowApproveRejectButtons function
+  const shouldShowApproveRejectButtons = (request) => {
+    // Debug log
+    console.log("🔍 Approve/Reject Check - FIXED:", {
+      id: request.id,
+      employee: request.employee,
+      status: request.status,
+      inspection_status: request.inspection_status,
+      type: request.type,
+      equipment_count: request.equipment_count,
+      lost_equipment_status: request.lost_equipment_status,
+    });
+
+    // 1. NEVER show for Completed/Rejected status
+    const normalizedStatus = (request.status || "").toLowerCase().trim();
+    if (normalizedStatus === "completed" || normalizedStatus === "rejected") {
+      console.log("❌ Not showing: Already completed or rejected");
+      return false;
     }
-  };
 
-  // UPDATED: Function to check if clearance can be approved based on accountability
-  const checkClearanceApprovalEligibility = async (requestId, personnelId) => {
-    try {
-      // Check if this is an equipment-related clearance type
-      const request = clearanceRequests.find((r) => r.id === requestId);
-      if (!request) return false;
+    // 2. Check if status is "Pending for Approval" or "Pending"
+    const isPendingForApproval =
+      normalizedStatus === "pending for approval" ||
+      normalizedStatus === "pendingforapproval" ||
+      normalizedStatus === "pending";
 
-      const isEquipmentRelated =
-        request.type === "Retirement" ||
-        request.type === "Resignation" ||
-        request.type === "Equipment Completion";
+    if (!isPendingForApproval) {
+      console.log("❌ Not showing: Status is not pending for approval");
+      return false;
+    }
 
-      if (!isEquipmentRelated) {
-        return true; // Non-equipment clearances can always be approved
-      }
+    // 3. Check for equipment-related clearances
+    const isEquipmentClearance =
+      request.type === "Retirement" ||
+      request.type === "Resignation" ||
+      request.type === "Equipment Completion";
 
-      // NEW: Check for lost equipment
-      const { data: lostRecords, error: lostError } = await supabase
-        .from("accountability_records")
-        .select("id, is_settled")
-        .eq("personnel_id", personnelId)
-        .eq("clearance_request_id", requestId)
-        .eq("record_type", "LOST")
-        .eq("is_settled", false);
+    if (isEquipmentClearance) {
+      const inspectionStatus = (request.inspection_status || "").toLowerCase();
+      const hasUnsettledLostEquipment =
+        request.lost_equipment_status?.includes("Unsettled") || false;
 
-      if (!lostError && lostRecords && lostRecords.length > 0) {
-        return false; // Has unsettled lost equipment
-      }
-
-      // Check if there's any accountability record
-      const { data: accountabilityData, error } = await supabase
-        .from("personnel_equipment_accountability_table")
-        .select("accountability_status")
-        .eq("personnel_id", personnelId)
-        .eq("clearance_request_id", requestId)
-        .maybeSingle();
-
-      if (error) {
-        console.error("Error checking accountability:", error);
+      // BLOCK if there's unsettled lost equipment
+      if (hasUnsettledLostEquipment) {
+        console.log("❌ Not showing: Has unsettled lost equipment");
         return false;
       }
 
-      // If there's an accountability record, check if it's settled
-      if (accountabilityData) {
-        return accountabilityData.accountability_status === "SETTLED";
+      // BLOCK if inspection is not explicitly PASSED
+      const hasPassedInspection =
+        inspectionStatus.includes("pass") ||
+        inspectionStatus === "no equipment" ||
+        inspectionStatus === "completed";
+
+      if (!hasPassedInspection) {
+        console.log(
+          `❌ Not showing: Inspection not passed (${request.inspection_status})`
+        );
+        return false;
       }
 
-      // No accountability record means no lost/damaged equipment
-      return true;
-    } catch (err) {
-      console.error("Error in checkClearanceApprovalEligibility:", err);
+      // ALLOW if no equipment OR inspection passed
+      if (request.equipment_count === 0 || hasPassedInspection) {
+        console.log("✅ Showing: Equipment clearance ready for approval");
+        return true;
+      }
+
+      console.log("❌ Not showing: Equipment clearance not ready");
       return false;
     }
+
+    // 4. Non-equipment clearances can be approved if status is pending
+    console.log("✅ Showing: Non-equipment clearance ready for approval");
+    return true;
   };
 
   const openApproveModal = async (request) => {
@@ -685,19 +703,14 @@ const ClearanceSystem = () => {
       id: request.id,
       employee: request.employee,
       status: request.status,
-      calculated_status: request.calculated_status,
       inspection_status: request.inspection_status,
-      lost_equipment_status: request.lost_equipment_status,
     });
 
-    // First check if buttons should be shown
+    // Check if buttons should be shown
     const canShowButtons = shouldShowApproveRejectButtons(request);
     if (!canShowButtons) {
       // Provide specific feedback
-      if (
-        request.lost_equipment_count > 0 &&
-        request.lost_equipment_status?.includes("Unsettled")
-      ) {
+      if (request.lost_equipment_status?.includes("Unsettled")) {
         toast.warning(
           `Cannot approve clearance: ${request.lost_equipment_count} unsettled lost equipment item(s).`,
           {
@@ -716,9 +729,20 @@ const ClearanceSystem = () => {
             autoClose: 5000,
           }
         );
+      } else if (
+        request.inspection_status === "Pending" ||
+        request.inspection_status === "In Progress"
+      ) {
+        toast.warning(
+          "Cannot approve clearance: Equipment inspection is still in progress.",
+          {
+            position: "top-right",
+            autoClose: 4000,
+          }
+        );
       } else {
         toast.warning(
-          "Clearance is not ready for approval. Check inspection status or lost equipment.",
+          "Clearance is not ready for approval. Check inspection status.",
           {
             position: "top-right",
             autoClose: 4000,
@@ -728,39 +752,20 @@ const ClearanceSystem = () => {
       return;
     }
 
-    // Check database eligibility as well
+    // Check database eligibility
     const canApprove = await checkClearanceApprovalEligibility(
       request.id,
       request.personnel_id
     );
 
     if (!canApprove) {
-      // Check specifically for what's blocking
-      const { data: lostRecords } = await supabase
-        .from("accountability_records")
-        .select("id, is_settled")
-        .eq("personnel_id", request.personnel_id)
-        .eq("clearance_request_id", request.id)
-        .eq("record_type", "LOST")
-        .eq("is_settled", false);
-
-      if (lostRecords && lostRecords.length > 0) {
-        toast.warning(
-          `Database check: ${lostRecords.length} unsettled lost equipment item(s) found.`,
-          {
-            position: "top-right",
-            autoClose: 5000,
-          }
-        );
-      } else {
-        toast.warning(
-          "Database check: Equipment accountability not settled yet.",
-          {
-            position: "top-right",
-            autoClose: 4000,
-          }
-        );
-      }
+      toast.warning(
+        "Database check: Clearance is not eligible for approval yet.",
+        {
+          position: "top-right",
+          autoClose: 4000,
+        }
+      );
       return;
     }
 
@@ -768,82 +773,7 @@ const ClearanceSystem = () => {
     setApproveRemarks("");
     setShowApproveModal(true);
   };
-  // In your ClearanceRecords.jsx component:
 
-  // ... other handler functions ...
-
-  // Add this function after your other handlers:
-
-  // Inside your ClearanceRecords component, add this after the other render functions:
-
-  // ... other code ...
-
-  // Add this AFTER your other render functions like renderArchiveButton,
-  // but BEFORE the return statement of your component:
-
-  const renderArchiveDeleteButton = (record) => {
-    const isArchiving = archiveHook.archivingId === record.dbId;
-    const canArchive = canArchiveClearance(record);
-
-    if (!canArchive) return null;
-
-    return (
-      <button
-        className={styles.CRSarchiveDeleteBtn}
-        onClick={() => handleArchiveDeleteClick(record)} // Use the new handler
-        disabled={isArchiving}
-        title="Archive and delete from current requests"
-      >
-        {isArchiving ? (
-          <>
-            <span className={styles.spinner}></span>
-            Processing...
-          </>
-        ) : (
-          "🗑️ Archive & Delete"
-        )}
-      </button>
-    );
-  };
-
-const handleArchiveDeleteClick = async (record) => {
-  const confirmed = window.confirm(
-    `Archive and Delete Confirmation\n\n` +
-      `This will:\n` +
-      `1. Archive "${record.fullName}"'s ${record.clearanceType} clearance to yearly records\n` +
-      `2. Remove it from current requests\n\n` +
-      `The archived data will remain in Yearly Records for reporting.\n\n` +
-      `Continue?`
-  );
-
-  if (!confirmed) return;
-
-  try {
-    // Use the archive hook function
-    await archiveHook.handleSingleArchiveAndDelete(
-      record.dbId,
-      record,
-      loadClearanceData
-    );
-
-    // Show success with details
-    toast.success(
-      `✅ ${record.fullName}'s clearance archived to yearly records and removed from current requests`,
-      {
-        position: "top-right",
-        autoClose: 5000,
-      }
-    );
-  } catch (error) {
-    console.error("Archive delete error:", error);
-    toast.error(`Failed: ${error.message}`);
-  }
-};
-
-
-  // ... then continue with your other functions and the return statement
-  // ... rest of your component ...
-  // UPDATED: handleClearanceSubmit with lost equipment check
   const handleClearanceSubmit = async (e) => {
     e.preventDefault();
     const { personnel_id, type } = newClearance;
@@ -856,7 +786,7 @@ const handleArchiveDeleteClick = async (record) => {
       return;
     }
 
-    // ✅ ONLY ONE CALL - Use the new function
+    // Check for existing clearance
     const { exists, message } = await checkExistingClearance(
       personnel_id,
       type
@@ -869,22 +799,44 @@ const handleArchiveDeleteClick = async (record) => {
       return;
     }
 
-    // NEW: Check for lost equipment for specific clearance types
-    // In handleClearanceSubmit function, update this section:
-
-    // NEW: Check for lost equipment for specific clearance types
+    // Check if personnel has equipment for specific clearance types
     if (
       type === "Resignation" ||
       type === "Retirement" ||
       type === "Equipment Completion"
     ) {
+      const equipmentItems = await loadPersonnelEquipment(personnel_id);
+
+      // Check if personnel has no equipment
+      if (!equipmentItems || equipmentItems.length === 0) {
+        const selectedPersonnel = personnelList.find(
+          (p) => p.id === personnel_id
+        );
+        const employeeName = selectedPersonnel
+          ? `${selectedPersonnel.first_name || ""} ${
+              selectedPersonnel.middle_name || ""
+            } ${selectedPersonnel.last_name || ""}`
+              .replace(/\s+/g, " ")
+              .trim()
+          : "Unknown";
+
+        setShowNoEquipmentModal({
+          show: true,
+          personnelName: employeeName,
+          clearanceType: type,
+          personnelId: personnel_id,
+          equipmentType: type,
+        });
+        return;
+      }
+
+      // Check for lost equipment
       const { hasLostEquipment, lostItems, count } = await checkLostEquipment(
         personnel_id,
         type
       );
 
       if (hasLostEquipment) {
-        // Show warning about lost equipment
         const confirmProceed = window.confirm(
           `⚠️ WARNING: ${count} lost equipment item(s) found for this personnel.\n\n` +
             `Lost items must be settled before clearance can be processed.\n` +
@@ -906,6 +858,7 @@ const handleArchiveDeleteClick = async (record) => {
       }
     }
 
+    // Continue with normal submission flow
     setShowPreloader(true);
     setPreloaderProgress(10);
 
@@ -951,6 +904,41 @@ const handleArchiveDeleteClick = async (record) => {
       setShowPreloader(false);
     }
   };
+
+  const continueClearanceSubmission = async () => {
+    const { personnelId, equipmentType, personnelName } = showNoEquipmentModal;
+
+    setShowNoEquipmentModal({
+      show: false,
+      personnelName: "",
+      clearanceType: "",
+    });
+
+    try {
+      setLoading(true);
+
+      const confirmationInfo = {
+        personnel_id: personnelId,
+        employeeName: personnelName,
+        type: equipmentType,
+        equipmentCount: 0,
+        totalValue: 0,
+        equipmentList: [],
+      };
+
+      setConfirmationData(confirmationInfo);
+      setShowSubmitConfirmation(true);
+    } catch (err) {
+      console.error("Error continuing clearance submission:", err);
+      toast.error("Failed to process clearance submission", {
+        position: "top-right",
+        autoClose: 3000,
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const confirmClearanceSubmission = async () => {
     if (!confirmationData) return;
 
@@ -985,13 +973,13 @@ const handleArchiveDeleteClick = async (record) => {
         return;
       }
 
-      // ✅ FIX: Generate UUID for the request
+      // Generate UUID for the request
       const requestId = crypto.randomUUID
         ? crypto.randomUUID()
         : generateUUID();
 
       const newRequest = {
-        id: requestId, // Add the generated ID
+        id: requestId,
         personnel_id: personnel_id,
         type: type,
         status: "Pending",
@@ -1000,16 +988,14 @@ const handleArchiveDeleteClick = async (record) => {
       };
 
       setPreloaderProgress(30);
-      console.log("Creating clearance request:", newRequest);
 
-      // Try insert without expecting return first
+      // Create clearance request
       const { error: insertError } = await supabase
         .from("clearance_requests")
         .insert([newRequest]);
 
       if (insertError) {
         console.error("Error creating clearance request:", insertError);
-
         if (insertError.code === "23505") {
           toast.error(
             `Duplicate clearance request found for ${employeeName}.`,
@@ -1018,15 +1004,9 @@ const handleArchiveDeleteClick = async (record) => {
               autoClose: 4000,
             }
           );
-        } else if (insertError.code === "23503") {
-          toast.error(`Invalid personnel ID. Please check the employee data.`, {
-            position: "top-right",
-            autoClose: 4000,
-          });
         } else {
           throw insertError;
         }
-
         setShowPreloader(false);
         setSubmissionLoading(false);
         return;
@@ -1034,7 +1014,7 @@ const handleArchiveDeleteClick = async (record) => {
 
       console.log("Clearance request created with ID:", requestId);
 
-      // NEW: Link lost equipment to this clearance request
+      // Link lost equipment to this clearance request
       if (
         type === "Resignation" ||
         type === "Retirement" ||
@@ -1058,7 +1038,6 @@ const handleArchiveDeleteClick = async (record) => {
           }
         } catch (linkError) {
           console.warn("Warning: Could not link lost equipment:", linkError);
-          // Continue with clearance creation even if linking fails
         }
       }
 
@@ -1072,15 +1051,9 @@ const handleArchiveDeleteClick = async (record) => {
       ) {
         const equipmentItems = await loadPersonnelEquipment(personnel_id);
 
-        console.log(
-          "Personnel equipment found:",
-          equipmentItems.length,
-          "items"
-        );
-
         if (equipmentItems && equipmentItems.length > 0) {
           clearanceItems = equipmentItems.map((equipment) => ({
-            clearance_request_id: requestId, // Use the generated ID
+            clearance_request_id: requestId,
             inventory_id: equipment.id,
             personnel_id: personnel_id,
             status: "Pending",
@@ -1088,12 +1061,6 @@ const handleArchiveDeleteClick = async (record) => {
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           }));
-
-          console.log(
-            "Inserting equipment into clearance_inventory:",
-            clearanceItems.length,
-            "items"
-          );
 
           setPreloaderProgress(70);
           if (clearanceItems.length > 0) {
@@ -1113,24 +1080,15 @@ const handleArchiveDeleteClick = async (record) => {
                   autoClose: 4000,
                 }
               );
-            } else {
-              console.log(
-                "Equipment saved to clearance_inventory successfully"
-              );
             }
           }
-        } else {
-          console.log("No equipment found for this personnel");
         }
       } else if (
         newClearance.equipment_ids &&
         newClearance.equipment_ids.length > 0
       ) {
-        console.log(
-          "Adding selected equipment for non-standard clearance type"
-        );
         clearanceItems = newClearance.equipment_ids.map((equipmentId) => ({
-          clearance_request_id: requestId, // Use the generated ID
+          clearance_request_id: requestId,
           inventory_id: equipmentId,
           personnel_id: personnel_id,
           status: "Pending",
@@ -1172,21 +1130,6 @@ const handleArchiveDeleteClick = async (record) => {
         autoClose: 3000,
       });
 
-      if (
-        (type === "Resignation" ||
-          type === "Retirement" ||
-          type === "Equipment Completion") &&
-        clearanceItems.length > 0
-      ) {
-        toast.info(
-          "Equipment added for clearance. Accountability will be assessed during inspection.",
-          {
-            position: "top-right",
-            autoClose: 5000,
-          }
-        );
-      }
-
       setTimeout(() => {
         setShowPreloader(false);
       }, 500);
@@ -1224,143 +1167,65 @@ const handleArchiveDeleteClick = async (record) => {
     );
   }
 
-  const checkExistingClearance = async (personnelId, type) => {
-    try {
-      // Check for any active Retirement or Resignation clearances first
-      const { data: retirementResignationData, error: rrError } = await supabase
-        .from("clearance_requests")
-        .select("id, type, status")
-        .eq("personnel_id", personnelId)
-        .in("type", ["Retirement", "Resignation"])
-        .in("status", ["Pending", "In Progress"])
-        .limit(1);
-
-      if (rrError) throw rrError;
-
-      // If user already has an active Retirement or Resignation
-      if (retirementResignationData && retirementResignationData.length > 0) {
-        const existingType = retirementResignationData[0].type;
-        const existingStatus = retirementResignationData[0].status;
-
-        // If trying to submit another Retirement/Resignation while one already exists
-        if (
-          (type === "Retirement" || type === "Resignation") &&
-          (existingType === "Retirement" || existingType === "Resignation")
-        ) {
-          return {
-            exists: true,
-            message: `Cannot submit ${type} clearance: Personnel already has a ${existingType.toLowerCase()} clearance (Status: ${existingStatus})`,
-          };
-        }
-
-        // If trying to submit Retirement while Resignation exists or vice versa
-        if (
-          (type === "Retirement" && existingType === "Resignation") ||
-          (type === "Resignation" && existingType === "Retirement")
-        ) {
-          return {
-            exists: true,
-            message: `Cannot submit ${type} clearance: Personnel already has a ${existingType.toLowerCase()} clearance (Status: ${existingStatus})`,
-          };
-        }
-      }
-
-      // Check for existing clearance of the same type
-      const { data: sameTypeData, error: sameTypeError } = await supabase
-        .from("clearance_requests")
-        .select("id, status")
-        .eq("personnel_id", personnelId)
-        .eq("type", type)
-        .in("status", ["Pending", "In Progress"])
-        .limit(1);
-
-      if (sameTypeError) throw sameTypeError;
-
-      if (sameTypeData && sameTypeData.length > 0) {
-        const existingStatus = sameTypeData[0].status;
-        return {
-          exists: true,
-          message: `This personnel already has a ${type.toLowerCase()} clearance request (Status: ${existingStatus}).`,
-        };
-      }
-
-      return { exists: false, message: "" };
-    } catch (error) {
-      console.error("Error checking existing clearance:", error);
-      return { exists: false, message: "" };
-    }
-  };
-
   const openRejectModal = (request) => {
     setSelectedRequestForAction(request);
     setRejectReason("");
     setShowRejectModal(true);
   };
 
-const loadPersonnel = async () => {
-  try {
-    // Update progress if preloader is showing
-    if (showPreloader) {
-      setPreloaderProgress(40);
-    }
-
-    const { data, error } = await supabase
-      .from("personnel")
-      .select(
-        "id, first_name, middle_name, last_name, username, rank, rank_image, badge_number, is_active, status, separation_type, separation_date, retirement_date"
-      )
-      .order("last_name", { ascending: true });
-
-    if (error) throw error;
-
-    // Filter out retired/resigned personnel using utility function
-    const activePersonnel = filterActivePersonnel(data || []);
-
-    console.log(
-      `Clearance System: Loaded ${
-        activePersonnel.length
-      } active personnel out of ${data?.length || 0} total`
-    );
-
-    // Transform rank_image URLs if needed
-    const personnelWithRankImages = activePersonnel.map((person) => {
-      let rankImageUrl = person.rank_image;
-
-      // If rank_image is a storage path, convert to public URL
-      if (rankImageUrl && !rankImageUrl.startsWith("http")) {
-        const { data: imageData } = supabase.storage
-          .from("rank_images")
-          .getPublicUrl(rankImageUrl);
-        rankImageUrl = imageData?.publicUrl || "";
+  const loadPersonnel = async () => {
+    try {
+      if (showPreloader) {
+        setPreloaderProgress(40);
       }
 
-      return {
-        ...person,
-        rank_image: rankImageUrl,
-      };
-    });
+      const { data, error } = await supabase
+        .from("personnel")
+        .select(
+          "id, first_name, middle_name, last_name, username, rank, rank_image, badge_number, is_active, status, separation_type, separation_date, retirement_date"
+        )
+        .order("last_name", { ascending: true });
 
-    setPersonnelList(personnelWithRankImages || []);
-  } catch (err) {
-    console.error("Error loading personnel:", err);
-    toast.error("Failed to load personnel data", {
-      position: "top-right",
-      autoClose: 3000,
-    });
-  }
-};
+      if (error) throw error;
+
+      // Filter out retired/resigned personnel
+      const activePersonnel = filterActivePersonnel(data || []);
+
+      // Transform rank_image URLs
+      const personnelWithRankImages = activePersonnel.map((person) => {
+        let rankImageUrl = person.rank_image;
+
+        if (rankImageUrl && !rankImageUrl.startsWith("http")) {
+          const { data: imageData } = supabase.storage
+            .from("rank_images")
+            .getPublicUrl(rankImageUrl);
+          rankImageUrl = imageData?.publicUrl || "";
+        }
+
+        return {
+          ...person,
+          rank_image: rankImageUrl,
+        };
+      });
+
+      setPersonnelList(personnelWithRankImages || []);
+    } catch (err) {
+      console.error("Error loading personnel:", err);
+      toast.error("Failed to load personnel data", {
+        position: "top-right",
+        autoClose: 3000,
+      });
+    }
+  };
 
   const loadPersonnelEquipment = async (personnelId) => {
     try {
-      console.log("🔍 Loading equipment for personnel ID:", personnelId);
-
-      // Only use assigned_personnel_id for exact matching
       const { data: dataById, error: errorById } = await supabase
         .from("inventory")
         .select(
           "id, item_name, item_code, category, status, assigned_to, price, is_active, assigned_personnel_id"
         )
-        .eq("assigned_personnel_id", personnelId) // This is the key
+        .eq("assigned_personnel_id", personnelId)
         .eq("is_active", true);
 
       if (errorById) {
@@ -1368,13 +1233,9 @@ const loadPersonnel = async () => {
         return [];
       }
 
-      console.log(
-        `✅ Found ${dataById?.length || 0} equipment items by personnel ID`
-      );
-
       return dataById || [];
     } catch (err) {
-      console.error("💥 Error loading personnel equipment:", err);
+      console.error("Error loading personnel equipment:", err);
       return [];
     }
   };
@@ -1405,7 +1266,6 @@ const loadPersonnel = async () => {
     setFilters((prev) => ({ ...prev, [key]: value }));
   };
 
-  // UPDATED: viewEquipment with lost equipment detection
   const viewEquipment = async (requestId) => {
     try {
       setEquipmentLoading(true);
@@ -1418,13 +1278,12 @@ const loadPersonnel = async () => {
 
       if (requestError) throw requestError;
 
-      // DECLARE variables at the beginning
       let equipmentList = [];
       let equipmentSource = "";
       let isAccountabilitySettled = false;
       let lostEquipmentList = [];
 
-      // Check accountability status if this is an equipment-related clearance
+      // Check accountability status
       if (
         requestData.type === "Retirement" ||
         requestData.type === "Resignation" ||
@@ -1443,7 +1302,7 @@ const loadPersonnel = async () => {
             accountabilityData.accountability_status === "SETTLED";
         }
 
-        // NEW: Get lost equipment records
+        // Get lost equipment records
         const { data: lostRecords, error: lostError } =
           await getDetailedLostEquipment(requestData.personnel_id, requestId);
 
@@ -1468,7 +1327,7 @@ const loadPersonnel = async () => {
         }
       }
 
-      // Fetch from the enhanced view (if it exists) or use clearance_inventory
+      // Fetch from clearance_equipment_with_accountability view
       try {
         const { data: clearanceItems, error: clearanceError } = await supabase
           .from("clearance_equipment_with_accountability")
@@ -1529,15 +1388,9 @@ const loadPersonnel = async () => {
           }));
           equipmentSource = "clearance_inventory (view)";
         } else {
-          // Fallback to original clearance_inventory table if view doesn't exist
           throw new Error("View not available, falling back to table");
         }
       } catch (viewError) {
-        console.log(
-          "Using fallback clearance_inventory query:",
-          viewError.message
-        );
-
         // Fallback to original clearance_inventory query
         const { data: clearanceItems, error: clearanceError } = await supabase
           .from("clearance_inventory")
@@ -1567,7 +1420,6 @@ const loadPersonnel = async () => {
           .eq("clearance_request_id", requestId);
 
         if (!clearanceError && clearanceItems && clearanceItems.length > 0) {
-          // Check for settled accountability to determine effective status
           const effectiveStatus = isAccountabilitySettled
             ? "Cleared"
             : "Pending";
@@ -1721,11 +1573,26 @@ const loadPersonnel = async () => {
 
     try {
       setPreloaderProgress(50);
-      await updateStatus(
-        selectedRequestForAction.id,
-        "Completed",
-        approveRemarks
-      );
+
+      // Update status to Completed
+      const updateData = {
+        status: "Completed",
+        updated_at: new Date().toISOString(),
+        approved_by: "Administrator",
+        approved_at: new Date().toISOString(),
+        completed_at: new Date().toISOString(),
+        remarks: approveRemarks,
+      };
+
+      const { error } = await supabase
+        .from("clearance_requests")
+        .update(updateData)
+        .eq("id", selectedRequestForAction.id);
+
+      if (error) throw error;
+
+      setPreloaderProgress(80);
+      await loadClearanceRequests();
 
       setPreloaderProgress(100);
       toast.update(toastId, {
@@ -1773,7 +1640,22 @@ const loadPersonnel = async () => {
 
     try {
       setPreloaderProgress(50);
-      await updateStatus(selectedRequestForAction.id, "Rejected", rejectReason);
+
+      const updateData = {
+        status: "Rejected",
+        updated_at: new Date().toISOString(),
+        rejection_reason: rejectReason,
+      };
+
+      const { error } = await supabase
+        .from("clearance_requests")
+        .update(updateData)
+        .eq("id", selectedRequestForAction.id);
+
+      if (error) throw error;
+
+      setPreloaderProgress(80);
+      await loadClearanceRequests();
 
       setPreloaderProgress(100);
       toast.update(toastId, {
@@ -1803,80 +1685,12 @@ const loadPersonnel = async () => {
     }
   };
 
-  const updateStatus = async (id, newStatus, remarks = "") => {
-    try {
-      setShowPreloader(true);
-      setPreloaderProgress(10);
-
-      const updateData = {
-        status: newStatus,
-        updated_at: new Date().toISOString(),
-      };
-
-      if (newStatus === "Completed") {
-        updateData.approved_by = "Administrator";
-        updateData.approved_at = new Date().toISOString();
-        updateData.completed_at = new Date().toISOString();
-        updateData.remarks = remarks;
-
-        // REMOVED: Personnel status update - handle this separately if needed
-        console.log(
-          "Approving clearance. Personnel status update removed to prevent 409 conflict."
-        );
-      } else if (newStatus === "Rejected") {
-        updateData.rejection_reason = remarks;
-      }
-
-      setPreloaderProgress(60);
-      const { error } = await supabase
-        .from("clearance_requests")
-        .update(updateData)
-        .eq("id", id);
-
-      if (error) throw error;
-
-      setPreloaderProgress(80);
-      await loadClearanceRequests();
-
-      setPreloaderProgress(100);
-      if (newStatus === "Completed") {
-        toast.success(`Clearance request approved successfully!`, {
-          position: "top-right",
-          autoClose: 3000,
-        });
-      } else if (newStatus === "Rejected") {
-        toast.warning(`Clearance request rejected.`, {
-          position: "top-right",
-          autoClose: 3000,
-        });
-      }
-
-      setTimeout(() => {
-        setShowPreloader(false);
-      }, 500);
-    } catch (err) {
-      console.error("Error updating status:", err);
-      setShowPreloader(false);
-      toast.error(`Failed to update status: ${err.message}`, {
-        position: "top-right",
-        autoClose: 4000,
-      });
-    }
-  };
-
-  const showDetails = (request) => {
-    setSelectedRequest(request);
-    setShowDetailsModal(true);
-  };
-
   const statusToClass = (status) => {
     return (status || "")
       .toLowerCase()
       .replace(/\s+/g, "-")
       .replace("pending-for-approval", "pendingforapproval");
   };
-
-  // ========== PDF GENERATION FUNCTIONS ==========
 
   const downloadPdfLocal = (pdfBytes, fileName) => {
     const blob = new Blob([pdfBytes], { type: "application/pdf" });
@@ -1892,7 +1706,6 @@ const loadPersonnel = async () => {
 
   const loadPdfTemplate = async () => {
     try {
-      // Try multiple paths for the template
       const templatePaths = [
         "/forms/blank-No-Money-and-Property-Accountability-Clearance.pdf",
         "./forms/blank-No-Money-and-Property-Accountability-Clearance.pdf",
@@ -1934,20 +1747,16 @@ const loadPersonnel = async () => {
 
   const fillClearanceForm = async (pdfBytes, clearanceData) => {
     try {
-      // Dynamically import pdf-lib
       const pdfLib = await import("pdf-lib");
       const { PDFDocument, rgb, StandardFonts } = pdfLib;
 
-      // Load the PDF template
       const pdfDoc = await PDFDocument.load(pdfBytes);
       const pages = pdfDoc.getPages();
       const firstPage = pages[0];
 
-      // Get font
       const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
       const textColor = rgb(0, 0, 0);
 
-      // Helper function for drawing text
       const drawText = (text, x, y, size = 12) => {
         if (text && typeof text === "string" && text.trim() !== "") {
           firstPage.drawText(text.trim(), {
@@ -1960,7 +1769,6 @@ const loadPersonnel = async () => {
         }
       };
 
-      // Format date
       const formatDate = (dateString) => {
         if (!dateString) return new Date().toLocaleDateString("en-PH");
         try {
@@ -1975,12 +1783,9 @@ const loadPersonnel = async () => {
         }
       };
 
-      // ===== FILL THE FORM DATA =====
-
-      // Date (top right)
+      // Fill the form data
       drawText(formatDate(new Date()), 580, 713, 12);
 
-      // Personnel Information
       const personnel = clearanceData.personnel || {};
       const fullName = `${personnel.first_name || ""} ${
         personnel.middle_name || ""
@@ -1988,32 +1793,22 @@ const loadPersonnel = async () => {
         .replace(/\s+/g, " ")
         .trim();
 
-      // Rank/Name
       drawText(`${personnel.rank || ""} ${fullName}`, 188, 603, 12);
-
-      // Designation
       drawText(
         clearanceData.designation || personnel.designation || "N/A",
         190,
         580,
         12
       );
-
-      // Unit Assignment
       drawText(
         clearanceData.station || personnel.station || "N/A",
         210,
         560,
         12
       );
-
-      // Purpose (Clearance Type)
       drawText(clearanceData.type || "Clearance", 169, 545, 12);
 
-      // Serialize the PDFDocument to bytes
       const pdfBytesFilled = await pdfDoc.save();
-
-      console.log("Clearance PDF successfully filled");
       return pdfBytesFilled;
     } catch (error) {
       console.error("Error filling clearance PDF form:", error);
@@ -2023,10 +1818,7 @@ const loadPersonnel = async () => {
 
   const generateClearancePDF = async (clearanceData, isYearly = false) => {
     try {
-      // Load PDF template
       const pdfBytes = await loadClearancePdfTemplate();
-
-      // Fill the form
       const filledPdf = await fillClearanceFormEnhanced(
         pdfBytes,
         clearanceData,
@@ -2118,19 +1910,19 @@ const loadPersonnel = async () => {
         }
       }
 
-      // Combine data for PDF including officer names
+      // Combine data for PDF
       const pdfData = {
         ...clearanceRequest,
         personnel: personnelData,
         approvedBy: "Administrator",
         date: new Date().toISOString(),
-        officerNames: customOfficerNames, // Add officer names to PDF data
+        officerNames: customOfficerNames,
       };
 
       // Generate PDF
       const filledPdfBytes = await generateClearancePDF(pdfData);
 
-      // Convert ArrayBuffer to Uint8Array if needed
+      // Convert ArrayBuffer to Uint8Array
       let pdfBytesForUpload;
       if (filledPdfBytes instanceof ArrayBuffer) {
         pdfBytesForUpload = new Uint8Array(filledPdfBytes);
@@ -2140,7 +1932,7 @@ const loadPersonnel = async () => {
         pdfBytesForUpload = new Uint8Array(filledPdfBytes);
       }
 
-      // Create filename using shared function
+      // Create filename
       const fileName = createClearancePdfFileName(
         clearanceRequest,
         personnelData
@@ -2154,7 +1946,7 @@ const loadPersonnel = async () => {
       setPdfDownloadProgress(85);
 
       try {
-        // Use shared upload function
+        // Upload to storage
         const uploadResult = await uploadClearanceDocumentToStorage({
           record: {
             ...clearanceRequest,
@@ -2168,7 +1960,7 @@ const loadPersonnel = async () => {
           generatedBy: "Administrator",
         });
 
-        // Save metadata using shared function
+        // Save metadata
         await saveClearanceDocumentMetadata({
           clearanceRequestId: clearanceRequest.id,
           documentName: fileName,
@@ -2249,101 +2041,9 @@ const loadPersonnel = async () => {
     }
   };
 
-  const shouldShowApproveRejectButtons = (request) => {
-    console.log("🔍 Approve/Reject Check - DETAILED:", {
-      id: request.id,
-      employee: request.employee,
-      status: request.status,
-      calculated_status: request.calculated_status,
-      type: request.type,
-      inspection_status: request.inspection_status,
-      lost_equipment_count: request.lost_equipment_count,
-      lost_equipment_status: request.lost_equipment_status,
-    });
-
-    // IMPORTANT: Use calculated_status instead of status
-    const effectiveStatus = request.calculated_status || request.status;
-    const normalizedStatus = (effectiveStatus || "").toLowerCase().trim();
-
-    // 1. If status is already Completed or Rejected, don't show buttons
-    if (normalizedStatus === "completed" || normalizedStatus === "rejected") {
-      console.log("❌ Not showing: Already completed or rejected");
-      return false;
-    }
-
-    // 2. Check for lost equipment - ONLY BLOCK if there are UNSETTLED lost items
-    if (request.lost_equipment_count > 0) {
-      // Parse the lost equipment status to check if it's settled
-      const lostStatus = request.lost_equipment_status || "";
-      const hasUnsettledLost = lostStatus.includes("Unsettled");
-
-      if (hasUnsettledLost) {
-        console.log(
-          `❌ Not showing: Has ${request.lost_equipment_count} unsettled lost equipment`
-        );
-        return false;
-      } else {
-        console.log(
-          `✅ Lost equipment is settled: ${request.lost_equipment_status}`
-        );
-      }
-    }
-
-    // 3. For equipment-related clearances, check inspection status
-    const isEquipmentRelatedType =
-      request.type === "Retirement" ||
-      request.type === "Resignation" ||
-      request.type === "Equipment Completion";
-
-    if (isEquipmentRelatedType) {
-      const inspectionStatus = (request.inspection_status || "").toLowerCase();
-
-      console.log(`📊 Equipment clearance inspection check:`, {
-        inspectionStatus,
-        type: request.type,
-        equipmentCount: request.equipment_count,
-      });
-
-      // Show buttons if:
-      // - Inspection passed (any variation of "PASS")
-      // - No equipment
-      // - Equipment all cleared
-      // - Accountability settled (even if it says "FAIL" originally)
-      const shouldShow =
-        inspectionStatus.includes("pass") ||
-        inspectionStatus === "no equipment" ||
-        inspectionStatus === "completed" ||
-        (inspectionStatus.includes("fail") &&
-          inspectionStatus.includes("settled")) ||
-        request.lost_equipment_status?.includes("Settled") ||
-        normalizedStatus === "pending for approval" ||
-        normalizedStatus === "pendingforapproval";
-
-      console.log(`📊 Should show after inspection check: ${shouldShow}`);
-
-      if (shouldShow) {
-        console.log("✅ Showing: Equipment check passed");
-        return true;
-      }
-
-      // Also show if there's no equipment at all
-      if (request.equipment_count === 0 && request.lost_equipment_count === 0) {
-        console.log("✅ Showing: No equipment to inspect");
-        return true;
-      }
-    } else {
-      // Non-equipment clearances can be approved if status is Pending
-      if (
-        normalizedStatus === "pending" ||
-        normalizedStatus === "pending for approval"
-      ) {
-        console.log("✅ Showing: Non-equipment clearance with Pending status");
-        return true;
-      }
-    }
-
-    console.log("❌ Not showing buttons - final check failed");
-    return false;
+  const showDetails = (request) => {
+    setSelectedRequest(request);
+    setShowDetailsModal(true);
   };
 
   const totalPages = Math.ceil(filteredRequests.length / rowsPerPage);
@@ -2352,6 +2052,116 @@ const loadPersonnel = async () => {
     startIndex,
     startIndex + rowsPerPage
   );
+
+  const renderPaginationButtons = () => {
+    const pageCount = Math.max(
+      1,
+      Math.ceil(filteredRequests.length / rowsPerPage)
+    );
+    const hasNoData = filteredRequests.length === 0;
+
+    const buttons = [];
+
+    buttons.push(
+      <button
+        key="prev"
+        className={`${styles.clearancePaginationBtn} ${
+          hasNoData ? styles.clearanceDisabled : ""
+        }`}
+        disabled={currentPage === 1 || hasNoData}
+        onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+      >
+        Previous
+      </button>
+    );
+
+    buttons.push(
+      <button
+        key={1}
+        className={`${styles.clearancePaginationBtn} ${
+          1 === currentPage ? styles.clearanceActive : ""
+        } ${hasNoData ? styles.clearanceDisabled : ""}`}
+        onClick={() => setCurrentPage(1)}
+        disabled={hasNoData}
+      >
+        1
+      </button>
+    );
+
+    if (currentPage > 3) {
+      buttons.push(
+        <span key="ellipsis1" className={styles.clearancePaginationEllipsis}>
+          ...
+        </span>
+      );
+    }
+
+    let startPage = Math.max(2, currentPage - 1);
+    let endPage = Math.min(pageCount - 1, currentPage + 1);
+
+    if (currentPage <= 3) {
+      endPage = Math.min(pageCount - 1, 4);
+    }
+
+    if (currentPage >= pageCount - 2) {
+      startPage = Math.max(2, pageCount - 3);
+    }
+
+    for (let i = startPage; i <= endPage; i++) {
+      if (i > 1 && i < pageCount) {
+        buttons.push(
+          <button
+            key={i}
+            className={`${styles.clearancePaginationBtn} ${
+              i === currentPage ? styles.clearanceActive : ""
+            } ${hasNoData ? styles.clearanceDisabled : ""}`}
+            onClick={() => setCurrentPage(i)}
+            disabled={hasNoData}
+          >
+            {i}
+          </button>
+        );
+      }
+    }
+
+    if (currentPage < pageCount - 2) {
+      buttons.push(
+        <span key="ellipsis2" className={styles.clearancePaginationEllipsis}>
+          ...
+        </span>
+      );
+    }
+
+    if (pageCount > 1) {
+      buttons.push(
+        <button
+          key={pageCount}
+          className={`${styles.clearancePaginationBtn} ${
+            pageCount === currentPage ? styles.clearanceActive : ""
+          } ${hasNoData ? styles.clearanceDisabled : ""}`}
+          onClick={() => setCurrentPage(pageCount)}
+          disabled={hasNoData}
+        >
+          {pageCount}
+        </button>
+      );
+    }
+
+    buttons.push(
+      <button
+        key="next"
+        className={`${styles.clearancePaginationBtn} ${
+          hasNoData ? styles.clearanceDisabled : ""
+        }`}
+        disabled={currentPage === pageCount || hasNoData}
+        onClick={() => setCurrentPage(Math.min(pageCount, currentPage + 1))}
+      >
+        Next
+      </button>
+    );
+
+    return buttons;
+  };
 
   const renderBottomPaginationButtons = () => {
     const pageCount = Math.max(
@@ -2469,128 +2279,17 @@ const loadPersonnel = async () => {
     return buttons;
   };
 
-  const renderPaginationButtons = () => {
-    const pageCount = Math.max(
-      1,
-      Math.ceil(filteredRequests.length / rowsPerPage)
-    );
-    const hasNoData = filteredRequests.length === 0;
-
-    const buttons = [];
-
-    buttons.push(
-      <button
-        key="prev"
-        className={`${styles.clearancePaginationBtn} ${
-          hasNoData ? styles.clearanceDisabled : ""
-        }`}
-        disabled={currentPage === 1 || hasNoData}
-        onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-      >
-        Previous
-      </button>
-    );
-
-    buttons.push(
-      <button
-        key={1}
-        className={`${styles.clearancePaginationBtn} ${
-          1 === currentPage ? styles.clearanceActive : ""
-        } ${hasNoData ? styles.clearanceDisabled : ""}`}
-        onClick={() => setCurrentPage(1)}
-        disabled={hasNoData}
-      >
-        1
-      </button>
-    );
-
-    if (currentPage > 3) {
-      buttons.push(
-        <span key="ellipsis1" className={styles.clearancePaginationEllipsis}>
-          ...
-        </span>
-      );
-    }
-
-    let startPage = Math.max(2, currentPage - 1);
-    let endPage = Math.min(pageCount - 1, currentPage + 1);
-
-    if (currentPage <= 3) {
-      endPage = Math.min(pageCount - 1, 4);
-    }
-
-    if (currentPage >= pageCount - 2) {
-      startPage = Math.max(2, pageCount - 3);
-    }
-
-    for (let i = startPage; i <= endPage; i++) {
-      if (i > 1 && i < pageCount) {
-        buttons.push(
-          <button
-            key={i}
-            className={`${styles.clearancePaginationBtn} ${
-              i === currentPage ? styles.clearanceActive : ""
-            } ${hasNoData ? styles.clearanceDisabled : ""}`}
-            onClick={() => setCurrentPage(i)}
-            disabled={hasNoData}
-          >
-            {i}
-          </button>
-        );
-      }
-    }
-
-    if (currentPage < pageCount - 2) {
-      buttons.push(
-        <span key="ellipsis2" className={styles.clearancePaginationEllipsis}>
-          ...
-        </span>
-      );
-    }
-
-    if (pageCount > 1) {
-      buttons.push(
-        <button
-          key={pageCount}
-          className={`${styles.clearancePaginationBtn} ${
-            pageCount === currentPage ? styles.clearanceActive : ""
-          } ${hasNoData ? styles.clearanceDisabled : ""}`}
-          onClick={() => setCurrentPage(pageCount)}
-          disabled={hasNoData}
-        >
-          {pageCount}
-        </button>
-      );
-    }
-
-    buttons.push(
-      <button
-        key="next"
-        className={`${styles.clearancePaginationBtn} ${
-          hasNoData ? styles.clearanceDisabled : ""
-        }`}
-        disabled={currentPage === pageCount || hasNoData}
-        onClick={() => setCurrentPage(Math.min(pageCount, currentPage + 1))}
-      >
-        Next
-      </button>
-    );
-
-    return buttons;
-  };
-
   const handleGeneratePdfWithOfficerNames = (clearanceRequest) => {
     setSelectedRequestForPdf(clearanceRequest);
     setShowOfficerModal(true);
   };
 
-  // Function to confirm officer names and generate PDF
   const handleConfirmOfficerNames = async (names) => {
     setShowOfficerModal(false);
     if (selectedRequestForPdf) {
       await generateAndUploadClearanceForm(selectedRequestForPdf, names);
     }
-    setOfficerNames(names); // Save for future use
+    setOfficerNames(names);
     setSelectedRequestForPdf(null);
   };
 
@@ -2650,344 +2349,61 @@ const loadPersonnel = async () => {
     }
   };
 
-  const deleteClearanceCascade = async (clearanceId) => {
+  // FIXED: Add this helper function that was missing
+  const checkClearanceApprovalEligibility = async (requestId, personnelId) => {
     try {
-      setLoading(true);
-      const toastId = toast.loading("Deleting clearance request...", {
-        position: "top-right",
-      });
+      const request = clearanceRequests.find((r) => r.id === requestId);
+      if (!request) return false;
 
-      // 1. Delete associated PDFs from storage
-      const { data: documents, error: docsError } = await supabase
-        .from("clearance_documents")
-        .select("file_path")
-        .eq("clearance_request_id", clearanceId);
+      const isEquipmentRelated =
+        request.type === "Retirement" ||
+        request.type === "Resignation" ||
+        request.type === "Equipment Completion";
 
-      if (!docsError && documents && documents.length > 0) {
-        const filePaths = documents.map((doc) => doc.file_path);
-
-        // Delete from storage
-        const { error: storageError } = await supabase.storage
-          .from("clearance-documents")
-          .remove(filePaths.filter((path) => path !== null));
-
-        if (storageError) {
-          console.warn(
-            "Warning: Could not delete PDFs from storage:",
-            storageError
-          );
-        }
+      if (!isEquipmentRelated) {
+        return true;
       }
 
-      // 2. Delete from clearance_inventory
-      const { error: inventoryError } = await supabase
-        .from("clearance_inventory")
-        .delete()
-        .eq("clearance_request_id", clearanceId);
+      // Check for lost equipment
+      const { data: lostRecords, error: lostError } = await supabase
+        .from("accountability_records")
+        .select("id, is_settled")
+        .eq("personnel_id", personnelId)
+        .eq("clearance_request_id", requestId)
+        .eq("record_type", "LOST")
+        .eq("is_settled", false);
 
-      if (inventoryError) {
-        console.error("Error deleting clearance inventory:", inventoryError);
-        // Continue anyway
+      if (!lostError && lostRecords && lostRecords.length > 0) {
+        return false;
       }
 
-      // 3. Delete from personnel_equipment_accountability_table
-      const { error: accountabilityError } = await supabase
+      // Check if there's any accountability record
+      const { data: accountabilityData, error } = await supabase
         .from("personnel_equipment_accountability_table")
-        .delete()
-        .eq("clearance_request_id", clearanceId);
+        .select("accountability_status")
+        .eq("personnel_id", personnelId)
+        .eq("clearance_request_id", requestId)
+        .maybeSingle();
 
-      if (accountabilityError) {
-        console.error(
-          "Error deleting accountability records:",
-          accountabilityError
-        );
-        // Continue anyway
+      if (error) {
+        console.error("Error checking accountability:", error);
+        return false;
       }
 
-      // 4. Delete from clearance_documents
-      const { error: documentsError } = await supabase
-        .from("clearance_documents")
-        .delete()
-        .eq("clearance_request_id", clearanceId);
-
-      if (documentsError) {
-        console.error("Error deleting document metadata:", documentsError);
-        // Continue anyway
+      // If there's an accountability record, check if it's settled
+      if (accountabilityData) {
+        return accountabilityData.accountability_status === "SETTLED";
       }
 
-      // 5. Finally delete the clearance request
-      const { error: requestError } = await supabase
-        .from("clearance_requests")
-        .delete()
-        .eq("id", clearanceId);
-
-      if (requestError) throw requestError;
-
-      // Update local state
-      setClearanceRequests((prev) =>
-        prev.filter((req) => req.id !== clearanceId)
-      );
-      setExistingPdfs((prev) => {
-        const updated = { ...prev };
-        delete updated[clearanceId];
-        return updated;
-      });
-
-      toast.update(toastId, {
-        render: "Clearance request deleted successfully",
-        type: "success",
-        isLoading: false,
-        autoClose: 3000,
-      });
-    } catch (error) {
-      console.error("Error deleting clearance:", error);
-      toast.error(`Failed to delete clearance: ${error.message}`, {
-        position: "top-right",
-        autoClose: 4000,
-      });
-    } finally {
-      setLoading(false);
+      // No accountability record means no lost/damaged equipment
+      return true;
+    } catch (err) {
+      console.error("Error in checkClearanceApprovalEligibility:", err);
+      return false;
     }
   };
 
-  const canDeleteClearance = (request) => {
-    // Only allow deletion if status is Pending or Rejected
-    const deletableStatuses = ["Pending", "Rejected"];
-
-    if (!deletableStatuses.includes(request.status)) {
-      return {
-        allowed: false,
-        reason: `Cannot delete clearance with status: ${request.status}`,
-      };
-    }
-
-    // Additional business rules
-    if (
-      request.inspection_status === "PASS" ||
-      request.inspection_status === "In Progress"
-    ) {
-      return {
-        allowed: false,
-        reason: "Cannot delete clearance with equipment inspection in progress",
-      };
-    }
-
-    return { allowed: true, reason: "" };
-  };
-
-  const updateClearanceRequestStatus = async (clearanceRequestId) => {
-    try {
-      console.log(
-        `🔍 Checking clearance request ${clearanceRequestId} for status update...`
-      );
-
-      // Get the clearance request
-      const { data: request, error: requestError } = await supabase
-        .from("clearance_requests")
-        .select("id, personnel_id, type, status")
-        .eq("id", clearanceRequestId)
-        .single();
-
-      if (requestError) {
-        console.error("Error fetching clearance request:", requestError);
-        return;
-      }
-
-      console.log(`Current status: ${request.status}`);
-
-      // Only process if status is "In Progress" or "Pending"
-      if (request.status !== "In Progress" && request.status !== "Pending") {
-        console.log(`Skipping - status is already ${request.status}`);
-        return;
-      }
-
-      // Get all clearance_inventory records for this request
-      const { data: inventoryItems, error: inventoryError } = await supabase
-        .from("clearance_inventory")
-        .select("id, status, inspection_id")
-        .eq("clearance_request_id", clearanceRequestId);
-
-      if (inventoryError) {
-        console.error("Error fetching inventory items:", inventoryError);
-        return;
-      }
-
-      if (!inventoryItems || inventoryItems.length === 0) {
-        console.log("No inventory items found");
-        return;
-      }
-
-      // Analyze the statuses
-      const totalItems = inventoryItems.length;
-      const clearedItems = inventoryItems.filter(
-        (item) => item.status === "Cleared"
-      ).length;
-      const pendingItems = inventoryItems.filter(
-        (item) => item.status === "Pending"
-      ).length;
-      const damagedItems = inventoryItems.filter(
-        (item) => item.status === "Damaged"
-      ).length;
-      const lostItems = inventoryItems.filter(
-        (item) => item.status === "Lost"
-      ).length;
-
-      console.log(`Status analysis:`, {
-        total: totalItems,
-        cleared: clearedItems,
-        pending: pendingItems,
-        damaged: damagedItems,
-        lost: lostItems,
-      });
-
-      let newStatus = request.status;
-      let statusMessage = "";
-
-      // Determine the new status
-      if (pendingItems === 0 && damagedItems === 0 && lostItems === 0) {
-        // All items are Cleared (no damaged/lost)
-        newStatus = "Pending for Approval";
-        statusMessage = "All equipment cleared - ready for approval";
-      } else if (damagedItems > 0 || lostItems > 0) {
-        // There are damaged/lost items
-        // Check if accountability is settled
-        const { data: accountabilityData, error: accError } = await supabase
-          .from("personnel_equipment_accountability_table")
-          .select("accountability_status")
-          .eq("personnel_id", request.personnel_id)
-          .eq("clearance_request_id", clearanceRequestId)
-          .maybeSingle();
-
-        const isAccountabilitySettled =
-          accountabilityData?.accountability_status === "SETTLED";
-
-        if (isAccountabilitySettled) {
-          newStatus = "Pending for Approval";
-          statusMessage = "Accountability settled - ready for approval";
-        } else {
-          newStatus = "In Progress";
-          statusMessage = "Accountability pending for damaged/lost equipment";
-        }
-      } else if (pendingItems > 0) {
-        // Still have pending items
-        // Check if inspections are scheduled
-        const inventoryIds = inventoryItems
-          .filter((item) => item.status === "Pending")
-          .map((item) => item.id);
-
-        const { data: scheduledInspections, error: scheduleError } =
-          await supabase
-            .from("inspections")
-            .select("id")
-            .in("equipment_id", inventoryIds)
-            .eq("status", "PENDING");
-
-        const hasScheduledInspections =
-          !scheduleError &&
-          scheduledInspections &&
-          scheduledInspections.length > 0;
-
-        if (hasScheduledInspections) {
-          newStatus = "In Progress";
-          statusMessage = "Inspections scheduled - in progress";
-        } else {
-          newStatus = "Pending";
-          statusMessage = "Awaiting inspection schedule";
-        }
-      }
-
-      // Update the clearance_request if status changed
-      if (newStatus !== request.status) {
-        console.log(
-          `🔄 Updating clearance request ${clearanceRequestId}: ${request.status} → ${newStatus}`
-        );
-        console.log(`📝 Message: ${statusMessage}`);
-
-        const { error: updateError } = await supabase
-          .from("clearance_requests")
-          .update({
-            status: newStatus,
-            updated_at: new Date().toISOString(),
-            remarks: statusMessage,
-          })
-          .eq("id", clearanceRequestId);
-
-        if (updateError) {
-          console.error(
-            "Error updating clearance request status:",
-            updateError
-          );
-        } else {
-          console.log(
-            `✅ Updated clearance request ${clearanceRequestId} to ${newStatus}`
-          );
-        }
-      } else {
-        console.log(`✅ No status change needed. Current: ${request.status}`);
-      }
-    } catch (error) {
-      console.error("Error in updateClearanceRequestStatus:", error);
-    }
-  };
-
-  const handleDeleteClearance = async (request) => {
-    const { allowed, reason } = canDeleteClearance(request);
-
-    if (!allowed) {
-      toast.warning(reason, {
-        position: "top-right",
-        autoClose: 4000,
-      });
-      return;
-    }
-
-    if (
-      window.confirm(
-        `Are you sure you want to delete clearance for ${request.employee}?`
-      )
-    ) {
-      await deleteClearanceCascade(request.id);
-    }
-  };
-
-  const syncClearanceStatuses = async () => {
-    try {
-      console.log("🔄 Syncing clearance statuses...");
-
-      const { data: clearanceRequests, error } = await supabase
-        .from("clearance_requests")
-        .select("id, personnel_id, type, status")
-        .in("status", ["Pending", "In Progress"]);
-
-      if (error) throw error;
-
-      console.log(`Found ${clearanceRequests?.length || 0} requests to sync`);
-
-      for (const request of clearanceRequests || []) {
-        await updateClearanceRequestStatus(request.id);
-      }
-
-      console.log("✅ Clearance status sync complete");
-    } catch (error) {
-      console.error("Error syncing clearance statuses:", error);
-    }
-  };
-
-  // Add this useEffect in your ClearanceSystem component, near your other useEffect hooks
-  useEffect(() => {
-    // Initial sync when component mounts
-    syncClearanceStatuses();
-
-    // Set up periodic sync
-    const interval = setInterval(() => {
-      console.log("⏰ Running periodic clearance status sync");
-      syncClearanceStatuses();
-    }, 30000); // Every 30 seconds
-
-    return () => clearInterval(interval);
-  }, []);
-
-  // Also add this useEffect for real-time updates
+  // FIXED: Add subscription effects
   useEffect(() => {
     // Subscribe to clearance_requests changes
     const clearanceSubscription = supabase
@@ -3001,7 +2417,7 @@ const loadPersonnel = async () => {
         },
         (payload) => {
           console.log("Clearance request changed:", payload);
-          loadClearanceRequests(); // Refresh the list
+          loadClearanceRequests();
         }
       )
       .subscribe();
@@ -3018,7 +2434,7 @@ const loadPersonnel = async () => {
         },
         (payload) => {
           console.log("Clearance inventory changed:", payload);
-          loadClearanceRequests(); // Refresh the list
+          loadClearanceRequests();
         }
       )
       .subscribe();
@@ -3035,7 +2451,7 @@ const loadPersonnel = async () => {
         },
         (payload) => {
           console.log("Inspection changed:", payload);
-          loadClearanceRequests(); // Refresh the list
+          loadClearanceRequests();
         }
       )
       .subscribe();
@@ -3052,12 +2468,12 @@ const loadPersonnel = async () => {
         },
         (payload) => {
           console.log("Accountability changed:", payload);
-          loadClearanceRequests(); // Refresh the list
+          loadClearanceRequests();
         }
       )
       .subscribe();
 
-    // NEW: Subscribe to accountability_records changes for lost equipment
+    // Subscribe to accountability_records changes for lost equipment
     const accountabilityRecordsSubscription = supabase
       .channel("accountability-records-changes")
       .on(
@@ -3069,7 +2485,7 @@ const loadPersonnel = async () => {
         },
         (payload) => {
           console.log("Accountability record changed:", payload);
-          loadClearanceRequests(); // Refresh the list
+          loadClearanceRequests();
         }
       )
       .subscribe();
@@ -3082,21 +2498,30 @@ const loadPersonnel = async () => {
       accountabilityRecordsSubscription.unsubscribe();
     };
   }, []);
-if (showPreloader) {
-  return (
-    <div className={styles.clearanceSystem}>
-      <Title>Clearance System | BFP Villanueva</Title>
-      <Meta name="robots" content="noindex, nofollow" />
-      <ToastContainer />
-      <BFPPreloader
-        loading={showPreloader}
-        progress={preloaderProgress}
-        moduleTitle="CLEARANCE SYSTEM • Loading Clearance Requests..."
-        onRetry={handleRetryPreloader}
-      />
-    </div>
-  );
-}
+
+  // Add force refresh function
+  const forceRefreshRequests = async () => {
+    console.log("🔄 Force refreshing clearance requests...");
+    await loadClearanceRequests();
+    setRefreshKey((prev) => prev + 1);
+  };
+
+  if (showPreloader) {
+    return (
+      <div className={styles.clearanceSystem}>
+        <Title>Clearance System | BFP Villanueva</Title>
+        <Meta name="robots" content="noindex, nofollow" />
+        <ToastContainer />
+        <BFPPreloader
+          loading={showPreloader}
+          progress={preloaderProgress}
+          moduleTitle="CLEARANCE SYSTEM • Loading Clearance Requests..."
+          onRetry={handleRetryPreloader}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className={styles.clearanceSystem}>
       <Title>Clearance System | BFP Villanueva</Title>
@@ -3115,6 +2540,7 @@ if (showPreloader) {
       />
 
 
+
       <Hamburger />
       <Sidebar />
       <OfficerInputModal
@@ -3126,6 +2552,72 @@ if (showPreloader) {
           generatingPdf && pdfDownloadForRequest === selectedRequestForPdf?.id
         }
       />
+      {showNoEquipmentModal.show && (
+        <div className={styles.noEquipmentModalOverlay}>
+          <div className={styles.noEquipmentModal}>
+            <div className={styles.noEquipmentModalHeader}>
+              <h3>No Equipment Found</h3>
+              <button
+                onClick={() =>
+                  setShowNoEquipmentModal({
+                    show: false,
+                    personnelName: "",
+                    clearanceType: "",
+                  })
+                }
+                className={styles.closeButton}
+              >
+                &times;
+              </button>
+            </div>
+            <div className={styles.noEquipmentModalBody}>
+              <div className={styles.warningIcon}>🚫</div>
+              <p>
+                <strong>{showNoEquipmentModal.personnelName}</strong> has no
+                assigned equipment.
+              </p>
+              <p>
+                {showNoEquipmentModal.clearanceType} clearance requires
+                equipment accountability check.
+              </p>
+              <p className={styles.warningText}>
+                Please ensure all equipment is properly assigned to this
+                personnel before submitting a clearance request.
+              </p>
+              <div className={styles.helpText}>
+                <p>
+                  <strong>Possible reasons:</strong>
+                </p>
+                <ul>
+                  <li>Equipment hasn't been assigned to this personnel yet</li>
+                  <li>Equipment records might be missing or inactive</li>
+                  <li>Personnel might not require equipment for their role</li>
+                </ul>
+              </div>
+            </div>
+            <div className={styles.noEquipmentModalFooter}>
+              <button
+                className={styles.cancelButton}
+                onClick={() =>
+                  setShowNoEquipmentModal({
+                    show: false,
+                    personnelName: "",
+                    clearanceType: "",
+                  })
+                }
+              >
+                Cancel
+              </button>
+              <button
+                className={styles.continueButton}
+                onClick={continueClearanceSubmission}
+              >
+                Continue Anyway
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className={`main-content ${isSidebarCollapsed ? "collapsed" : ""}`}>
         <h1>Clearance System</h1>
 
@@ -3214,7 +2706,6 @@ if (showPreloader) {
                     </p>
                   </div>
                 )}
-                {/* NEW: Lost equipment warning for specific clearance types */}
                 {(newClearance.type === "Resignation" ||
                   newClearance.type === "Retirement" ||
                   newClearance.type === "Equipment Completion") &&
@@ -3268,12 +2759,7 @@ if (showPreloader) {
                                   </span>
                                 </td>
                                 <td>
-                                  {item.price
-                                    ? new Intl.NumberFormat("en-PH", {
-                                        style: "currency",
-                                        currency: "PHP",
-                                      }).format(item.price)
-                                    : "₱0.00"}
+                                  {item.price ? formatPHP(item.price) : "₱0.00"}
                                 </td>
                               </tr>
                             ))}
@@ -3292,10 +2778,7 @@ if (showPreloader) {
                         <p>
                           <strong>Total Value:</strong>
                           <span className={styles.totalValue}>
-                            {new Intl.NumberFormat("en-PH", {
-                              style: "currency",
-                              currency: "PHP",
-                            }).format(
+                            {formatPHP(
                               inventoryItems.reduce(
                                 (sum, item) => sum + (item.price || 0),
                                 0
@@ -3545,7 +3028,6 @@ if (showPreloader) {
                           )}
                       </span>
                     </td>
-                    {/* NEW: Lost Equipment Status Column */}
                     <td>
                       {req.lost_equipment_count > 0 ? (
                         <div className={styles.lostEquipmentStatus}>
@@ -3575,6 +3057,12 @@ if (showPreloader) {
                       {req.status === "Pending" ||
                       req.status === "Pending for Approval" ? (
                         <>
+                          {/* Debug info (hidden) */}
+                          <div style={{ display: "none" }}>
+                            ID: {req.id} | Status: {req.status} | Inspection:{" "}
+                            {req.inspection_status} | Type: {req.type}
+                          </div>
+
                           {shouldShowApproveRejectButtons(req) ? (
                             <>
                               <button
@@ -3594,7 +3082,13 @@ if (showPreloader) {
                             </>
                           ) : (
                             <span className={styles.pendingInspectionNote}>
-                              Awaiting inspection
+                              {req.inspection_status === "Pending"
+                                ? "Awaiting inspection schedule"
+                                : req.inspection_status === "In Progress"
+                                ? "Inspection in progress"
+                                : `Awaiting: ${
+                                    req.inspection_status || "inspection"
+                                  }`}
                             </span>
                           )}
                           <button
@@ -3658,10 +3152,33 @@ if (showPreloader) {
           {renderBottomPaginationButtons()}
         </div>
 
-        {/* Equipment Modal with Lost Equipment Section */}
+        {/* Equipment Modal */}
         {showEquipmentModal && selectedRequest && (
-          <div className={styles.equipmentModalOverlay}>
-            <div className={styles.equipmentModal}>
+          <div
+            className={`${styles.equipmentModalOverlay} ${
+              isSidebarCollapsed ? styles.collapsed : ""
+            }`}
+            style={{
+              left: isSidebarCollapsed ? "80px" : "250px",
+              width: isSidebarCollapsed
+                ? "calc(100vw - 80px)"
+                : "calc(100vw - 250px)",
+              transition: "left 0.3s ease, width 0.3s ease",
+            }}
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                setShowEquipmentModal(false);
+              }
+            }}
+          >
+            <div
+              className={styles.equipmentModal}
+              style={{
+                marginLeft: isSidebarCollapsed ? "0" : "0",
+                left: isSidebarCollapsed ? "0" : "0",
+                transform: "none",
+              }}
+            >
               <div className={styles.equipmentModalHeader}>
                 <h3>
                   Equipment for Clearance - {selectedRequest.employee}
@@ -3671,7 +3188,6 @@ if (showPreloader) {
                       (From Inventory)
                     </span>
                   )}
-                  {/* NEW: Show lost equipment count with clearance link info */}
                   {selectedRequest.lost_equipment_count > 0 && (
                     <span className={styles.lostEquipmentBadge}>
                       ⚠️ {selectedRequest.lost_equipment_count} Lost Item(s)
@@ -3690,516 +3206,542 @@ if (showPreloader) {
                 </button>
               </div>
 
-              {/* Lost Equipment Section */}
-              {selectedRequest.lost_equipment_count > 0 && (
-                <div className={styles.lostEquipmentSection}>
-                  <div className={styles.lostEquipmentHeader}>
-                    <h4 className={styles.lostEquipmentTitle}>
-                      ⚠️ Lost Equipment Status
-                      <span className={styles.clearanceLinkInfo}>
-                        {
-                          lostEquipment.filter(
-                            (item) =>
-                              item.clearance_request_id === selectedRequest.id
-                          ).length
-                        }
-                        of {lostEquipment.length} linked to this clearance
-                      </span>
-                    </h4>
-                    <button
-                      className={styles.linkAllBtn}
-                      onClick={async () => {
-                        try {
-                          const { success, linkedCount } =
-                            await linkLostEquipmentToClearance(
-                              selectedRequest.id,
-                              selectedRequest.personnel_id
-                            );
-                          if (success && linkedCount > 0) {
-                            toast.success(
-                              `Linked ${linkedCount} lost equipment records to this clearance`
-                            );
-                            // Refresh the view
-                            viewEquipment(selectedRequest.id);
+              <div className={styles.equipmentModalContent}>
+                {/* Lost Equipment Section */}
+                {selectedRequest.lost_equipment_count > 0 && (
+                  <div className={styles.lostEquipmentSection}>
+                    <div className={styles.lostEquipmentHeader}>
+                      <h4 className={styles.lostEquipmentTitle}>
+                        ⚠️ Lost Equipment Status
+                        <span className={styles.clearanceLinkInfo}>
+                          {
+                            lostEquipment.filter(
+                              (item) =>
+                                item.clearance_request_id === selectedRequest.id
+                            ).length
                           }
-                        } catch (error) {
-                          toast.error("Failed to link lost equipment");
-                        }
-                      }}
-                    >
-                      Link All to Clearance
-                    </button>
-                  </div>
-                  <div className={styles.lostEquipmentTableContainer}>
-                    <table className={styles.lostEquipmentTable}>
-                      <thead>
-                        <tr>
-                          <th>Item Name</th>
-                          <th>Item Code</th>
-                          <th>Lost Date</th>
-                          <th>Status</th>
-                          <th>Amount Due</th>
-                          <th>Linked to Clearance</th>
-                          <th>Settlement Date</th>
-                          <th>Return Status</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {lostEquipment.map((item) => (
-                          <tr key={item.id} className={styles.lostEquipmentRow}>
-                            <td>{item.item_name}</td>
-                            <td>{item.item_code}</td>
-                            <td>
-                              {item.record_date
-                                ? new Date(
-                                    item.record_date
-                                  ).toLocaleDateString()
-                                : "N/A"}
-                            </td>
-                            <td>
-                              <span
-                                className={`${styles.statusBadge} ${
-                                  item.is_settled
-                                    ? styles.settled
-                                    : styles.pending
-                                }`}
-                              >
-                                {item.is_settled ? "Settled" : "Pending"}
-                              </span>
-                            </td>
-                            <td>{formatPHP(item.amount_due)}</td>
-                            <td>
-                              <span
-                                className={`${styles.clearanceLinkStatus} ${
-                                  item.clearance_request_id ===
-                                  selectedRequest.id
-                                    ? styles.linked
-                                    : styles.notLinked
-                                }`}
-                              >
-                                {item.clearance_request_id ===
-                                selectedRequest.id
-                                  ? "✅ Linked"
-                                  : "❌ Not Linked"}
-                              </span>
-                            </td>
-                            <td>
-                              {item.settlement_date
-                                ? new Date(
-                                    item.settlement_date
-                                  ).toLocaleDateString()
-                                : item.is_settled
-                                ? "Settled"
-                                : "Not Settled"}
-                            </td>
-                            <td>
-                              <span
-                                className={`${styles.returnStatus} ${
-                                  item.equipment_returned
-                                    ? styles.returned
-                                    : styles.notReturned
-                                }`}
-                              >
-                                {item.equipment_returned
-                                  ? "Returned"
-                                  : "Not Returned"}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  <div className={styles.lostEquipmentSummary}>
-                    <p>
-                      <strong>Total Lost Items:</strong>
-                      {selectedRequest.lost_equipment_count}
-                    </p>
-                    <p>
-                      <strong>Linked to Clearance:</strong>
-                      {
-                        lostEquipment.filter(
-                          (item) =>
-                            item.clearance_request_id === selectedRequest.id
-                        ).length
-                      }
-                    </p>
-                    <p>
-                      <strong>Total Amount Due:</strong>
-                      {formatPHP(
-                        lostEquipment.reduce(
-                          (sum, item) => sum + (item.amount_due || 0),
-                          0
-                        )
-                      )}
-                    </p>
-                    <p>
-                      <strong>Cleared for Approval:</strong>
-                      <span
-                        className={
-                          lostEquipment.every((item) => item.is_settled)
-                            ? styles.clearedYes
-                            : styles.clearedNo
-                        }
+                          of {lostEquipment.length} linked to this clearance
+                        </span>
+                      </h4>
+                      <button
+                        className={styles.linkAllBtn}
+                        onClick={async () => {
+                          try {
+                            const { success, linkedCount } =
+                              await linkLostEquipmentToClearance(
+                                selectedRequest.id,
+                                selectedRequest.personnel_id
+                              );
+                            if (success && linkedCount > 0) {
+                              toast.success(
+                                `Linked ${linkedCount} lost equipment records to this clearance`
+                              );
+                              viewEquipment(selectedRequest.id);
+                            }
+                          } catch (error) {
+                            toast.error("Failed to link lost equipment");
+                          }
+                        }}
                       >
-                        {lostEquipment.every((item) => item.is_settled)
-                          ? "YES"
-                          : "NO"}
-                      </span>
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              <div className={styles.equipmentModalBody}>
-                {equipmentLoading ? (
-                  <p>Loading equipment...</p>
-                ) : (
-                  <div className={styles.equipmentTableContainer}>
-                    <table className={styles.equipmentTable}>
-                      <thead>
-                        <tr>
-                          <th>Personnel Name</th>
-                          <th>Item Name</th>
-                          <th>Item Code</th>
-                          <th>Category</th>
-                          <th>Status</th>
-                          <th>Price</th>
-                          <th>Clearance Status</th>
-                          <th>Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {selectedEquipment.map((item) => {
-                          const statusClass =
-                            item.clearance_status?.toLowerCase() || "pending";
-                          const hasAccountability =
-                            item.accountability_info &&
-                            item.accountability_info.length > 0;
-
-                          return (
-                            <tr key={item.id}>
-                              <td>{item.personnel_name}</td>
-                              <td>{item.name}</td>
-                              <td>{item.code}</td>
-                              <td>{item.category}</td>
-                              <td>{item.status}</td>
+                        Link All to Clearance
+                      </button>
+                    </div>
+                    <div className={styles.equipmentTableContainer}>
+                      <table className={styles.lostEquipmentTable}>
+                        <thead>
+                          <tr>
+                            <th>Item Name</th>
+                            <th>Item Code</th>
+                            <th>Lost Date</th>
+                            <th>Status</th>
+                            <th>Amount Due</th>
+                            <th>Linked to Clearance</th>
+                            <th>Settlement Date</th>
+                            <th>Return Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {lostEquipment.map((item) => (
+                            <tr
+                              key={item.id}
+                              className={styles.lostEquipmentRow}
+                            >
+                              <td>{item.item_name}</td>
+                              <td>{item.item_code}</td>
                               <td>
-                                {formatPHP(item.price || item.current_value)}
+                                {item.record_date
+                                  ? new Date(
+                                      item.record_date
+                                    ).toLocaleDateString()
+                                  : "N/A"}
                               </td>
                               <td>
                                 <span
-                                  className={`${styles.statusBadge} ${styles[statusClass]}`}
+                                  className={`${styles.statusBadge} ${
+                                    item.is_settled
+                                      ? styles.settled
+                                      : styles.pending
+                                  }`}
                                 >
-                                  {item.clearance_status}
+                                  {item.is_settled ? "Settled" : "Pending"}
                                 </span>
-                                {hasAccountability && (
-                                  <div
-                                    className={styles.accountabilityIndicator}
-                                  >
-                                    ⚖️ Accountability
-                                    {item.accountability_info[0]?.is_settled
-                                      ? "Settled"
-                                      : "Pending"}
-                                  </div>
-                                )}
+                              </td>
+                              <td>{formatPHP(item.amount_due)}</td>
+                              <td>
+                                <span
+                                  className={`${styles.clearanceLinkStatus} ${
+                                    item.clearance_request_id ===
+                                    selectedRequest.id
+                                      ? styles.linked
+                                      : styles.notLinked
+                                  }`}
+                                >
+                                  {item.clearance_request_id ===
+                                  selectedRequest.id
+                                    ? "✅ Linked"
+                                    : "❌ Not Linked"}
+                                </span>
                               </td>
                               <td>
-                                {item.clearance_status === "Cleared" && (
-                                  <button
-                                    className={styles.clearedBtn}
-                                    disabled
-                                  >
-                                    ✅ Cleared
-                                  </button>
-                                )}
+                                {item.settlement_date
+                                  ? new Date(
+                                      item.settlement_date
+                                    ).toLocaleDateString()
+                                  : item.is_settled
+                                  ? "Settled"
+                                  : "Not Settled"}
+                              </td>
+                              <td>
+                                <span
+                                  className={`${styles.returnStatus} ${
+                                    item.equipment_returned
+                                      ? styles.returned
+                                      : styles.notReturned
+                                  }`}
+                                >
+                                  {item.equipment_returned
+                                    ? "Returned"
+                                    : "Not Returned"}
+                                </span>
                               </td>
                             </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <div className={styles.lostEquipmentSummary}>
+                      <p>
+                        <strong>Total Lost Items:</strong>
+                        <span>{selectedRequest.lost_equipment_count}</span>
+                      </p>
+                      <p>
+                        <strong>Linked to Clearance:</strong>
+                        <span>
+                          {
+                            lostEquipment.filter(
+                              (item) =>
+                                item.clearance_request_id === selectedRequest.id
+                            ).length
+                          }
+                        </span>
+                      </p>
+                      <p>
+                        <strong>Total Amount Due:</strong>
+                        <span>
+                          {formatPHP(
+                            lostEquipment.reduce(
+                              (sum, item) => sum + (item.amount_due || 0),
+                              0
+                            )
+                          )}
+                        </span>
+                      </p>
+                      <p>
+                        <strong>Cleared for Approval:</strong>
+                        <span
+                          className={
+                            lostEquipment.every((item) => item.is_settled)
+                              ? styles.clearedYes
+                              : styles.clearedNo
+                          }
+                        >
+                          {lostEquipment.every((item) => item.is_settled)
+                            ? "YES"
+                            : "NO"}
+                        </span>
+                      </p>
+                    </div>
                   </div>
                 )}
+
+                {/* Regular Equipment Section */}
+                <div className={styles.equipmentSection}>
+                  <h4>Assigned Equipment ({selectedEquipment.length} items)</h4>
+                  {equipmentLoading ? (
+                    <p>Loading equipment...</p>
+                  ) : (
+                    <div className={styles.equipmentTableContainer}>
+                      <table className={styles.equipmentTable}>
+                        <thead>
+                          <tr>
+                            <th>Item Name</th>
+                            <th>Item Code</th>
+                            <th>Category</th>
+                            <th>Assigned To</th>
+                            <th>Value</th>
+                            <th>Clearance Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {selectedEquipment.map((item) => {
+                            const statusClass =
+                              item.clearance_status?.toLowerCase() || "pending";
+                            const hasAccountability =
+                              item.accountability_info &&
+                              item.accountability_info.length > 0;
+
+                            return (
+                              <tr key={item.id}>
+                                <td>{item.name}</td>
+                                <td>{item.code}</td>
+                                <td>{item.category}</td>
+                                <td>{item.personnel_name}</td>
+                                <td>
+                                  {formatPHP(item.price || item.current_value)}
+                                </td>
+                                <td>
+                                  <span
+                                    className={`${styles.statusBadge} ${styles[statusClass]}`}
+                                  >
+                                    {item.clearance_status}
+                                  </span>
+                                  {hasAccountability && (
+                                    <div
+                                      className={styles.accountabilityIndicator}
+                                    >
+                                      ⚖️ Accountability
+                                      {item.accountability_info[0]?.is_settled
+                                        ? " Settled"
+                                        : " Pending"}
+                                    </div>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  {/* Equipment Summary */}
+                  {selectedEquipment.length > 0 && (
+                    <div className={styles.equipmentSummary}>
+                      <p>
+                        <strong>Total Items:</strong>
+                        <span className={styles.totalItems}>
+                          {selectedEquipment.length} item
+                          {selectedEquipment.length !== 1 ? "s" : ""}
+                        </span>
+                      </p>
+                      <p>
+                        <strong>Total Value:</strong>
+                        <span className={styles.totalValue}>
+                          {formatPHP(
+                            selectedEquipment.reduce(
+                              (sum, item) =>
+                                sum + (item.price || item.current_value || 0),
+                              0
+                            )
+                          )}
+                        </span>
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
         )}
 
-        {/* View Details Modal */}
+        {/* Details Modal */}
         {showDetailsModal && selectedRequest && (
-          <div className={styles.clearanceModalOverlay}>
-            <div className={styles.clearanceModal}>
+          <div
+            className={`${styles.clearanceModalOverlay} ${
+              isSidebarCollapsed ? styles.collapsed : ""
+            } ${styles.compactModal}`}
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                setShowDetailsModal(false);
+              }
+            }}
+          >
+            <div className={`${styles.clearanceModal} ${styles.compactView}`}>
               <div className={styles.clearanceModalContentDetails}>
                 <div className={styles.clearanceModalHeaderDetails}>
-                  <h2>Clearance Request Details</h2>
-                  <button
-                    className={styles.clearanceCloseBtnDetails}
-                    onClick={() => setShowDetailsModal(false)}
-                    type="button"
-                    aria-label="Close modal"
-                  >
-                    &times;
-                  </button>
-                </div>
-
-                <div className={styles.clearanceModalBodyDetails}>
-                  <div className={styles.clearanceModalSectionDetails}>
-                    <h3 className={styles.clearanceModalSectionTitleDetails}>
-                      Employee Information
-                    </h3>
-                    <div className={styles.clearanceModalDetailsGridDetails}>
-                      <div className={styles.clearanceModalDetailItemDetails}>
-                        <span className={styles.clearanceModalLabelDetails}>
-                          Name:
-                        </span>
-                        <span className={styles.clearanceModalValueDetails}>
-                          {selectedRequest.employee || "N/A"}
-                        </span>
-                      </div>
-                      <div className={styles.clearanceModalDetailItemDetails}>
-                        <span className={styles.clearanceModalLabelDetails}>
-                          Badge Number:
-                        </span>
-                        <span className={styles.clearanceModalValueDetails}>
-                          {selectedRequest.badge_number || "N/A"}
-                        </span>
-                      </div>
-                      <div className={styles.clearanceModalDetailItemDetails}>
-                        <span className={styles.clearanceModalLabelDetails}>
-                          Username:
-                        </span>
-                        <span className={styles.clearanceModalValueDetails}>
-                          {selectedRequest.username || "N/A"}
-                        </span>
-                      </div>
-                      <div className={styles.clearanceModalDetailItemDetails}>
-                        <span className={styles.clearanceModalLabelDetails}>
-                          Rank:
-                        </span>
-                        <span className={styles.clearanceModalValueDetails}>
-                          {selectedRequest.rank || "N/A"}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className={styles.clearanceModalSectionDetails}>
-                    <h3 className={styles.clearanceModalSectionTitleDetails}>
-                      Clearance Details
-                    </h3>
-                    <div className={styles.clearanceModalDetailsGridDetails}>
-                      <div className={styles.clearanceModalDetailItemDetails}>
-                        <span className={styles.clearanceModalLabelDetails}>
-                          Type:
-                        </span>
-                        <span className={styles.clearanceModalValueDetails}>
-                          {selectedRequest.type || "N/A"}
-                        </span>
-                      </div>
-                      <div className={styles.clearanceModalDetailItemDetails}>
-                        <span className={styles.clearanceModalLabelDetails}>
-                          Request Date:
-                        </span>
-                        <span className={styles.clearanceModalValueDetails}>
-                          {selectedRequest.date || "N/A"}
-                        </span>
-                      </div>
-                      {selectedRequest.effective_date && (
-                        <div className={styles.clearanceModalDetailItemDetails}>
-                          <span className={styles.clearanceModalLabelDetails}>
-                            Effective Date:
-                          </span>
-                          <span className={styles.clearanceModalValueDetails}>
-                            {selectedRequest.effective_date}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className={styles.clearanceModalSectionDetails}>
-                    <h3 className={styles.clearanceModalSectionTitleDetails}>
-                      Equipment Information
-                    </h3>
-                    <div className={styles.clearanceModalDetailsGridDetails}>
-                      <div className={styles.clearanceModalDetailItemDetails}>
-                        <span className={styles.clearanceModalLabelDetails}>
-                          Equipment Count:
-                        </span>
-                        <span className={styles.clearanceModalValueDetails}>
-                          {selectedRequest.equipment_display || "N/A"}
-                        </span>
-                      </div>
-                      <div className={styles.clearanceModalDetailItemDetails}>
-                        <span className={styles.clearanceModalLabelDetails}>
-                          Inspection Status:
-                        </span>
-                        <span className={styles.clearanceModalValueDetails}>
-                          <span
-                            className={`${styles.inspectionStatus} ${
-                              styles[
-                                selectedRequest.inspection_status
-                                  ?.toLowerCase()
-                                  .replace(/\s+/g, "-")
-                                  .replace("not-applicable", "notapplicable")
-                                  .replace("not-yet-added", "notyetadded") ||
-                                  "pending"
-                              ]
-                            }`}
-                          >
-                            {selectedRequest.inspection_status || "N/A"}
-                          </span>
-                        </span>
-                      </div>
-                      {/* NEW: Lost Equipment Information */}
-                      <div className={styles.clearanceModalDetailItemDetails}>
-                        <span className={styles.clearanceModalLabelDetails}>
-                          Lost Equipment:
-                        </span>
-                        <span className={styles.clearanceModalValueDetails}>
-                          {selectedRequest.lost_equipment_count > 0 ? (
-                            <span
-                              className={`${styles.lostEquipmentStatusBadge} ${
-                                selectedRequest.lost_equipment_status.includes(
-                                  "Unsettled"
-                                )
-                                  ? styles.lostEquipmentUnsettled
-                                  : styles.lostEquipmentSettled
-                              }`}
-                            >
-                              {selectedRequest.lost_equipment_count} item(s) -
-                              {selectedRequest.lost_equipment_status.includes(
-                                "Unsettled"
-                              )
-                                ? " ⚠️ Needs Settlement"
-                                : " ✅ Settled"}
-                            </span>
-                          ) : (
-                            "None"
-                          )}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className={styles.clearanceModalSectionDetails}>
-                    <h3 className={styles.clearanceModalSectionTitleDetails}>
-                      Request Status
-                    </h3>
-                    <div className={styles.clearanceModalDetailsGridDetails}>
-                      <div className={styles.clearanceModalDetailItemDetails}>
-                        <span className={styles.clearanceModalLabelDetails}>
-                          Status:
+                  <div className={styles.modalHeaderCompact}>
+                    <div className={styles.headerLeftCompact}>
+                      <h2>Clearance Details</h2>
+                      <div className={styles.headerInfoCompact}>
+                        <span
+                          className={`${styles.requestStatusCompact} ${
+                            styles[statusToClass(selectedRequest.status)]
+                          }`}
+                        >
+                          {selectedRequest.status}
                         </span>
                         <span
-                          className={`${styles.clearanceModalValueDetails} ${
-                            styles.clearanceModalStatusDetails
-                          } ${
+                          className={`${styles.requestTypeCompact} ${
                             styles[
-                              `clearance${selectedRequest.status?.replace(
-                                /\s+/g,
-                                ""
-                              )}`
+                              selectedRequest.type
+                                ?.replace(/\s+/g, "-")
+                                .toLowerCase()
                             ]
                           }`}
                         >
-                          {selectedRequest.status || "N/A"}
+                          {selectedRequest.type}
                         </span>
                       </div>
-
-                      {selectedRequest.approved_by && (
-                        <div className={styles.clearanceModalDetailItemDetails}>
-                          <span className={styles.clearanceModalLabelDetails}>
-                            Approved By:
-                          </span>
-                          <span className={styles.clearanceModalValueDetails}>
-                            {selectedRequest.approved_by}
-                          </span>
+                    </div>
+                    <div className={styles.headerRightCompact}>
+                      <span className={styles.dateCompact}>
+                        {selectedRequest.date}
+                      </span>
+                      <button
+                        className={styles.clearanceCloseBtnCompact}
+                        onClick={() => setShowDetailsModal(false)}
+                        type="button"
+                        aria-label="Close modal"
+                      >
+                        &times;
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <div className={styles.clearanceModalBodyDetails}>
+                  <div className={styles.compactLayout}>
+                    <div className={styles.leftColumnCompact}>
+                      <div className={styles.infoSectionCompact}>
+                        <h3 className={styles.sectionTitleCompact}>
+                          <span className={styles.sectionIconCompact}>👤</span>
+                          Personnel
+                        </h3>
+                        <div className={styles.personnelInfo}>
+                          <div className={styles.personnelNameCompact}>
+                            {selectedRequest.employee}
+                          </div>
+                          <div className={styles.personnelDetails}>
+                            <div className={styles.detailItemCompact}>
+                              <span className={styles.detailLabelCompact}>
+                                Badge:
+                              </span>
+                              <span className={styles.detailValueCompact}>
+                                {selectedRequest.badge_number || "N/A"}
+                              </span>
+                            </div>
+                            <div className={styles.detailItemCompact}>
+                              <span className={styles.detailLabelCompact}>
+                                Rank:
+                              </span>
+                              <span className={styles.detailValueCompact}>
+                                {selectedRequest.rank || "N/A"}
+                              </span>
+                            </div>
+                          </div>
                         </div>
-                      )}
+                      </div>
 
-                      {selectedRequest.approved_at && (
-                        <div className={styles.clearanceModalDetailItemDetails}>
-                          <span className={styles.clearanceModalLabelDetails}>
-                            Approved Date:
-                          </span>
-                          <span className={styles.clearanceModalValueDetails}>
-                            {new Date(
-                              selectedRequest.approved_at
-                            ).toLocaleDateString()}
-                          </span>
+                      <div className={styles.infoSectionCompact}>
+                        <h3 className={styles.sectionTitleCompact}>
+                          <span className={styles.sectionIconCompact}>⏱️</span>
+                          Timeline
+                        </h3>
+                        <div className={styles.timelineCompact}>
+                          <div className={styles.timelineItemCompact}>
+                            <span className={styles.timelineLabelCompact}>
+                              Created:
+                            </span>
+                            <span className={styles.timelineValueCompact}>
+                              {selectedRequest.created_at
+                                ? new Date(
+                                    selectedRequest.created_at
+                                  ).toLocaleDateString("en-US", {
+                                    month: "short",
+                                    day: "numeric",
+                                  })
+                                : "N/A"}
+                            </span>
+                          </div>
+                          {selectedRequest.approved_at && (
+                            <div className={styles.timelineItemCompact}>
+                              <span className={styles.timelineLabelCompact}>
+                                Approved:
+                              </span>
+                              <span className={styles.timelineValueCompact}>
+                                {new Date(
+                                  selectedRequest.approved_at
+                                ).toLocaleDateString("en-US", {
+                                  month: "short",
+                                  day: "numeric",
+                                })}
+                              </span>
+                            </div>
+                          )}
                         </div>
-                      )}
+                      </div>
+                    </div>
 
-                      {selectedRequest.rejection_reason && (
-                        <div className={styles.clearanceModalDetailItemDetails}>
-                          <span className={styles.clearanceModalLabelDetails}>
-                            Rejection Reason:
-                          </span>
-                          <span className={styles.clearanceModalValueDetails}>
-                            {selectedRequest.rejection_reason}
-                          </span>
-                        </div>
-                      )}
+                    <div className={styles.rightColumnCompact}>
+                      <div className={styles.infoSectionCompact}>
+                        <h3 className={styles.sectionTitleCompact}>
+                          <span className={styles.sectionIconCompact}>🛠️</span>
+                          Equipment Status
+                        </h3>
+                        <div className={styles.equipmentStatusCompact}>
+                          <div className={styles.equipmentStatsRow}>
+                            <div className={styles.statBoxCompact}>
+                              <div className={styles.statNumberCompact}>
+                                {selectedRequest.equipment_count || 0}
+                              </div>
+                              <div className={styles.statLabelCompact}>
+                                Items
+                              </div>
+                            </div>
+                            <div className={styles.statBoxCompact}>
+                              <div
+                                className={`${styles.inspectionStatusCompact} ${
+                                  styles[
+                                    selectedRequest.inspection_status
+                                      ?.toLowerCase()
+                                      .replace(/\s+/g, "-")
+                                  ] || "pending"
+                                }`}
+                              >
+                                {selectedRequest.inspection_status || "N/A"}
+                              </div>
+                              <div className={styles.statLabelCompact}>
+                                Inspection
+                              </div>
+                            </div>
+                          </div>
 
-                      {selectedRequest.remarks && (
-                        <div className={styles.clearanceModalDetailItemDetails}>
-                          <span className={styles.clearanceModalLabelDetails}>
-                            Remarks:
-                          </span>
-                          <span className={styles.clearanceModalValueDetails}>
-                            {selectedRequest.remarks}
-                          </span>
+                          {selectedRequest.lost_equipment_count > 0 && (
+                            <div className={styles.lostEquipmentAlert}>
+                              <span className={styles.lostIcon}>⚠️</span>
+                              <span className={styles.lostText}>
+                                {selectedRequest.lost_equipment_count} lost
+                                item(s)
+                                {selectedRequest.lost_equipment_status?.includes(
+                                  "Unsettled"
+                                )
+                                  ? " • Needs settlement"
+                                  : " • Settled"}
+                              </span>
+                            </div>
+                          )}
                         </div>
-                      )}
+                      </div>
+
+                      <div className={styles.infoSectionCompact}>
+                        <h3 className={styles.sectionTitleCompact}>
+                          <span className={styles.sectionIconCompact}>⚡</span>
+                          Actions
+                        </h3>
+                        <div className={styles.actionsContainer}>
+                          {selectedRequest.status === "Completed" && (
+                            <div className={styles.documentActionsContainer}>
+                              {existingPdfs[selectedRequest.id] &&
+                              existingPdfs[selectedRequest.id].length > 0 ? (
+                                <button
+                                  className={styles.actionBtnPrimary}
+                                  onClick={() =>
+                                    downloadExistingPdf(
+                                      existingPdfs[selectedRequest.id][0]
+                                        .file_url,
+                                      selectedRequest
+                                    )
+                                  }
+                                >
+                                  <span className={styles.btnIcon}>📥</span>
+                                  Download PDF
+                                </button>
+                              ) : (
+                                <button
+                                  className={styles.actionBtnPrimary}
+                                  onClick={() => {
+                                    setShowDetailsModal(false);
+                                    generateAndUploadClearanceForm(
+                                      selectedRequest
+                                    );
+                                  }}
+                                  disabled={generatingPdf}
+                                >
+                                  {generatingPdf ? (
+                                    <>
+                                      <span
+                                        className={styles.spinnerSmall}
+                                      ></span>
+                                      Generating...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <span className={styles.btnIcon}>📄</span>
+                                      Generate PDF
+                                    </>
+                                  )}
+                                </button>
+                              )}
+                            </div>
+                          )}
+
+                          <button
+                            className={styles.actionBtnSecondary}
+                            onClick={() => {
+                              setShowDetailsModal(false);
+                              viewEquipment(selectedRequest.id);
+                            }}
+                          >
+                            <span className={styles.btnIcon}>🔍</span>
+                            View Equipment
+                          </button>
+
+                          {selectedRequest.status === "Pending" &&
+                            shouldShowApproveRejectButtons(selectedRequest) && (
+                              <div className={styles.approveRejectButtons}>
+                                <button
+                                  className={styles.approveBtnCompact}
+                                  onClick={() =>
+                                    openApproveModal(selectedRequest)
+                                  }
+                                  disabled={loading}
+                                >
+                                  Approve
+                                </button>
+                                <button
+                                  className={styles.rejectBtnCompact}
+                                  onClick={() =>
+                                    openRejectModal(selectedRequest)
+                                  }
+                                  disabled={loading}
+                                >
+                                  Reject
+                                </button>
+                              </div>
+                            )}
+                        </div>
+                      </div>
                     </div>
                   </div>
 
-                  {selectedRequest.status === "Completed" && (
-                    <div className={styles.clearanceModalSectionDetails}>
-                      <h3 className={styles.clearanceModalSectionTitleDetails}>
-                        Document
+                  {selectedRequest.remarks && (
+                    <div className={styles.remarksSectionCompact}>
+                      <h3 className={styles.sectionTitleCompact}>
+                        <span className={styles.sectionIconCompact}>📝</span>
+                        Remarks
                       </h3>
-                      <div className={styles.clearanceModalDetailsGridDetails}>
-                        <div className={styles.clearanceModalDetailItemDetails}>
-                          <span className={styles.clearanceModalLabelDetails}>
-                            PDF Certificate:
-                          </span>
-                          <span className={styles.clearanceModalValueDetails}>
-                            {existingPdfs[selectedRequest.id] &&
-                            existingPdfs[selectedRequest.id].length > 0 ? (
-                              <button
-                                className={styles.downloadModalBtn}
-                                onClick={() =>
-                                  downloadExistingPdf(
-                                    existingPdfs[selectedRequest.id][0]
-                                      .file_url,
-                                    selectedRequest
-                                  )
-                                }
-                              >
-                                📥 Download Certificate
-                              </button>
-                            ) : (
-                              <button
-                                className={styles.generateModalBtn}
-                                onClick={() => {
-                                  setShowDetailsModal(false);
-                                  generateAndUploadClearanceForm(
-                                    selectedRequest
-                                  );
-                                }}
-                                disabled={generatingPdf}
-                              >
-                                {generatingPdf
-                                  ? "Generating..."
-                                  : "📄 Generate Certificate"}
-                              </button>
-                            )}
-                          </span>
-                        </div>
-                      </div>
+                      <p className={styles.remarksTextCompact}>
+                        {selectedRequest.remarks}
+                      </p>
                     </div>
                   )}
                 </div>
@@ -4210,7 +3752,11 @@ if (showPreloader) {
 
         {/* PDF Progress Overlay */}
         {generatingPdf && (
-          <div className={styles.pdfProgressOverlay}>
+          <div
+            className={`${styles.pdfProgressOverlay} ${
+              isSidebarCollapsed ? styles.collapsed : ""
+            }`}
+          >
             <div className={styles.pdfProgressModal}>
               <h3>Generating Clearance Form PDF</h3>
               <div className={styles.pdfProgressBar}>
@@ -4229,7 +3775,16 @@ if (showPreloader) {
 
         {/* Clearance Submission Confirmation Modal */}
         {showSubmitConfirmation && confirmationData && (
-          <div className={styles.clearanceConfirmationModalOverlay}>
+          <div
+            className={`${styles.clearanceConfirmationModalOverlay} ${
+              isSidebarCollapsed ? styles.collapsed : ""
+            }`}
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                cancelClearanceSubmission();
+              }
+            }}
+          >
             <div className={styles.clearanceConfirmationModal}>
               <div className={styles.clearanceConfirmationHeader}>
                 <h2>Confirm Clearance Request</h2>
@@ -4261,10 +3816,7 @@ if (showPreloader) {
                   </p>
                   <p>
                     <strong>Total Equipment Value:</strong>{" "}
-                    {new Intl.NumberFormat("en-PH", {
-                      style: "currency",
-                      currency: "PHP",
-                    }).format(confirmationData.totalValue)}
+                    {formatPHP(confirmationData.totalValue)}
                   </p>
 
                   {confirmationData.equipmentCount > 0 && (
@@ -4273,10 +3825,7 @@ if (showPreloader) {
                       <div className={styles.clearanceEquipmentList}>
                         <p>
                           <strong>Total Equipment Value:</strong>{" "}
-                          {new Intl.NumberFormat("en-PH", {
-                            style: "currency",
-                            currency: "PHP",
-                          }).format(confirmationData.totalValue)}
+                          {formatPHP(confirmationData.totalValue)}
                         </p>
 
                         {confirmationData.equipmentList
@@ -4289,12 +3838,7 @@ if (showPreloader) {
                               <span>
                                 {item.item_name} ({item.item_code})
                               </span>
-                              <span>
-                                {new Intl.NumberFormat("en-PH", {
-                                  style: "currency",
-                                  currency: "PHP",
-                                }).format(item.price || 0)}
-                              </span>
+                              <span>{formatPHP(item.price || 0)}</span>
                             </div>
                           ))}
                         {confirmationData.equipmentCount > 5 && (
@@ -4346,7 +3890,16 @@ if (showPreloader) {
 
         {/* Approve Modal */}
         {showApproveModal && (
-          <div className={styles.approveRejectModalOverlay}>
+          <div
+            className={`${styles.approveRejectModalOverlay} ${
+              isSidebarCollapsed ? styles.collapsed : ""
+            }`}
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                setShowApproveModal(false);
+              }
+            }}
+          >
             <div className={styles.approveRejectModal}>
               <div className={styles.approveRejectModalHeader}>
                 <h3>Approve Clearance Request</h3>
@@ -4401,7 +3954,15 @@ if (showPreloader) {
 
         {/* Reject Modal */}
         {showRejectModal && (
-          <div className={styles.approveRejectModalOverlay}>
+          <div
+            className={`${styles.approveRejectModalOverlay}
+           ${isSidebarCollapsed ? styles.collapsed : ""}`}
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                setShowRejectModal(false);
+              }
+            }}
+          >
             <div className={styles.approveRejectModal}>
               <div className={styles.approveRejectModalHeader}>
                 <h3>Reject Clearance Request</h3>

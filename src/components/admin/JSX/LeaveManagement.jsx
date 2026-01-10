@@ -17,20 +17,19 @@ import {
 } from "../../utils/leaveDocumentUpload.js";
 import { fillLeaveFormEnhanced } from "../../utils/pdfLeaveFormFiller.js";
 // Import from your new client-side utility
-import { 
-  calculateWorkingDays, 
+import {
+  calculateWorkingDays,
   getPhilippineHolidays,
   calculateCalendarDays,
-  LeaveCalculator 
+  LeaveCalculator,
 } from "../../utils/holidayCalendar.js";
-import FloatingNotificationBell from "../../FloatingNotificationBell.jsx";
-
+import LeaveOfficerInputModal from "../../utils/LeaveOfficerInputModal.jsx";
 import { useUserId } from "../../hooks/useUserId.js";
 
 const LeaveManagement = () => {
   const { isSidebarCollapsed } = useSidebar();
   const { user: authUser, hasSupabaseAuth } = useAuth();
-const { userId, isAuthenticated, userRole } = useUserId();
+  const { userId, isAuthenticated, userRole } = useUserId();
   // UNCOMMENT AND ACTIVATE THESE PRELOADER STATES
   const [isInitializing, setIsInitializing] = useState(true);
   const [loadingProgress, setLoadingProgress] = useState(0);
@@ -43,7 +42,10 @@ const { userId, isAuthenticated, userRole } = useUserId();
   const [leaveBreakdown, setLeaveBreakdown] = useState(null);
   // Add this state to track if data is fully loaded
   const [isDataFullyLoaded, setIsDataFullyLoaded] = useState(false);
-
+  const [showLeaveOfficerModal, setShowLeaveOfficerModal] = useState(false);
+  const [selectedRequestForCustomPdf, setSelectedRequestForCustomPdf] =
+    useState(null);
+  const [leaveOfficerNames, setLeaveOfficerNames] = useState({});
   const [leaveRequests, setLeaveRequests] = useState([]);
   const [filteredRequests, setFilteredRequests] = useState([]);
   const [currentView, setCurrentView] = useState("table");
@@ -104,7 +106,13 @@ const { userId, isAuthenticated, userRole } = useUserId();
       setTimeout(resolve, 150);
     });
   };
-
+  // Add this useEffect to update CSS variables based on sidebar state
+  useEffect(() => {
+    document.documentElement.style.setProperty(
+      "--modal-margin-left",
+      isSidebarCollapsed ? "100px" : "290px"
+    );
+  }, [isSidebarCollapsed]);
   useEffect(() => {
     // ENHANCED INITIALIZATION WITH PRELOADER SYNC
     const initializeData = async () => {
@@ -196,7 +204,10 @@ const { userId, isAuthenticated, userRole } = useUserId();
         return 0;
       }
 
-      switch (leaveType) {
+      // Make sure leaveType is not undefined and normalize it
+      const normalizedLeaveType = leaveType?.trim() || "Vacation";
+
+      switch (normalizedLeaveType) {
         case "Vacation":
           return parseFloat(balance.vacation_balance) || 0;
         case "Sick":
@@ -204,7 +215,10 @@ const { userId, isAuthenticated, userRole } = useUserId();
         case "Emergency":
           return parseFloat(balance.emergency_balance) || 0;
         default:
-          return 0;
+          console.warn(
+            `Unknown leave type: ${normalizedLeaveType}, defaulting to Vacation`
+          );
+          return parseFloat(balance.vacation_balance) || 0;
       }
     } catch (error) {
       console.error("Error in getLeaveBalanceForType:", error);
@@ -404,7 +418,7 @@ const { userId, isAuthenticated, userRole } = useUserId();
             endDate: item.end_date
               ? new Date(item.end_date).toISOString().split("T")[0]
               : "N/A",
-            numDays: item.num_days,
+            num_days: item.num_days,
             location: item.location || personnel.station || "-",
             status: item.status || "Pending",
             dateOfFiling: item.date_of_filing
@@ -557,41 +571,227 @@ const { userId, isAuthenticated, userRole } = useUserId();
 
   const generatePDF = async (leaveData) => {
     try {
+      console.log("=== GENERATE PDF - START DEBUG ===");
+      console.log("Initial leaveData received:", leaveData);
+      console.log("Keys in leaveData:", Object.keys(leaveData));
+
       // Load PDF template
       const pdfBytes = await loadPdfTemplate();
 
-      // Use the imported enhanced function
-      const filledPdf = await fillLeaveFormEnhanced(
-        pdfBytes,
-        {
-          ...leaveData,
-          // Ensure proper field names
-          lastName: leaveData.lastName || "",
-          firstName: leaveData.firstName || "",
-          middleName: leaveData.middleName || "",
-          rank: leaveData.rank || "",
-          station: leaveData.station || "",
-          leaveType: leaveData.leaveType || "",
-          location: leaveData.location || "",
-          dateOfFiling: leaveData.dateOfFiling || leaveData.createdAt,
-          balance_before: leaveData.balance_before || 0,
-          balance_after: leaveData.balance_after || 0,
-          numDays: leaveData.numDays || 0,
-          vacationLocationType:
-            leaveData.vacation_location_type || "philippines",
-          illnessType: leaveData.illness_type || "",
-          illnessDetails: leaveData.illness_details || "",
-        },
-        {
-          isYearly: false,
-          generationDate: new Date().toISOString(),
-          adminUsername: adminUsername,
+      // First, try to fetch the latest data from database to ensure accuracy
+      let databaseData = null;
+      try {
+        const { data: latestData, error } = await supabase
+          .from("leave_requests")
+          .select(
+            `
+          approve_for, 
+          paid_days, 
+          unpaid_days, 
+          balance_before, 
+          balance_after, 
+          num_days,
+          working_days,
+          holiday_days,
+          leave_type,
+          start_date,
+          end_date,
+          location,
+          personnel_id
+        `
+          )
+          .eq("id", leaveData.id)
+          .single();
+
+        if (error) {
+          console.warn(
+            "Could not fetch latest data from database:",
+            error.message
+          );
+        } else {
+          databaseData = latestData;
+          console.log("Database data fetched successfully:", databaseData);
         }
+      } catch (dbError) {
+        console.warn("Error fetching from database:", dbError.message);
+      }
+
+      // Use database data if available, otherwise use provided data
+      const effectiveData = databaseData || leaveData;
+
+      // Extract critical fields
+      const approveFor =
+        effectiveData.approve_for || leaveData.approve_for || "with_pay";
+      const paidDays = effectiveData.paid_days || leaveData.paid_days || 0;
+      const unpaidDays =
+        effectiveData.unpaid_days || leaveData.unpaid_days || 0;
+
+      // Calculate total deduction - THIS IS CRITICAL
+      // First try working_days from database (most accurate)
+      // Then try paid+unpaid calculation
+      // Fallback to num_days as last resort
+      let totalDeducted = effectiveData.working_days || paidDays + unpaidDays;
+
+      // If totalDeducted is still 0, use num_days (calendar days)
+      if (totalDeducted === 0) {
+        totalDeducted =
+          effectiveData.num_days ||
+          leaveData.num_days ||
+          leaveData.numDays ||
+          0;
+      }
+
+      // Calculate balance before and after
+      const balanceBefore = parseFloat(
+        effectiveData.balance_before || leaveData.balance_before || 0
+      );
+      let balanceAfter = parseFloat(
+        effectiveData.balance_after || leaveData.balance_after || 0
       );
 
+      // If balanceAfter is 0 or not provided, calculate it
+      if (balanceAfter === 0 && balanceBefore > 0) {
+        balanceAfter = Math.max(0, balanceBefore - totalDeducted);
+      }
+
+      // Debug logging for critical values
+      console.log("=== PDF GENERATION - CRITICAL VALUES ===");
+      console.log("Approve For:", approveFor);
+      console.log("Paid Days:", paidDays);
+      console.log("Unpaid Days:", unpaidDays);
+      console.log("Total Deducted (working days):", totalDeducted);
+      console.log("Balance Before:", balanceBefore);
+      console.log("Balance After:", balanceAfter);
+      console.log("Working Days from DB:", effectiveData.working_days);
+      console.log(
+        "Num Days:",
+        effectiveData.num_days || leaveData.num_days || leaveData.numDays || 0
+      );
+
+      // Also fetch personnel data for name fields if available
+      let personnelData = null;
+      if (leaveData.personnel_id) {
+        try {
+          const { data: personnel, error } = await supabase
+            .from("personnel")
+            .select("first_name, last_name, middle_name, rank, station")
+            .eq("id", leaveData.personnel_id)
+            .single();
+
+          if (!error) {
+            personnelData = personnel;
+            console.log("Personnel data fetched:", personnelData);
+          }
+        } catch (personnelError) {
+          console.warn(
+            "Could not fetch personnel data:",
+            personnelError.message
+          );
+        }
+      }
+
+      // Prepare data for PDF filler
+      const pdfData = {
+        ...leaveData,
+        // Critical payment fields
+        approve_for: approveFor,
+        paid_days: paidDays,
+        unpaid_days: unpaidDays,
+        total_deducted: totalDeducted,
+
+        // Balance fields
+        balance_before: balanceBefore,
+        balance_after: balanceAfter,
+        balanceBefore: balanceBefore, // Add camelCase version
+        balanceAfter: balanceAfter, // Add camelCase version
+
+        // Leave type and details
+        leaveType: leaveData.leaveType || effectiveData.leave_type || "",
+        leave_type: leaveData.leave_type || effectiveData.leave_type || "",
+        num_days:
+          effectiveData.num_days ||
+          leaveData.num_days ||
+          leaveData.numDays ||
+          0,
+        numDays:
+          effectiveData.num_days ||
+          leaveData.num_days ||
+          leaveData.numDays ||
+          0,
+
+        // Name fields - use personnel data if available
+        lastName: leaveData.lastName || personnelData?.last_name || "",
+        firstName: leaveData.firstName || personnelData?.first_name || "",
+        middleName: leaveData.middleName || personnelData?.middle_name || "",
+
+        // Rank and station
+        rank: leaveData.rank || personnelData?.rank || "",
+        station: leaveData.station || personnelData?.station || "",
+
+        // Location and dates
+        location: leaveData.location || effectiveData.location || "",
+        startDate: leaveData.startDate || effectiveData.start_date || "",
+        endDate: leaveData.endDate || effectiveData.end_date || "",
+
+        // Filing date
+        dateOfFiling:
+          leaveData.dateOfFiling ||
+          leaveData.createdAt ||
+          new Date().toISOString(),
+        date_of_filing:
+          leaveData.date_of_filing ||
+          leaveData.createdAt ||
+          new Date().toISOString(),
+
+        // Additional fields
+        vacationLocationType: leaveData.vacation_location_type || "philippines",
+        vacation_location_type:
+          leaveData.vacation_location_type || "philippines",
+        illnessType: leaveData.illness_type || "",
+        illness_type: leaveData.illness_type || "",
+        illnessDetails: leaveData.illness_details || "",
+        illness_details: leaveData.illness_details || "",
+
+        // Employee name for fallback
+        employeeName:
+          leaveData.employeeName ||
+          `${personnelData?.first_name || ""} ${
+            personnelData?.last_name || ""
+          }`.trim(),
+        fullName:
+          leaveData.fullName ||
+          `${personnelData?.first_name || ""} ${
+            personnelData?.last_name || ""
+          }`.trim(),
+      };
+
+      console.log("=== PDF DATA BEING SENT TO FILLER ===");
+      console.log("Final pdfData structure:", {
+        approve_for: pdfData.approve_for,
+        paid_days: pdfData.paid_days,
+        unpaid_days: pdfData.unpaid_days,
+        total_deducted: pdfData.total_deducted,
+        balance_before: pdfData.balance_before,
+        balance_after: pdfData.balance_after,
+        num_days: pdfData.num_days,
+        leaveType: pdfData.leaveType,
+        lastName: pdfData.lastName,
+        firstName: pdfData.firstName,
+        middleName: pdfData.middleName,
+      });
+
+      // Use the imported enhanced function
+      const filledPdf = await fillLeaveFormEnhanced(pdfBytes, pdfData, {
+        isYearly: false,
+        generationDate: new Date().toISOString(),
+        adminUsername: adminUsername,
+      });
+
+      console.log("✅ PDF generated successfully");
       return filledPdf;
     } catch (error) {
       console.error("Error generating PDF:", error);
+      console.error("Error stack:", error.stack);
       throw error;
     }
   };
@@ -630,7 +830,26 @@ const { userId, isAuthenticated, userRole } = useUserId();
       )
     );
   };
-  const generateAndUploadLeaveForm = async (leaveRequest) => {
+
+  // Add this function after your other handler functions like handleApproveClick, handleRejectClick, etc.
+  const handleCustomizeLeavePdf = (leaveRequest) => {
+    setSelectedRequestForCustomPdf(leaveRequest);
+    setShowLeaveOfficerModal(true);
+  };
+
+  const handleConfirmLeaveOfficerNames = async (names) => {
+    setShowLeaveOfficerModal(false);
+    if (selectedRequestForCustomPdf) {
+      // Generate PDF with custom officer names
+      await generateAndUploadLeaveForm(selectedRequestForCustomPdf, names);
+    }
+    setLeaveOfficerNames(names); // Save for future use
+    setSelectedRequestForCustomPdf(null);
+  };
+  const generateAndUploadLeaveForm = async (
+    leaveRequest,
+    customOfficerNames = {}
+  ) => {
     if (!leaveRequest || !leaveRequest.id) {
       toast.error("Invalid leave request data");
       return;
@@ -647,10 +866,32 @@ const { userId, isAuthenticated, userRole } = useUserId();
     setPdfDownloadProgress(10);
 
     try {
+      console.log("=== DEBUG: LEAVE DATA FOR PDF ===");
+      console.log("Full leaveRequest object:", leaveRequest);
+      console.log("Custom officer names:", customOfficerNames); // <-- Debug log
+      console.log("Keys in leaveRequest:", Object.keys(leaveRequest));
+
+      // Calculate what should be displayed
+      const totalDeducted =
+        (leaveRequest.paid_days || 0) + (leaveRequest.unpaid_days || 0);
+      console.log("Calculated total deduction:", totalDeducted);
+
       setPdfDownloadProgress(40);
 
-      // Generate PDF
-      const filledPdfBytes = await generatePDF(leaveRequest);
+      // Generate PDF with corrected data AND officer names
+      const filledPdfBytes = await generatePDF({
+        ...leaveRequest,
+        // Ensure these fields are properly passed
+        total_deducted: totalDeducted,
+        balance_before: leaveRequest.balance_before || 0,
+        balance_after: leaveRequest.balance_after || 0,
+        // Make sure these are included
+        approve_for: leaveRequest.approve_for || "with_pay",
+        paid_days: leaveRequest.paid_days || 0,
+        unpaid_days: leaveRequest.unpaid_days || 0,
+        // ADD OFFICER NAMES HERE: (THIS IS THE KEY CHANGE)
+        officerNames: customOfficerNames, // <-- This gets passed to fillLeaveFormEnhanced
+      });
 
       // Get personnel data
       let personnelData = null;
@@ -794,6 +1035,12 @@ const { userId, isAuthenticated, userRole } = useUserId();
     days
   ) => {
     try {
+      // Validate leaveType
+      if (!leaveType) {
+        console.error("Leave type is undefined or null");
+        return;
+      }
+
       const fieldMap = {
         Vacation: "vacation_balance",
         Sick: "sick_balance",
@@ -803,6 +1050,7 @@ const { userId, isAuthenticated, userRole } = useUserId();
       const fieldName = fieldMap[leaveType];
       if (!fieldName) {
         console.error("Invalid leave type:", leaveType);
+        console.log("Available leave types:", Object.keys(fieldMap));
         return;
       }
 
@@ -1162,221 +1410,937 @@ const { userId, isAuthenticated, userRole } = useUserId();
     setShowApprovalOptionsModal(true);
   };
 
-const handleApproveWithOptions = async (
-  requestId,
-  approveFor,
-  withPayDays = null
-) => {
-  try {
-    setProcessingAction(requestId);
-    const request = leaveRequests.find((req) => req.id === requestId);
-    if (!request) return;
+  const handleApproveWithOptions = async (
+    requestId,
+    approveFor,
+    withPayDays = null
+  ) => {
+    try {
+      setProcessingAction(requestId);
+      const request = leaveRequests.find((req) => req.id === requestId);
+      if (!request) {
+        toast.error("Leave request not found");
+        return;
+      }
 
-    // Create calculator and calculate breakdown
-    const calculator = new LeaveCalculator(holidays);
-    const availableBalance = await getLeaveBalanceForType(
-      request.leaveType,
-      request.personnel_id
-    );
-    const breakdown = calculator.calculateLeaveBreakdown(
-      {
-        ...request,
-        approveFor,
-        withPayDays,
-      },
-      availableBalance
-    );
+      const leaveType = request.leaveType || request.leave_type || "Vacation";
+      const numDays = request.numDays || request.num_days || 0;
 
-    // Update leave request with payment details
-    const updateData = {
-      status: "Approved",
-      approve_for: approveFor,
-      paid_days: breakdown.paidDays,
-      unpaid_days: breakdown.unpaidDays,
-      working_days: breakdown.totalWorkingDays,
-      holiday_days: breakdown.holidayDays,
-      updated_at: new Date().toISOString(),
-      approved_by: adminUsername,
-    };
+      console.log("=== APPROVAL DEBUG ===");
+      console.log("Request ID:", requestId);
+      console.log("Approve For:", approveFor);
+      console.log("With Pay Days Input:", withPayDays);
+      console.log("Total Calendar Days:", numDays);
 
-    // Calculate the actual balance update
-    const totalDeducted = breakdown.paidDays + breakdown.unpaidDays;
+      // Get the LeaveCalculator
+      const calculator = new LeaveCalculator(holidays);
 
-    // Update in database
-    const { error } = await supabase
-      .from("leave_requests")
-      .update(updateData)
-      .eq("id", requestId);
-
-    if (error) throw error;
-
-    // Deduct leave credits for ALL days (both paid AND unpaid)
-    // Both types are deducted, only difference is monthly accrual eligibility
-    if (totalDeducted > 0) {
-      await updateLeaveBalanceForApproval(
-        request.leave_balance_id,
-        request.leave_type,
-        totalDeducted
+      // Calculate total working days (excluding holidays/weekends)
+      const totalWorkingDays = calculator.calculateWorkingDays(
+        request.startDate,
+        request.endDate
       );
+      const holidayDays = numDays - totalWorkingDays;
+
+      console.log(
+        "Total Working Days (excluding holidays/weekends):",
+        totalWorkingDays
+      );
+      console.log("Holiday/Weekend Days:", holidayDays);
+
+      // Get available balance
+      const availableBalance = await getLeaveBalanceForType(
+        leaveType,
+        request.personnel_id
+      );
+      console.log("Available Balance:", availableBalance);
+
+      // Calculate paidDays and unpaidDays based on approval type
+      let paidDays = 0;
+      let unpaidDays = 0;
+      let totalDeducted = 0;
+
+      if (approveFor === "with_pay") {
+        // ALL working days are paid
+        paidDays = totalWorkingDays;
+        unpaidDays = 0;
+        totalDeducted = totalWorkingDays; // All working days deducted
+
+        console.log("With Pay - All working days are paid and deducted");
+        console.log("Paid Days:", paidDays);
+        console.log("Unpaid Days:", unpaidDays);
+        console.log("Total Deducted:", totalDeducted);
+      } else if (approveFor === "without_pay") {
+        // ALL working days are unpaid (BUT STILL DEDUCTED!)
+        paidDays = 0;
+        unpaidDays = totalWorkingDays;
+        totalDeducted = totalWorkingDays; // All working days still deducted
+
+        console.log(
+          "Without Pay - All working days are unpaid but still deducted"
+        );
+        console.log("Paid Days:", paidDays);
+        console.log("Unpaid Days:", unpaidDays);
+        console.log("Total Deducted:", totalDeducted);
+      } else if (approveFor === "both") {
+        // Split working days between paid and unpaid
+        console.log("Partial mixed calculation:");
+        console.log("Requested withPayDays:", withPayDays);
+        console.log("Total Working Days:", totalWorkingDays);
+
+        // Validate withPayDays doesn't exceed total working days
+        const validatedWithPayDays = Math.min(
+          Math.max(0, withPayDays || 0),
+          totalWorkingDays
+        );
+
+        console.log("Validated With Pay Days:", validatedWithPayDays);
+
+        // Split working days
+        paidDays = validatedWithPayDays;
+        unpaidDays = totalWorkingDays - validatedWithPayDays;
+        totalDeducted = totalWorkingDays; // ALL working days deducted
+
+        console.log("Final Calculated for Both:");
+        console.log("Paid Days:", paidDays);
+        console.log("Unpaid Days:", unpaidDays);
+        console.log("Total Deducted (ALL working days):", totalDeducted);
+      }
+
+      // Calculate balance after deduction
+      const balanceAfter = Math.max(0, availableBalance - totalDeducted);
+      console.log("Balance Before:", availableBalance);
+      console.log("Balance After Deduction:", balanceAfter);
+
+      // Update leave request with payment details
+      const updateData = {
+        status: "Approved",
+        approve_for: approveFor,
+        paid_days: paidDays,
+        unpaid_days: unpaidDays,
+        working_days: totalWorkingDays,
+        holiday_days: holidayDays,
+        updated_at: new Date().toISOString(),
+        approved_by: adminUsername,
+        balance_before: availableBalance,
+        balance_after: balanceAfter,
+      };
+
+      console.log("Updating database with:", updateData);
+
+      // Update in database
+      const { error } = await supabase
+        .from("leave_requests")
+        .update(updateData)
+        .eq("id", requestId);
+
+      if (error) {
+        console.error("Database update error:", error);
+        toast.error("Failed to update leave request in database");
+        throw error;
+      }
+
+      // CRITICAL: Deduct ALL working days from leave balance
+      // Both paid AND unpaid days are deducted
+      if (totalDeducted > 0) {
+        if (request.leave_balance_id) {
+          await updateLeaveBalanceForApproval(
+            request.leave_balance_id,
+            leaveType,
+            totalDeducted
+          );
+          console.log(
+            `Deducted ${totalDeducted} days from leave_balance_id: ${request.leave_balance_id}`
+          );
+        } else {
+          // Fallback to personnel table
+          await updatePersonnelLeaveBalance(
+            request.personnel_id,
+            leaveType,
+            totalDeducted,
+            false
+          );
+          console.log(
+            `Deducted ${totalDeducted} days from personnel_id: ${request.personnel_id}`
+          );
+        }
+      }
+
+      // Update local state
+      const updatedRequest = {
+        ...request,
+        ...updateData,
+        status: "Approved",
+        approve_for: approveFor,
+        paid_days: paidDays,
+        unpaid_days: unpaidDays,
+      };
+
+      setLeaveRequests((prev) =>
+        prev.map((req) => (req.id === requestId ? updatedRequest : req))
+      );
+
+      setFilteredRequests((prev) =>
+        prev.map((req) => (req.id === requestId ? updatedRequest : req))
+      );
+
+      console.log("✅ Leave request updated successfully:", {
+        id: requestId,
+        approve_for: approveFor,
+        paid_days: paidDays,
+        unpaid_days: unpaidDays,
+        total_working_days: totalWorkingDays,
+        total_deduction: totalDeducted,
+        balance_before: availableBalance,
+        balance_after: balanceAfter,
+      });
+
+      // Show success message with clear details
+      let message = `✅ Leave approved successfully!\n\n`;
+
+      // Add breakdown details
+      message += `📊 **Breakdown:**\n`;
+      message += `• Calendar Days: ${numDays}\n`;
+      message += `• Working Days: ${totalWorkingDays}\n`;
+
+      if (holidayDays > 0) {
+        message += `• Holidays/Weekends: ${holidayDays}\n`;
+      }
+
+      message += `\n💰 **Payment Details:**\n`;
+
+      if (approveFor === "with_pay") {
+        message += `• ${paidDays} paid working days\n`;
+      } else if (approveFor === "without_pay") {
+        message += `• ${unpaidDays} unpaid working days\n`;
+      } else if (approveFor === "both") {
+        message += `• ${paidDays} paid working days\n`;
+        message += `• ${unpaidDays} unpaid working days\n`;
+      }
+
+      // Add deduction information
+      message += `\n📉 **Leave Credits:**\n`;
+      message += `• Balance Before: ${availableBalance} days\n`;
+      message += `• Deducted: ${totalDeducted} working days\n`;
+      message += `• Balance After: ${balanceAfter} days\n`;
+
+      // Add accrual impact
+      message += `\n📈 **Accrual Impact:**\n`;
+      if (approveFor === "without_pay") {
+        message += `• ❌ No monthly accrual for this period`;
+      } else if (approveFor === "both" && unpaidDays > 0) {
+        message += `• ⚠️ Partial monthly accrual (blocked for ${unpaidDays} unpaid days)`;
+      } else {
+        message += `• ✅ Eligible for full monthly accrual`;
+      }
+
+      toast.success(message, {
+        duration: 5000,
+        position: "top-right",
+      });
+
+      // Close modal
+      setShowApprovalOptionsModal(false);
+      setSelectedRequestForApproval(null);
+
+      // Refresh data after a short delay
+      setTimeout(() => {
+        loadLeaveRequests();
+      }, 1000);
+    } catch (error) {
+      console.error("Error approving leave:", error);
+      toast.error(`Failed to approve leave: ${error.message}`);
+    } finally {
+      setProcessingAction(null);
     }
-
-    // Update local state
-    setLeaveRequests((prev) =>
-      prev.map((req) =>
-        req.id === requestId
-          ? { ...req, ...updateData, status: "Approved" }
-          : req
-      )
-    );
-
-    setFilteredRequests((prev) =>
-      prev.map((req) =>
-        req.id === requestId
-          ? { ...req, ...updateData, status: "Approved" }
-          : req
-      )
-    );
-
-    let message = `Leave approved (${breakdown.paidDays} paid, ${breakdown.unpaidDays} unpaid)`;
-
-    if (approveFor === "without_pay") {
-      message += " - ❌ No monthly accrual for this month";
-    } else if (approveFor === "both" && breakdown.unpaidDays > 0) {
-      message += " - ⚠️ Partial monthly accrual block";
-    } else {
-      message += " - ✅ Eligible for monthly accrual";
-    }
-
-    toast.success(message);
-
-    // Close modal
-    setShowApprovalOptionsModal(false);
-    setSelectedRequestForApproval(null);
-  } catch (error) {
-    console.error("Error approving leave:", error);
-    toast.error("Failed to approve leave");
-  } finally {
-    setProcessingAction(null);
-  }
-};
+  };
 
   // Add this component before the final return statement
   const ApprovalOptionsModal = ({ request, onClose, onApprove }) => {
     const [approveFor, setApproveFor] = useState("with_pay");
-    const [withPayDays, setWithPayDays] = useState(request.num_days || 0);
+    const [withPayDays, setWithPayDays] = useState(0);
     const [breakdown, setBreakdown] = useState(null);
+    const [totalWorkingDays, setTotalWorkingDays] = useState(0);
+    const [holidayDays, setHolidayDays] = useState(0);
+    const [isCalculating, setIsCalculating] = useState(false);
 
+    // Initialize values based on request
+    useEffect(() => {
+      const calculateInitialValues = async () => {
+        if (!request) return;
+
+        setIsCalculating(true);
+
+        try {
+          const calculator = new LeaveCalculator(holidays);
+
+          // Calculate total working days (excluding holidays/weekends)
+          const totalWorkingDaysCalc = calculator.calculateWorkingDays(
+            request.startDate,
+            request.endDate
+          );
+
+          const numDays = request.numDays || request.num_days || 0;
+          const holidayDaysCalc = numDays - totalWorkingDaysCalc;
+
+          setTotalWorkingDays(totalWorkingDaysCalc);
+          setHolidayDays(holidayDaysCalc);
+
+          // Default withPayDays to all working days for "with_pay"
+          setWithPayDays(totalWorkingDaysCalc);
+
+          console.log("Initial calculation:", {
+            totalCalendarDays: numDays,
+            totalWorkingDays: totalWorkingDaysCalc,
+            holidayDays: holidayDaysCalc,
+          });
+        } catch (error) {
+          console.error("Error calculating initial values:", error);
+        } finally {
+          setIsCalculating(false);
+        }
+      };
+
+      calculateInitialValues();
+    }, [request, holidays]);
+
+    // Recalculate breakdown when options change
     useEffect(() => {
       calculateBreakdown();
     }, [approveFor, withPayDays]);
 
-    // In ApprovalOptionsModal component, change:
     const calculateBreakdown = async () => {
-      const calculator = new LeaveCalculator(holidays);
-      const availableBalance = await getLeaveBalanceForType(
-        request.leaveType,
-        request.personnel_id
-      );
-      const result = calculator.calculateLeaveBreakdown(
-        {
-          ...request,
-          approveFor,
-          withPayDays,
-        },
-        availableBalance
-      );
-      setBreakdown(result);
+      if (!request || isCalculating) return;
+
+      setIsCalculating(true);
+
+      try {
+        const calculator = new LeaveCalculator(holidays);
+        const availableBalance = await getLeaveBalanceForType(
+          request.leaveType,
+          request.personnel_id
+        );
+
+        // Validate withPayDays for "both" mode
+        let validatedWithPayDays = withPayDays;
+        let calculatedPaidDays = 0;
+        let calculatedUnpaidDays = 0;
+
+        if (approveFor === "with_pay") {
+          // All working days are paid
+          calculatedPaidDays = totalWorkingDays;
+          calculatedUnpaidDays = 0;
+          validatedWithPayDays = totalWorkingDays;
+        } else if (approveFor === "without_pay") {
+          // No working days are paid
+          calculatedPaidDays = 0;
+          calculatedUnpaidDays = totalWorkingDays;
+          validatedWithPayDays = 0;
+        } else if (approveFor === "both") {
+          // Split working days
+          validatedWithPayDays = Math.min(
+            Math.max(0, withPayDays),
+            totalWorkingDays
+          );
+          if (validatedWithPayDays !== withPayDays) {
+            setWithPayDays(validatedWithPayDays);
+          }
+          calculatedPaidDays = validatedWithPayDays;
+          calculatedUnpaidDays = totalWorkingDays - validatedWithPayDays;
+        }
+
+        // Calculate breakdown
+        const result = calculator.calculateLeaveBreakdown(
+          {
+            ...request,
+            approveFor,
+            withPayDays: validatedWithPayDays,
+          },
+          availableBalance
+        );
+
+        setBreakdown({
+          ...result,
+          totalWorkingDays: totalWorkingDays,
+          paidDays: calculatedPaidDays,
+          unpaidDays: calculatedUnpaidDays,
+          holidayDays: holidayDays,
+          availableBalance: availableBalance,
+          balanceAfter: Math.max(
+            0,
+            availableBalance - (calculatedPaidDays + calculatedUnpaidDays)
+          ),
+        });
+      } catch (error) {
+        console.error("Error calculating breakdown:", error);
+      } finally {
+        setIsCalculating(false);
+      }
     };
+
+    const handleWithPayDaysChange = (value) => {
+      const parsedValue = parseInt(value) || 0;
+      // Clamp value between 0 and total working days
+      const clampedValue = Math.max(0, Math.min(parsedValue, totalWorkingDays));
+      setWithPayDays(clampedValue);
+    };
+
+    const handleSliderChange = (value) => {
+      const parsedValue = parseInt(value) || 0;
+      setWithPayDays(parsedValue);
+    };
+
+    const handleApprove = () => {
+      if (isCalculating) return;
+
+      // For "with_pay" and "without_pay", don't pass withPayDays
+      const finalWithPayDays = approveFor === "both" ? withPayDays : undefined;
+      onApprove(request.id, approveFor, finalWithPayDays);
+    };
+
+    // Calculate days without pay for display
+    const daysWithoutPay = totalWorkingDays - withPayDays;
+
     return (
       <div className={styles.confirmationModalOverlay} onClick={onClose}>
         <div
-          className={styles.confirmationModal}
+          className={`${styles.confirmationModal} ${styles.landscapeModal}`}
           onClick={(e) => e.stopPropagation()}
         >
+          {/* HEADER */}
           <div className={styles.confirmationHeader}>
-            <h2>Approve Leave: {request.employeeName}</h2>
+            <div className={styles.headerContent}>
+              <h2>Approve Leave Request</h2>
+              <div className={styles.headerInfo}>
+                <div className={styles.employeeBadge}>
+                  <span className={styles.employeeName}>
+                    {request?.employeeName || "Unknown"}
+                  </span>
+                  <span className={styles.leaveType}>
+                    {request?.leaveType || "N/A"} Leave
+                  </span>
+                </div>
+                <div className={styles.leaveDates}>
+                  {request?.startDate ? formatDate(request.startDate) : "N/A"} →{" "}
+                  {request?.endDate ? formatDate(request.endDate) : "N/A"}
+                  <span className={styles.daysBadge}>
+                    {request?.numDays || request?.num_days || 0} days
+                  </span>
+                </div>
+              </div>
+            </div>
             <button className={styles.confirmationCloseBtn} onClick={onClose}>
               &times;
             </button>
           </div>
 
-          <div className={styles.confirmationBody}>
-            <div className={styles.paymentOptions}>
-              <label>
-                <input
-                  type="radio"
-                  value="with_pay"
-                  checked={approveFor === "with_pay"}
-                  onChange={(e) => setApproveFor(e.target.value)}
-                />
-                With Pay (deduct from leave credits) still eligible for monthly accrual
-              </label>
+          {/* MAIN CONTENT */}
+          <div className={styles.landscapeContent}>
+            {/* LEFT COLUMN - PAYMENT OPTIONS */}
+            <div className={styles.leftColumn}>
+              <div className={styles.sectionCard}>
+                <h3 className={styles.sectionTitle}>
+                  <span className={styles.sectionIcon}>💰</span>
+                  Payment Type
+                </h3>
 
-              <label>
-                <input
-                  type="radio"
-                  value="without_pay"
-                  checked={approveFor === "without_pay"}
-                  onChange={(e) => setApproveFor(e.target.value)}
-                />
-                Without Pay (deducts leave credits) does not eligible for monthly accrual
-              </label>
+                {isCalculating && (
+                  <div className={styles.calculatingOverlay}>
+                    <div className={styles.calculatingSpinner}></div>
+                    <span>Calculating...</span>
+                  </div>
+                )}
 
-              <label>
-                <input
-                  type="radio"
-                  value="both"
-                  checked={approveFor === "both"}
-                  onChange={(e) => setApproveFor(e.target.value)}
-                />
-                Partial (mixed) Unpaid days affect monthly accrual eligibility
-              </label>
-            </div>
+                <div className={styles.paymentOptions}>
+                  {/* With Pay Option */}
+                  <div
+                    className={`${styles.paymentOption} ${
+                      approveFor === "with_pay" ? styles.selected : ""
+                    }`}
+                  >
+                    <label className={styles.radioLabel}>
+                      <input
+                        type="radio"
+                        value="with_pay"
+                        checked={approveFor === "with_pay"}
+                        onChange={(e) => setApproveFor(e.target.value)}
+                        disabled={isCalculating}
+                      />
+                      <div className={styles.radioContent}>
+                        <div className={styles.optionHeader}>
+                          <span className={styles.optionTitle}>With Pay</span>
+                          <span className={styles.optionBadge}>
+                            Recommended
+                          </span>
+                        </div>
+                        <div className={styles.optionDescription}>
+                          Employee receives full salary during leave
+                        </div>
+                        <div className={styles.optionDetails}>
+                          <span className={styles.detailItem}>
+                            ✅ {totalWorkingDays} working days paid
+                          </span>
+                          <span className={styles.detailItem}>
+                            ✅ Full monthly accrual
+                          </span>
+                          {holidayDays > 0 && (
+                            <span className={styles.detailItem}>
+                              📅 {holidayDays} holiday(s)/weekend(s) excluded
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </label>
+                  </div>
 
-            {approveFor === "both" && (
-              <div className={styles.partialDays}>
-                <label>Days with Pay:</label>
-                <input
-                  type="number"
-                  min="0"
-                  max={request.num_days}
-                  value={withPayDays}
-                  onChange={(e) =>
-                    setWithPayDays(parseInt(e.target.value) || 0)
-                  }
-                />
-                <small>Total requested: {request.num_days} days</small>
-              </div>
-            )}
+                  {/* Without Pay Option */}
+                  <div
+                    className={`${styles.paymentOption} ${
+                      approveFor === "without_pay" ? styles.selected : ""
+                    }`}
+                  >
+                    <label className={styles.radioLabel}>
+                      <input
+                        type="radio"
+                        value="without_pay"
+                        checked={approveFor === "without_pay"}
+                        onChange={(e) => setApproveFor(e.target.value)}
+                        disabled={isCalculating}
+                      />
+                      <div className={styles.radioContent}>
+                        <div className={styles.optionHeader}>
+                          <span className={styles.optionTitle}>
+                            Without Pay
+                          </span>
+                          <span className={styles.optionBadgeWarning}>
+                            Limited
+                          </span>
+                        </div>
+                        <div className={styles.optionDescription}>
+                          Employee receives no salary during leave
+                        </div>
+                        <div className={styles.optionDetails}>
+                          <span className={styles.detailItem}>
+                            ❌ {totalWorkingDays} working days unpaid
+                          </span>
+                          <span className={styles.detailItem}>
+                            ❌ No monthly accrual
+                          </span>
+                          {holidayDays > 0 && (
+                            <span className={styles.detailItem}>
+                              📅 {holidayDays} holiday(s)/weekend(s) excluded
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </label>
+                  </div>
 
-            {breakdown && (
-              <div className={styles.breakdownSummary}>
-                <h4>Summary:</h4>
-                <p>Working Days: {breakdown.totalWorkingDays}</p>
-                <p>Holidays/Weekends: {breakdown.holidayDays}</p>
-                <p>With Pay: {breakdown.paidDays} days</p>
-                <p>Without Pay: {breakdown.unpaidDays} days</p>
+                  {/* Partial (Mixed) Option */}
+                  <div
+                    className={`${styles.paymentOption} ${
+                      approveFor === "both" ? styles.selected : ""
+                    }`}
+                  >
+                    <label className={styles.radioLabel}>
+                      <input
+                        type="radio"
+                        value="both"
+                        checked={approveFor === "both"}
+                        onChange={(e) => setApproveFor(e.target.value)}
+                        disabled={isCalculating}
+                      />
+                      <div className={styles.radioContent}>
+                        <div className={styles.optionHeader}>
+                          <span className={styles.optionTitle}>
+                            Partial (Mixed)
+                          </span>
+                          <span className={styles.optionBadgeInfo}>
+                            Flexible
+                          </span>
+                        </div>
+                        <div className={styles.optionDescription}>
+                          Split working days between paid and unpaid
+                        </div>
+                        <div className={styles.optionDetails}>
+                          <span className={styles.detailItem}>
+                            ⚠️ Partial monthly accrual
+                          </span>
+                          <span className={styles.detailItem}>
+                            📅 Holidays/weekends excluded from split
+                          </span>
+                        </div>
+                      </div>
+                    </label>
+                  </div>
+                </div>
 
-                {breakdown.requiresApproval && (
-                  <p className={styles.warning}>
-                    ⚠️ This leave requires special approval
-                  </p>
+                {/* Partial Days Section - Only for "both" mode */}
+                {approveFor === "both" && (
+                  <div className={styles.partialSection}>
+                    <div className={styles.sliderHeader}>
+                      <h4>Working Days with Pay</h4>
+                      <div className={styles.sliderStats}>
+                        <span className={styles.totalWorkingDaysDisplay}>
+                          Total Working Days:{" "}
+                          <strong>{totalWorkingDays}</strong>
+                          {holidayDays > 0 &&
+                            ` (excludes ${holidayDays} holiday(s)/weekend(s))`}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className={styles.sliderContainer}>
+                      <input
+                        type="range"
+                        min="0"
+                        max={totalWorkingDays}
+                        value={withPayDays}
+                        onChange={(e) => handleSliderChange(e.target.value)}
+                        className={styles.rangeSlider}
+                        disabled={isCalculating}
+                      />
+                      <div className={styles.sliderLabels}>
+                        <span>0</span>
+                        <span>{Math.floor(totalWorkingDays / 2)}</span>
+                        <span>{totalWorkingDays}</span>
+                      </div>
+                    </div>
+
+                    <div className={styles.daysInputRow}>
+                      <div className={styles.inputGroup}>
+                        <label>Working days with pay:</label>
+                        <input
+                          type="number"
+                          min="0"
+                          max={totalWorkingDays}
+                          value={withPayDays}
+                          onChange={(e) =>
+                            handleWithPayDaysChange(e.target.value)
+                          }
+                          className={styles.daysInput}
+                          disabled={isCalculating}
+                        />
+                        <small className={styles.inputHelper}>
+                          Enter 0-{totalWorkingDays} working days
+                          (holidays/weekends not included)
+                        </small>
+                      </div>
+
+                      <div className={styles.daysPreview}>
+                        <div className={styles.daysBar}>
+                          <div
+                            className={styles.paidBar}
+                            style={{
+                              width:
+                                totalWorkingDays > 0
+                                  ? `${(withPayDays / totalWorkingDays) * 100}%`
+                                  : "0%",
+                            }}
+                          ></div>
+                          <div
+                            className={styles.unpaidBar}
+                            style={{
+                              width:
+                                totalWorkingDays > 0
+                                  ? `${
+                                      (daysWithoutPay / totalWorkingDays) * 100
+                                    }%`
+                                  : "0%",
+                            }}
+                          ></div>
+                        </div>
+                        <div className={styles.barLabels}>
+                          <span>Paid ({withPayDays})</span>
+                          <span>Unpaid ({daysWithoutPay})</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 )}
               </div>
-            )}
+            </div>
 
-            <div className={styles.confirmationActions}>
+            {/* RIGHT COLUMN - BREAKDOWN & ACTIONS */}
+            <div className={styles.rightColumn}>
+              {/* Leave Details Card */}
+              <div className={styles.sectionCard}>
+                <h3 className={styles.sectionTitle}>
+                  <span className={styles.sectionIcon}>📋</span>
+                  Leave Details
+                </h3>
+                <div className={styles.detailsGrid}>
+                  <div className={styles.detailItem}>
+                    <span className={styles.detailLabel}>Employee:</span>
+                    <span className={styles.detailValue}>
+                      {request.employeeName}
+                    </span>
+                  </div>
+                  <div className={styles.detailItem}>
+                    <span className={styles.detailLabel}>Leave Type:</span>
+                    <span className={styles.detailValue}>
+                      {request.leaveType}
+                    </span>
+                  </div>
+                  <div className={styles.detailItem}>
+                    <span className={styles.detailLabel}>Location:</span>
+                    <span className={styles.detailValue}>
+                      {request.location || "Not specified"}
+                    </span>
+                  </div>
+                  <div className={styles.detailItem}>
+                    <span className={styles.detailLabel}>Duration:</span>
+                    <span className={styles.detailValue}>
+                      {request.numDays || request.num_days || 0} calendar days
+                    </span>
+                  </div>
+                  <div className={styles.detailItem}>
+                    <span className={styles.detailLabel}>Working Days:</span>
+                    <span className={styles.detailValue}>
+                      {totalWorkingDays} days (excl. holidays/weekends)
+                    </span>
+                  </div>
+                  {holidayDays > 0 && (
+                    <div className={styles.detailItem}>
+                      <span className={styles.detailLabel}>
+                        Holidays/Weekends:
+                      </span>
+                      <span className={styles.detailValue}>
+                        {holidayDays} days
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Breakdown Card */}
+              {breakdown && (
+                <div className={styles.sectionCard}>
+                  <h3 className={styles.sectionTitle}>
+                    <span className={styles.sectionIcon}>🧮</span>
+                    Leave Breakdown
+                  </h3>
+                  <div className={styles.breakdownGrid}>
+                    <div className={styles.breakdownCard}>
+                      <div className={styles.breakdownIcon}>📅</div>
+                      <div className={styles.breakdownContent}>
+                        <span className={styles.breakdownLabel}>
+                          Calendar Days
+                        </span>
+                        <span className={styles.breakdownValue}>
+                          {request.numDays || request.num_days || 0}
+                        </span>
+                      </div>
+                    </div>
+                    <div className={styles.breakdownCard}>
+                      <div className={styles.breakdownIcon}>💼</div>
+                      <div className={styles.breakdownContent}>
+                        <span className={styles.breakdownLabel}>
+                          Working Days
+                        </span>
+                        <span className={styles.breakdownValue}>
+                          {totalWorkingDays}
+                        </span>
+                      </div>
+                    </div>
+                    <div className={styles.breakdownCard}>
+                      <div className={styles.breakdownIcon}>🎉</div>
+                      <div className={styles.breakdownContent}>
+                        <span className={styles.breakdownLabel}>
+                          Holidays/Weekends
+                        </span>
+                        <span className={styles.breakdownValue}>
+                          {holidayDays}
+                        </span>
+                      </div>
+                    </div>
+                    <div className={styles.breakdownCard}>
+                      <div className={styles.breakdownIcon}>✅</div>
+                      <div className={styles.breakdownContent}>
+                        <span className={styles.breakdownLabel}>With Pay</span>
+                        <span
+                          className={`${styles.breakdownValue} ${styles.valueGreen}`}
+                        >
+                          {breakdown.paidDays || 0}
+                        </span>
+                      </div>
+                    </div>
+                    <div className={styles.breakdownCard}>
+                      <div className={styles.breakdownIcon}>❌</div>
+                      <div className={styles.breakdownContent}>
+                        <span className={styles.breakdownLabel}>
+                          Without Pay
+                        </span>
+                        <span
+                          className={`${styles.breakdownValue} ${styles.valueRed}`}
+                        >
+                          {breakdown.unpaidDays || 0}
+                        </span>
+                      </div>
+                    </div>
+                    <div className={styles.breakdownCard}>
+                      <div className={styles.breakdownIcon}>📊</div>
+                      <div className={styles.breakdownContent}>
+                        <span className={styles.breakdownLabel}>
+                          Total Deduction
+                        </span>
+                        <span className={styles.breakdownValue}>
+                          {(breakdown.paidDays || 0) +
+                            (breakdown.unpaidDays || 0)}{" "}
+                          days
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Balance Information */}
+                  <div className={styles.balanceInfo}>
+                    <div className={styles.balanceItem}>
+                      <span>Available Balance:</span>
+                      <strong>{breakdown.availableBalance || 0} days</strong>
+                    </div>
+                    <div className={styles.balanceItem}>
+                      <span>Balance After Deduction:</span>
+                      <strong>{breakdown.balanceAfter || 0} days</strong>
+                    </div>
+                  </div>
+
+                  {/* Warning for special approval */}
+                  {breakdown.requiresApproval && (
+                    <div className={styles.warningCard}>
+                      <div className={styles.warningIcon}>⚠️</div>
+                      <div className={styles.warningContent}>
+                        <strong>Special Approval Required</strong>
+                        <p>
+                          This leave exceeds normal limits and may require
+                          additional approval.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Accrual Impact */}
+              <div className={styles.sectionCard}>
+                <h3 className={styles.sectionTitle}>
+                  <span className={styles.sectionIcon}>📈</span>
+                  Monthly Accrual Impact
+                </h3>
+                <div className={styles.accrualImpact}>
+                  {approveFor === "with_pay" && (
+                    <div className={styles.accrualStatusSuccess}>
+                      <div className={styles.accrualIcon}>✅</div>
+                      <div className={styles.accrualText}>
+                        <strong>Full Accrual</strong>
+                        <p>
+                          Employee remains eligible for full monthly leave
+                          accrual
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                  {approveFor === "without_pay" && (
+                    <div className={styles.accrualStatusWarning}>
+                      <div className={styles.accrualIcon}>❌</div>
+                      <div className={styles.accrualText}>
+                        <strong>No Accrual</strong>
+                        <p>
+                          Employee will NOT receive monthly accrual for this
+                          period
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                  {approveFor === "both" &&
+                    breakdown &&
+                    breakdown.unpaidDays > 0 && (
+                      <div className={styles.accrualStatusPartial}>
+                        <div className={styles.accrualIcon}>⚠️</div>
+                        <div className={styles.accrualText}>
+                          <strong>Partial Accrual</strong>
+                          <p>
+                            Monthly accrual blocked for{" "}
+                            {breakdown.unpaidDays || 0} unpaid working day
+                            {(breakdown.unpaidDays || 0) !== 1 ? "s" : ""}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  {approveFor === "both" &&
+                    breakdown &&
+                    breakdown.unpaidDays === 0 && (
+                      <div className={styles.accrualStatusSuccess}>
+                        <div className={styles.accrualIcon}>✅</div>
+                        <div className={styles.accrualText}>
+                          <strong>Full Accrual</strong>
+                          <p>
+                            All working days are paid - eligible for full
+                            monthly accrual
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* FOOTER - ACTION BUTTONS */}
+          <div className={styles.modalFooter}>
+            <div className={styles.footerSummary}>
+              <div className={styles.summaryItem}>
+                <span>Selected:</span>
+                <strong>
+                  {approveFor === "with_pay"
+                    ? "With Pay"
+                    : approveFor === "without_pay"
+                    ? "Without Pay"
+                    : `Partial (${withPayDays} paid, ${daysWithoutPay} unpaid)`}
+                </strong>
+              </div>
+              {breakdown && (
+                <div className={styles.summaryItem}>
+                  <span>To deduct:</span>
+                  <strong className={styles.deductionAmount}>
+                    {(breakdown.paidDays || 0) + (breakdown.unpaidDays || 0)}{" "}
+                    working days from leave credits
+                  </strong>
+                </div>
+              )}
+            </div>
+            <div className={styles.footerActions}>
               <button
-                className={styles.confirmationCancelBtn}
+                className={styles.cancelButton}
                 onClick={onClose}
+                disabled={isCalculating}
               >
                 Cancel
               </button>
               <button
-                className={styles.confirmationApproveBtn}
-                onClick={() => onApprove(request.id, approveFor, withPayDays)}
+                className={styles.approveButton}
+                onClick={handleApprove}
+                disabled={isCalculating || !breakdown}
               >
-                Approve
+                {isCalculating ? (
+                  <div className={styles.loadingContent}>
+                    <span className={styles.spinnerSmall}></span>
+                    Calculating...
+                  </div>
+                ) : (
+                  <div className={styles.approveContent}>
+                    <span className={styles.approveIcon}>✓</span>
+                    <div className={styles.approveText}>
+                      <strong>Approve Leave</strong>
+                      {breakdown && (
+                        <span className={styles.approveSubtext}>
+                          {breakdown.paidDays || 0} paid •{" "}
+                          {breakdown.unpaidDays || 0} unpaid
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
               </button>
             </div>
           </div>
@@ -1630,7 +2594,7 @@ const handleApproveWithOptions = async (
       <Meta name="robots" content="noindex, nofollow" />
       <Hamburger />
       <Sidebar />
-    
+
       <ToastContainer
         position="top-right"
         autoClose={2500}
@@ -1756,7 +2720,7 @@ const handleApproveWithOptions = async (
                             <td>{formatDate(req.dateOfFiling)}</td>
                             <td>{formatDate(req.startDate)}</td>
                             <td>{formatDate(req.endDate)}</td>
-                            <td>{req.numDays || 0}</td>
+                            <td>{req.num_days || 0}</td>
                             <td>
                               <span className={statusClass}>
                                 {req.status || "Pending"}
@@ -1828,21 +2792,32 @@ const handleApproveWithOptions = async (
                               {isApproved ? (
                                 <div className={styles.downloadActions}>
                                   {req.hasExistingPdf ? (
-                                    <button
-                                      className={styles.downloadExistingBtn}
-                                      onClick={() =>
-                                        downloadExistingPdf(
-                                          req.existingPdfUrl,
-                                          `Leave_Form_${req.employeeName.replace(
-                                            /[^a-zA-Z0-9]/g,
-                                            "_"
-                                          )}_${req.id}.pdf`
-                                        )
-                                      }
-                                      title="Download existing PDF"
-                                    >
-                                      📥 Download
-                                    </button>
+                                    <>
+                                      <button
+                                        className={styles.downloadExistingBtn}
+                                        onClick={() =>
+                                          downloadExistingPdf(
+                                            req.existingPdfUrl,
+                                            req
+                                          )
+                                        }
+                                        title="Download existing PDF"
+                                      >
+                                        📥 Download
+                                      </button>
+                                      <button
+                                        className={styles.customizePdfBtn}
+                                        onClick={() =>
+                                          handleCustomizeLeavePdf(req)
+                                        }
+                                        disabled={
+                                          isDownloadingPdf || generatingPdf
+                                        }
+                                        title="Customize PDF with officer names"
+                                      >
+                                        ✏️ Customize
+                                      </button>
+                                    </>
                                   ) : (
                                     <button
                                       className={styles.generatePdfBtn}
@@ -1980,11 +2955,11 @@ const handleApproveWithOptions = async (
                           <strong>Location:</strong> {req.location || "-"}
                         </p>
                         <p>
-                          <strong>Duration:</strong> {formatDate(req.startDate)}
+                          <strong>Duration:</strong> {formatDate(req.startDate)}{" "}
                           to {formatDate(req.endDate)}
                         </p>
                         <p>
-                          <strong>Days:</strong> {req.numDays || 0}
+                          <strong>Days:</strong> {req.num_days || 0}
                         </p>
                         <p>
                           <strong>Filed:</strong>
@@ -2081,43 +3056,67 @@ const handleApproveWithOptions = async (
         )}
         {/* Add this near your other modals (showApproveModal, showRejectModal) */}
         {showApprovalOptionsModal && selectedRequestForApproval && (
-          <ApprovalOptionsModal
-            request={selectedRequestForApproval}
-            onClose={() => {
+          <div
+            className={`${styles.confirmationModalOverlay} ${
+              isSidebarCollapsed ? "collapsed" : ""
+            }`}
+            style={{
+              left: isSidebarCollapsed ? "80px" : "250px",
+              width: isSidebarCollapsed
+                ? "calc(100vw - 80px)"
+                : "calc(100vw - 250px)",
+            }}
+            onClick={() => {
               setShowApprovalOptionsModal(false);
               setSelectedRequestForApproval(null);
             }}
-            onApprove={handleApproveWithOptions}
-          />
+          >
+            <ApprovalOptionsModal
+              request={selectedRequestForApproval}
+              onClose={() => {
+                setShowApprovalOptionsModal(false);
+                setSelectedRequestForApproval(null);
+              }}
+              onApprove={handleApproveWithOptions}
+            />
+          </div>
         )}
         {showLeaveBreakdownModal && leaveBreakdown && (
-          <div className={styles.breakdownModal}>
-            <h3>Leave Breakdown</h3>
-            <div className={styles.breakdownDetails}>
-              <p>
-                <strong>Total Calendar Days:</strong>{" "}
-                {leaveBreakdown.totalCalendarDays}
-              </p>
-              <p>
-                <strong>Working Days:</strong> {leaveBreakdown.workingDays}
-              </p>
-              <p>
-                <strong>Holidays/Weekends:</strong> {leaveBreakdown.holidayDays}
-              </p>
+          <div
+            className={`${styles.confirmationModalOverlay} ${
+              isSidebarCollapsed ? "collapsed" : ""
+            }`}
+            onClick={() => setShowLeaveBreakdownModal(false)}
+          >
+            <div className={styles.breakdownModal}>
+              <h3>Leave Breakdown</h3>
+              <div className={styles.breakdownDetails}>
+                <p>
+                  <strong>Total Calendar Days:</strong>{" "}
+                  {leaveBreakdown.totalCalendarDays}
+                </p>
+                <p>
+                  <strong>Working Days:</strong> {leaveBreakdown.workingDays}
+                </p>
+                <p>
+                  <strong>Holidays/Weekends:</strong>{" "}
+                  {leaveBreakdown.holidayDays}
+                </p>
 
-              {leaveBreakdown.holidaysInRange.length > 0 && (
-                <div className={styles.holidayList}>
-                  <strong>Holidays during leave:</strong>
-                  <ul>
-                    {leaveBreakdown.holidaysInRange.map((holiday, idx) => (
-                      <li key={idx}>
-                        {new Date(holiday.date).toLocaleDateString()}:{" "}
-                        {holiday.name}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+                {leaveBreakdown.holidaysInRange.length > 0 && (
+                  <div className={styles.holidayList}>
+                    <strong>Holidays during leave:</strong>
+                    <ul>
+                      {leaveBreakdown.holidaysInRange.map((holiday, idx) => (
+                        <li key={idx}>
+                          {new Date(holiday.date).toLocaleDateString()}:{" "}
+                          {holiday.name}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}
@@ -2175,7 +3174,7 @@ const handleApproveWithOptions = async (
                 <div className={styles.modalRow}>
                   <div className={styles.modalField}>
                     <label>Duration:</label>
-                    <span>{modalData.numDays || 0} day(s)</span>
+                    <span>{modalData.num_days || 0} day(s)</span>
                   </div>
                   <div className={styles.modalField}>
                     <label>Date Filed:</label>
@@ -2255,7 +3254,7 @@ const handleApproveWithOptions = async (
                         onClick={() =>
                           downloadExistingPdf(
                             modalData.existingPdfUrl,
-                            modalData
+                            modalData // Pass the full object, not just filename
                           )
                         }
                       >
@@ -2317,7 +3316,15 @@ const handleApproveWithOptions = async (
         )}
         {showApproveModal && selectedRequest && (
           <div
-            className={styles.confirmationModalOverlay}
+            className={`${styles.confirmationModalOverlay} ${
+              isSidebarCollapsed ? "collapsed" : ""
+            }`}
+            style={{
+              left: isSidebarCollapsed ? "80px" : "250px",
+              width: isSidebarCollapsed
+                ? "calc(100vw - 80px)"
+                : "calc(100vw - 250px)",
+            }}
             onClick={cancelAction}
           >
             <div
@@ -2371,7 +3378,9 @@ const handleApproveWithOptions = async (
         )}
         {showRejectModal && selectedRequest && (
           <div
-            className={styles.confirmationModalOverlay}
+            className={`${styles.confirmationModalOverlay} ${
+              isSidebarCollapsed ? "collapsed" : ""
+            }`}
             onClick={cancelAction}
           >
             <div
@@ -2436,6 +3445,21 @@ const handleApproveWithOptions = async (
               </div>
             </div>
           </div>
+        )}
+        {showLeaveOfficerModal && (
+          <LeaveOfficerInputModal
+            isOpen={showLeaveOfficerModal}
+            onClose={() => {
+              setShowLeaveOfficerModal(false);
+              setSelectedRequestForCustomPdf(null);
+            }}
+            onConfirm={handleConfirmLeaveOfficerNames}
+            initialData={leaveOfficerNames}
+            isGenerating={
+              generatingPdf &&
+              pdfDownloadForRequest === selectedRequestForCustomPdf?.id
+            }
+          />
         )}
         {/* PDF Progress Overlay */}
         {generatingPdf && (

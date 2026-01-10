@@ -1,4 +1,209 @@
 /* Rank Image Styles for Inventory Table */
+
+/* ========== Scan Result Modal Styles ========== */
+.inventoryScanResultModalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+}
+.inventoryEditScannerInfo {
+  background-color: #f0f7ff;
+  border: 1px solid #cce5ff;
+  border-radius: 6px;
+  padding: 10px 15px;
+  margin-bottom: 15px;
+  text-align: center;
+}
+.inventoryScanResultModal {
+  background: white;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 500px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  animation: modalSlideIn 0.3s ease-out;
+}
+
+@keyframes modalSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.inventoryScanResultModalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 25px;
+  border-bottom: 1px solid #e9ecef;
+  background-color: #f8f9fa;
+  border-radius: 12px 12px 0 0;
+}
+
+.inventoryScanResultModalHeader h3 {
+  margin: 0;
+  font-size: 18px;
+  color: #2b2b2b;
+  font-weight: 600;
+}
+
+.inventoryScanResultModalCloseBtn {
+  background: none;
+  border: none;
+  font-size: 28px;
+  cursor: pointer;
+  color: #6c757d;
+  line-height: 1;
+  padding: 0;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.2s;
+}
+
+.inventoryScanResultModalCloseBtn:hover {
+  background-color: #e9ecef;
+  color: #2b2b2b;
+}
+
+.inventoryScanResultModalContent {
+  padding: 25px;
+}
+
+.inventoryScanResultIcon {
+  font-size: 48px;
+  text-align: center;
+  margin-bottom: 15px;
+}
+
+.successIcon {
+  color: #28a745;
+}
+
+.infoIcon {
+  color: #1060af;
+}
+
+.inventoryScanResultTitle {
+  text-align: center;
+  font-size: 20px;
+  font-weight: 600;
+  color: #2b2b2b;
+  margin-bottom: 15px;
+}
+
+.inventoryScanResultDetails {
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  padding: 15px;
+  margin-bottom: 20px;
+}
+
+.inventoryScanResultMessage {
+  font-size: 15px;
+  color: #495057;
+  margin-bottom: 15px;
+  line-height: 1.5;
+}
+
+.inventoryScanResultEquipmentInfo {
+  background-color: white;
+  border-radius: 6px;
+  padding: 12px;
+  border-left: 4px solid #28a745;
+}
+
+.inventoryScanResultInfoRow {
+  margin-bottom: 8px;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.inventoryScanResultInfoRow strong {
+  color: #2b2b2b;
+  margin-right: 5px;
+}
+
+.inventoryScanResultNotice {
+  background-color: white;
+  border-radius: 6px;
+  padding: 12px;
+  border-left: 4px solid #1060af;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.inventoryScanResultModalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.inventoryScanResultApplyBtn {
+  background-color: #28a745;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 14px;
+}
+
+.inventoryScanResultApplyBtn:hover {
+  background-color: #218838;
+  transform: translateY(-1px);
+}
+
+.inventoryScanResultCancelBtn {
+  background-color: #6c757d;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 14px;
+}
+
+.inventoryScanResultCancelBtn:hover {
+  background-color: #5a6268;
+  transform: translateY(-1px);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .inventoryScanResultModal {
+    width: 95%;
+    margin: 10px;
+  }
+  
+  .inventoryScanResultModalActions {
+    flex-direction: column;
+  }
+  
+  .inventoryScanResultApplyBtn,
+  .inventoryScanResultCancelBtn {
+    width: 100%;
+  }
+}
 .rankHeader {
   min-width: 150px !important;
 }
@@ -140,9 +345,12 @@ text-indent: 90px;
 .barcodeModal {
   background-color: white;
   border-radius: 8px;
-  width: 400px;
-  max-width: 90%;
+  width: 90%;
+  max-width: 500px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  max-height: 90vh;
+  overflow-y: auto;
+  margin-left: 200px;
 }
 
 .barcodeModalHeader {
@@ -167,20 +375,180 @@ text-indent: 90px;
 
 .barcodeModalContent {
   padding: 20px;
+  display: flex;
+  flex-direction: column;
 }
+
 
 .barcodeContainer {
-  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   margin-bottom: 20px;
+  width: 100%;
 }
 
+
+/* Equipment details - responsive grid */
+.equipmentDetails {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  margin-top: 15px;
+  width: 100%;
+}
+
+.equipmentDetails p {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.equipmentDetails strong {
+  min-width: 120px;
+}
+
+/* Modal actions - responsive buttons */
+.barcodeModalActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 20px;
+}
+
+.barcodeDownloadBtn,
+.barcodeCloseBtn {
+  flex: 1;
+  min-width: 150px;
+  padding: 12px;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+/* Responsive adjustments */
+@media screen and (max-width: 768px) {
+  .barcodeModal {
+    width: 95%;
+    max-width: 95%;
+    margin: 10px;
+  }
+  
+  .barcodeModalContent {
+    padding: 15px;
+  }
+  
+  .barcodeInfo h4 {
+    font-size: 16px;
+  }
+  
+  .barcodeCode {
+    font-size: 14px;
+    padding: 6px 10px;
+  }
+  
+  #barcode-canvas {
+    max-width: 250px;
+  }
+  
+  .equipmentDetails p {
+    flex-direction: column;
+    gap: 2px;
+  }
+  
+  .equipmentDetails strong {
+    min-width: auto;
+    display: inline-block;
+  }
+  
+  .barcodeModalActions {
+    flex-direction: column;
+  }
+  
+  .barcodeDownloadBtn,
+  .barcodeCloseBtn {
+    width: 100%;
+  }
+}
+
+@media screen and (max-width: 480px) {
+  .barcodeModalHeader h3 {
+    font-size: 18px;
+  }
+  
+  .barcodeInfo h4 {
+    font-size: 15px;
+  }
+  
+  .barcodeCode {
+    font-size: 13px;
+  }
+  
+  #barcode-canvas {
+    max-width: 200px;
+    height: 70px;
+  }
+}
+
+/* For very long barcodes */
+.barcodeCode.long-barcode {
+  font-size: 14px;
+  letter-spacing: 0.5px;
+}
+
+/* Scrollable container for very long content */
+.barcodeModalContent.scrollable {
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+/* Responsive text truncation for very long values */
+.barcodeInfo p {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Print styles for barcode */
+@media print {
+  .barcodeModal {
+    box-shadow: none;
+    border: 1px solid #000;
+  }
+  
+  .barcodeModalHeader,
+  .barcodeModalActions {
+    display: none;
+  }
+  
+  .barcodeContainer {
+    break-inside: avoid;
+  }
+}
 .barcodeInfo {
   margin-bottom: 15px;
 }
-
+.barcodeCode {
+  font-family: 'Courier New', monospace;
+  font-size: 16px;
+  font-weight: bold;
+  background-color: #f5f5f5;
+  padding: 8px 12px;
+  border-radius: 4px;
+  margin: 10px 0;
+  word-break: break-all;
+  text-align: center;
+  max-width: 100%;
+  overflow-wrap: break-word;
+}
 .barcodeInfo h4 {
-  margin: 0 0 5px 0;
+  margin: 0 0 10px 0;
   color: #333;
+  font-size: 18px;
+  word-break: break-word;
+  text-align: center;
+  max-width: 100%;
 }
 
 .barcodeInfo p {
@@ -883,7 +1251,24 @@ text-indent: 90px;
     max-height: 85vh !important;
     margin: 10px !important;
   }
-
+.modalContainer {
+  position: relative;
+  width: 100%;
+  left: 900px;
+}
+.inventoryModalWrapper {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  transition: margin-left 0.3s ease, width 0.3s ease;
+  z-index: 1001;
+  
+}
   .inventoryModalInputRow {
     grid-template-columns: 1fr !important;
     gap: 15px !important;
@@ -1749,22 +2134,23 @@ text-indent: 90px;
   display: flex;
   justify-content: center;
   align-items: center;
-  
+  animation: inventoryFadeIn 0.3s ease;
+}
+.inventoryEditModalOverlay.show {
   animation: inventoryFadeIn 0.3s ease;
 }
 
 .inventoryModalContainer {
   background: #fff;
   border-radius: 12px;
-  max-width: 500px;
-  width: 90%;
-  max-height: 80vh;
+  width: 95%;
+  max-width: 800px;
+  max-height: 90vh;
   overflow-y: auto;
-  overflow-x: hidden; /* ADD THIS to prevent horizontal scroll */
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
   animation: inventorySlideFadeIn 0.3s forwards;
   position: relative;
-  z-index: 1001;
+  z-index: 1002;
 }
 
 
@@ -1774,8 +2160,11 @@ text-indent: 90px;
   align-items: center;
   padding: 20px 25px;
   border-bottom: 1px solid #e0e0e0;
-  
   background: linear-gradient(135deg, #1060af, #529ae1);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  border-radius: 12px 12px 0 0;
 }
 
 .inventoryModalTitle {
@@ -1785,9 +2174,8 @@ text-indent: 90px;
   font-weight: 700;
   text-align: center;
   flex: 1;
-
-  
 }
+
 .H14{
   margin-top: 10px;
   margin-bottom: 10px;
@@ -2417,7 +2805,7 @@ text-indent: 90px;
   .inventoryModalScanBtn:hover {
     background: #0d4d8c;
     transform: translateY(-1px);
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.98);
+
   }
 
   /* Modal Actions */
@@ -3269,4 +3657,3 @@ margin-bottom: px;
   background-color: #f5f5f5;
   cursor: not-allowed;
 }
-
