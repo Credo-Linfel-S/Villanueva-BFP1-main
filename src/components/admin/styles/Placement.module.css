@@ -938,6 +938,10 @@
   .inventoryTable td:nth-child(8) {
     min-width: 210px !important;
   }
+        .inventoryTable th:nth-child(9),
+  .inventoryTable td:nth-child(9) {
+    min-width: 210px !important;
+  }
 .inventoryTable thead tr {
   background: #529ae1;
 }
@@ -1029,14 +1033,13 @@
 .inventoryDeleteBtn {
   background-color: red;
   color: #ffffff;
-  padding: 8px 4px;
+  padding: 8px 12px;
   border-radius: 5px;
   border: none;
   width: 60px;
   height: 30px;
   top: 0px;
   margin-left: 10px;
-  margin-top: 10px;
   cursor: pointer;
   font-weight: 600;
   transition: all 0.25s ease;
