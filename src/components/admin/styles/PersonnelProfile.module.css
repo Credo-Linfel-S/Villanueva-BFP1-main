@@ -601,13 +601,147 @@
     left: 10px;
   }
 
+  /* Card Header - Fix layout */
+.preCardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 15px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid #e0e0e0;
+  position: relative;
+  min-height: 80px; /* Ensure minimum height for rank image */
+}
+
+/* Left content - Add max width to prevent overlap */
+.headerLeft {
+  display: flex;
+  gap: 15px;
+  align-items: flex-start;
+  flex: 1;
+  max-width: calc(100% - 70px); /* Reserve space for rank image */
+  min-width: 0; /* Allow text to wrap */
+}
+
+/* Text container - Ensure text wraps properly */
+.headerText {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0; /* Crucial for text truncation */
+}
+
+/* Name styles with overflow handling */
+.headerText h3 {
+  margin: 0 0 5px 0;
+  font-size: 18px;
+  color: #333;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+/* Rank/Designation text */
+.headerText small {
+  display: block;
+  color: #666;
+  font-size: 12px;
+  margin-bottom: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+/* Rank Image Container - Fixed positioning */
+.rankImageContainer {
+  position: relative;
+  width: 60px;
+  height: 60px;
+  flex-shrink: 0;
+  margin-left: 10px; /* Add spacing from text */
+}
+
+/* For carousel text - adjust animation */
+.nameCarouselContainer {
+  position: relative;
+  overflow: hidden;
+  max-width: calc(100% - 70px); /* Reserve space for rank image */
+  margin-bottom: 5px;
+}
+
+.nameText {
+  display: inline-block;
+  white-space: nowrap;
+  font-size: 18px;
+  font-weight: 600;
+  color: #333;
+  transition: transform 0.3s ease;
+  padding-right: 10px; /* Prevent text from touching edge */
+}
+
+/* Update the carousel animation */
+@keyframes scrollText {
+  0% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(calc(-100% + 200px)); /* Adjust based on available space */
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+
+.scrolling {
+  animation: scrollText 10s ease-in-out infinite;
+  animation-play-state: running;
+}
+
+.paused {
+  animation-play-state: paused;
+}
+
+/* For very small screens */
+@media (max-width: 480px) {
+  .preCardHeader {
+    flex-direction: row; /* Keep side-by-side layout */
+    align-items: center;
+  }
   
+  .headerLeft {
+    max-width: calc(100% - 50px); /* Smaller rank image on mobile */
+  }
+  
+  .rankImageContainer {
+    width: 50px;
+    height: 50px;
+  }
+  
+  .headerText h3 {
+    font-size: 16px;
+  }
+}
+
+/* For extremely long names - force text wrapping after certain point */
+@media (max-width: 768px) {
+  .headerText h3 {
+    white-space: normal; /* Allow wrapping on smaller screens */
+    word-break: break-word;
+  }
+  
+  .nameCarouselContainer {
+    max-width: calc(100% - 60px);
+  }
+}
 
   .prePersonnelCards {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
     gap: 20px;
     width: 100%;
+    
     padding: 0 2px;
     margin-top: 10px;
     box-sizing: border-box;
@@ -1954,4 +2088,39 @@
 
 .nameHoverContainer:hover .fullNameTooltip {
   opacity: 1;
+}
+
+/* Status badge styling */
+.statusBadge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.statusActive {
+  background-color: #d1fae5;
+  color: #065f46;
+}
+
+.statusInactive {
+  background-color: #fef3c7;
+  color: #92400e;
+}
+
+.statusRetired {
+  background-color: #fee2e2;
+  color: #991b1b;
+}
+
+.statusTransferred { /* Changed from statusAWOL */
+  background-color: #e0f2fe;
+  color: #0369a1;
+}
+
+.statusResigned {
+  background-color: #f3e8ff;
+  color: #6b21a8;
 }

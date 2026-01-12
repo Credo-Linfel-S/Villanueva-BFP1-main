@@ -2,10 +2,15 @@ import React, { useState, useEffect } from "react";
 import styles from "../styles/EmployeeLeaveRequest.module.css";
 import Hamburger from "../../Hamburger.jsx";
 import EmployeeSidebar from "../../EmployeeSidebar.jsx";
+import LeaveMeter from "./LeaveMeter.jsx";
 import { useSidebar } from "../../SidebarContext.jsx";
 import { useAuth } from "../../AuthContext.jsx";
 import { Title, Meta } from "react-head";
 import { supabase } from "../../../lib/supabaseClient.js";
+import BFPPreloader from "../../BFPPreloader.jsx";
+import { useLocation } from "react-router-dom";
+import { ToastContainer, toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 const EmployeeLeaveRequest = () => {
   const [formData, setFormData] = useState({
@@ -17,11 +22,8 @@ const EmployeeLeaveRequest = () => {
     numDays: 0,
   });
 
-  const [leaveBalance, setLeaveBalance] = useState({
-    vacation: 0,
-    sick: 0,
-    emergency: 0,
-  });
+  // Keep only the leaveBalanceId for tracking
+  const [leaveBalanceId, setLeaveBalanceId] = useState(null);
 
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [showSickLeaveModal, setShowSickLeaveModal] = useState(false);
@@ -30,17 +32,16 @@ const EmployeeLeaveRequest = () => {
     type: "",
     illness: "",
   });
-  const [showToast, setShowToast] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const { isSidebarCollapsed } = useSidebar();
   const { user, loading: authLoading } = useAuth();
+  const location = useLocation();
   const [submitLoading, setSubmitLoading] = useState(false);
   const [employeeId, setEmployeeId] = useState(null);
   const [errorMessage, setErrorMessage] = useState("");
-  const [leaveBalanceId, setLeaveBalanceId] = useState(null);
 
-  // NEW: State for insufficient balance warning and user confirmation
+  // State for insufficient balance warning and user confirmation
   const [showInsufficientBalanceModal, setShowInsufficientBalanceModal] =
     useState(false);
   const [leaveRequestData, setLeaveRequestData] = useState(null);
@@ -51,8 +52,76 @@ const EmployeeLeaveRequest = () => {
   const [abroadLocation, setAbroadLocation] = useState("");
   const [philippinesLocation, setPhilippinesLocation] = useState("");
 
+  // State for holidays
+  const [holidays, setHolidays] = useState([]);
+  const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
+
+  // NEW: State to control form modal visibility
+  const [showFormModal, setShowFormModal] = useState(false);
+
+  // Define which leave types don't require credits
+  const LEAVES_WITHOUT_CREDIT_REQUIREMENT = [
+    "Maternity",
+    "Paternity",
+    "Emergency",
+  ];
+
   // PH Timezone constants and functions
-  const PH_TIMEZONE_OFFSET = 8 * 60 * 60 * 1000; // 8 hours in milliseconds
+  const PH_TIMEZONE_OFFSET = 8 * 60 * 60 * 1000;
+
+  // Toast notification functions
+  const showSuccessToast = (message) => {
+    toast.success(message, {
+      position: "top-right",
+      autoClose: 5000,
+      hideProgressBar: false,
+      closeOnClick: true,
+      pauseOnHover: true,
+      draggable: true,
+      progress: undefined,
+    });
+  };
+
+  const showErrorToast = (message) => {
+    toast.error(message, {
+      position: "top-right",
+      autoClose: 5000,
+      hideProgressBar: false,
+      closeOnClick: true,
+      pauseOnHover: true,
+      draggable: true,
+      progress: undefined,
+    });
+  };
+
+  const showWarningToast = (message) => {
+    toast.warning(message, {
+      position: "top-right",
+      autoClose: 5000,
+      hideProgressBar: false,
+      closeOnClick: true,
+      pauseOnHover: true,
+      draggable: true,
+      progress: undefined,
+    });
+  };
+
+  const showInfoToast = (message) => {
+    toast.info(message, {
+      position: "top-right",
+      autoClose: 5000,
+      hideProgressBar: false,
+      closeOnClick: true,
+      pauseOnHover: true,
+      draggable: true,
+      progress: undefined,
+    });
+  };
+
+  // Helper function to check if leave type requires credits
+  const requiresLeaveCredits = (leaveType) => {
+    return !LEAVES_WITHOUT_CREDIT_REQUIREMENT.includes(leaveType);
+  };
 
   // Convert any date to PH time
   const toPHTime = (date) => {
@@ -79,17 +148,45 @@ const EmployeeLeaveRequest = () => {
     return toPHTime(new Date()).toISOString();
   };
 
-  // Calculate days between dates (using PH time for accuracy)
-  const calculateDays = (start, end) => {
+  // Load holidays from API
+  const loadHolidays = async () => {
+    try {
+      const response = await fetch(
+        `https://date.nager.at/api/v3/PublicHolidays/${currentYear}/PH`
+      );
+      if (response.ok) {
+        const data = await response.json();
+        setHolidays(data);
+      } else {
+        const fallbackHolidays = [
+          { date: `${currentYear}-01-01`, name: "New Year's Day" },
+          { date: `${currentYear}-04-09`, name: "Araw ng Kagitingan" },
+          { date: `${currentYear}-05-01`, name: "Labor Day" },
+          { date: `${currentYear}-06-12`, name: "Independence Day" },
+          { date: `${currentYear}-08-21`, name: "Ninoy Aquino Day" },
+          { date: `${currentYear}-08-30`, name: "National Heroes' Day" },
+          { date: `${currentYear}-11-01`, name: "All Saints' Day" },
+          { date: `${currentYear}-11-30`, name: "Bonifacio Day" },
+          { date: `${currentYear}-12-25`, name: "Christmas Day" },
+          { date: `${currentYear}-12-30`, name: "Rizal Day" },
+        ];
+        setHolidays(fallbackHolidays);
+      }
+    } catch (error) {
+      console.error("Failed to load holidays:", error);
+      setHolidays([]);
+    }
+  };
+
+  // Calculate calendar days (for display only)
+  const calculateCalendarDays = (start, end) => {
     if (!start || !end) return 0;
 
-    // Convert to PH time for accurate day calculation
     const startDate = toPHTime(start);
     const endDate = toPHTime(end);
 
     if (isNaN(startDate) || isNaN(endDate) || endDate < startDate) return 0;
 
-    // Reset to midnight for accurate day count
     startDate.setUTCHours(0, 0, 0, 0);
     endDate.setUTCHours(0, 0, 0, 0);
 
@@ -97,58 +194,59 @@ const EmployeeLeaveRequest = () => {
     return Math.floor(timeDiff / (1000 * 60 * 60 * 24)) + 1;
   };
 
-  // Get current year leave balance WITH monthly accrual calculation
-  const getCurrentYearLeaveBalance = async (personnelId) => {
+  // Calculate working days (excludes weekends and holidays)
+  const calculateWorkingDays = (start, end) => {
+    if (!start || !end) return 0;
+
+    let count = 0;
+    let current = new Date(start);
+    const endDate = new Date(end);
+
+    while (current <= endDate) {
+      const dayOfWeek = current.getDay();
+      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+
+      const dateStr = current.toISOString().split("T")[0];
+      const isHoliday = holidays.some((h) => h.date === dateStr);
+
+      if (!isWeekend && !isHoliday) {
+        count++;
+      }
+
+      current.setDate(current.getDate() + 1);
+    }
+
+    return count;
+  };
+
+  // Calculate days (now returns working days for deduction)
+  const calculateDays = (start, end) => {
+    if (!start || !end) return 0;
+    return calculateWorkingDays(start, end);
+  };
+
+  // Get leave balance ID for tracking
+  const getLeaveBalanceId = async (personnelId) => {
     try {
       const currentYear = new Date().getFullYear();
-      const currentMonth = new Date().getMonth() + 1; // 1-12
 
       const { data: balance, error } = await supabase
         .from("leave_balances")
-        .select("*")
+        .select("id")
         .eq("personnel_id", personnelId)
         .eq("year", currentYear)
         .single();
 
       if (error && error.code === "PGRST116") {
-        // No balance record yet - create one with initial credits based on hire date
         const { data: personnelData } = await supabase
           .from("personnel")
           .select("date_hired")
           .eq("id", personnelId)
           .single();
 
-        let initialVacation = 0;
-        let initialSick = 0;
-        const initialEmergency = 5.0; // Emergency leave starts with 5 days
-
-        if (personnelData?.date_hired) {
-          const hireDate = new Date(personnelData.date_hired);
-          const hireYear = hireDate.getFullYear();
-
-          // If hired in current year, calculate pro-rated credits
-          if (hireYear === currentYear) {
-            const hireMonth = hireDate.getMonth() + 1; // 1-12
-            const monthsWorked = currentMonth - hireMonth + 1;
-
-            if (monthsWorked > 0) {
-              initialVacation = (monthsWorked * 1.25).toFixed(2);
-              initialSick = (monthsWorked * 1.25).toFixed(2);
-            }
-          } else {
-            // Hired in previous year, start with full accrual
-            initialVacation = (currentMonth * 1.25).toFixed(2);
-            initialSick = (currentMonth * 1.25).toFixed(2);
-          }
-        } else {
-          // Default if no hire date
-          initialVacation = (currentMonth * 1.25).toFixed(2);
-          initialSick = (currentMonth * 1.25).toFixed(2);
-        }
-
-        // Cap at 15 days max for vacation and sick
-        initialVacation = Math.min(parseFloat(initialVacation), 15).toFixed(2);
-        initialSick = Math.min(parseFloat(initialSick), 15).toFixed(2);
+        const initialVacation = 15.0;
+        const initialSick = 15.0;
+        const initialEmergency = 5.0;
 
         const newBalance = {
           personnel_id: personnelId,
@@ -171,96 +269,66 @@ const EmployeeLeaveRequest = () => {
 
         if (createError) throw createError;
 
-        setLeaveBalanceId(created.id);
-        return {
-          vacation: parseFloat(initialVacation),
-          sick: parseFloat(initialSick),
-          emergency: parseFloat(initialEmergency),
-          id: created.id,
-        };
+        return created.id;
       }
 
       if (error) throw error;
 
-      // Check if we need to apply monthly accrual
-      const lastUpdated = new Date(balance.updated_at);
-      const now = new Date();
+      return balance.id;
+    } catch (error) {
+      console.error("Error getting leave balance ID:", error);
+      return null;
+    }
+  };
 
-      // If it's a new month, apply accrual
-      if (
-        lastUpdated.getMonth() !== now.getMonth() ||
-        lastUpdated.getFullYear() !== now.getFullYear()
-      ) {
-        let newVacation = parseFloat(balance.vacation_balance) + 1.25;
-        let newSick = parseFloat(balance.sick_balance) + 1.25;
+  // Function to get current leave balance for a specific type
+  const getCurrentLeaveBalance = async (personnelId, leaveType) => {
+    try {
+      const currentYear = new Date().getFullYear();
+      const fieldMap = {
+        Vacation: "vacation_balance",
+        Sick: "sick_balance",
+        Emergency: "emergency_balance",
+      };
 
-        // Cap at 15 days max
-        newVacation = Math.min(newVacation, 15);
-        newSick = Math.min(newSick, 15);
+      const field = fieldMap[leaveType];
+      if (!field) return 0;
 
-        // Update in database
-        const { error: updateError } = await supabase
-          .from("leave_balances")
-          .update({
-            vacation_balance: newVacation.toFixed(2),
-            sick_balance: newSick.toFixed(2),
-            updated_at: getPHTimestamp(),
-          })
-          .eq("id", balance.id);
+      const { data: balance, error } = await supabase
+        .from("leave_balances")
+        .select(field)
+        .eq("personnel_id", personnelId)
+        .eq("year", currentYear)
+        .single();
 
-        if (updateError) throw updateError;
-
-        setLeaveBalanceId(balance.id);
-        return {
-          vacation: newVacation,
-          sick: newSick,
-          emergency: parseFloat(balance.emergency_balance) || 0,
-          id: balance.id,
-        };
+      if (error) {
+        console.error("Error getting leave balance:", error);
+        return 0;
       }
 
-      setLeaveBalanceId(balance.id);
-      return {
-        vacation: parseFloat(balance.vacation_balance) || 0,
-        sick: parseFloat(balance.sick_balance) || 0,
-        emergency: parseFloat(balance.emergency_balance) || 0,
-        id: balance.id,
-      };
+      return parseFloat(balance[field]) || 0;
     } catch (error) {
-      console.error("Error getting leave balance:", error);
-      return {
-        vacation: 0,
-        sick: 0,
-        emergency: 0,
-        id: null,
-      };
+      console.error("Error fetching leave balance:", error);
+      return 0;
     }
   };
 
-  // Get leave balance for type
-  const getLeaveBalanceForType = (leaveType) => {
-    switch (leaveType) {
-      case "Vacation":
-        return leaveBalance.vacation;
-      case "Sick":
-        return leaveBalance.sick;
-      case "Emergency":
-        return leaveBalance.emergency;
-      default:
-        return 0;
-    }
+  // Check if sufficient balance (now uses working days)
+  const hasSufficientBalance = async (personnelId, leaveType) => {
+    if (!formData.startDate || !formData.endDate) return false;
+
+    const balance = await getCurrentLeaveBalance(personnelId, leaveType);
+    const workingDays = calculateWorkingDays(
+      formData.startDate,
+      formData.endDate
+    );
+
+    return balance >= workingDays;
   };
 
-  // Check if sufficient balance
-  const hasSufficientBalance = (leaveType, requestedDays) => {
-    const balance = getLeaveBalanceForType(leaveType);
-    return balance >= requestedDays;
-  };
-
-  // NEW FUNCTION: Deduct leave balance ONLY when approved
+  // Deduct leave balance ONLY when approved
   const deductLeaveBalanceOnApproval = async (leaveRequestId) => {
     try {
-      // First, get the leave request details
       const { data: leaveRequest, error: fetchError } = await supabase
         .from("leave_requests")
         .select("*")
@@ -269,13 +337,15 @@ const EmployeeLeaveRequest = () => {
 
       if (fetchError) throw fetchError;
 
-      // Skip if it's leave without pay
-      if (leaveRequest.approve_for === "without_pay") {
-        console.log("Leave without pay - no balance deduction needed");
+      // Skip if it's leave without pay OR if it's a leave type that doesn't require credits
+      if (
+        leaveRequest.approve_for === "without_pay" ||
+        !requiresLeaveCredits(leaveRequest.leave_type)
+      ) {
+        console.log("No balance deduction needed for this leave type");
         return;
       }
 
-      // Get current balance
       const { data: balance, error: balanceError } = await supabase
         .from("leave_balances")
         .select("*")
@@ -284,17 +354,17 @@ const EmployeeLeaveRequest = () => {
 
       if (balanceError) throw balanceError;
 
-      // Calculate new balance
       const fieldToUpdate = leaveRequest.leave_type.toLowerCase() + "_balance";
       const usedField = leaveRequest.leave_type.toLowerCase() + "_used";
 
       const currentBalance = parseFloat(balance[fieldToUpdate]) || 0;
       const currentUsed = parseFloat(balance[usedField]) || 0;
 
-      const newBalance = Math.max(0, currentBalance - leaveRequest.num_days);
-      const newUsed = currentUsed + leaveRequest.num_days;
+      const daysToDeduct = leaveRequest.working_days || leaveRequest.num_days;
 
-      // Update balance in database
+      const newBalance = Math.max(0, currentBalance - daysToDeduct);
+      const newUsed = currentUsed + daysToDeduct;
+
       const { error: updateError } = await supabase
         .from("leave_balances")
         .update({
@@ -306,7 +376,6 @@ const EmployeeLeaveRequest = () => {
 
       if (updateError) throw updateError;
 
-      // Update leave request with final balance info
       const { error: updateRequestError } = await supabase
         .from("leave_requests")
         .update({
@@ -318,7 +387,9 @@ const EmployeeLeaveRequest = () => {
 
       if (updateRequestError) throw updateRequestError;
 
-      console.log(`Balance deducted for leave request ${leaveRequestId}`);
+      console.log(
+        `Balance deducted for leave request ${leaveRequestId}: ${daysToDeduct} days`
+      );
     } catch (error) {
       console.error("Error deducting leave balance on approval:", error);
       throw error;
@@ -346,7 +417,6 @@ const EmployeeLeaveRequest = () => {
       if (employeeData) {
         setEmployeeId(employeeData.id);
 
-        // Build full name
         const middle = employeeData.middle_name
           ? ` ${employeeData.middle_name}`
           : "";
@@ -354,18 +424,13 @@ const EmployeeLeaveRequest = () => {
           `${employeeData.first_name}${middle} ${employeeData.last_name}`.trim();
         setFormData((prev) => ({ ...prev, employeeName: fullName }));
 
-        // Get current year leave balance
-        const balanceRecord = await getCurrentYearLeaveBalance(employeeData.id);
-
-        setLeaveBalance({
-          vacation: balanceRecord.vacation,
-          sick: balanceRecord.sick,
-          emergency: balanceRecord.emergency,
-        });
+        const balanceId = await getLeaveBalanceId(employeeData.id);
+        setLeaveBalanceId(balanceId);
       }
     } catch (error) {
       console.error("Error loading employee data:", error);
       setErrorMessage("Failed to load employee data. Please refresh.");
+      showErrorToast("Failed to load employee data. Please refresh.");
     } finally {
       setIsLoading(false);
     }
@@ -375,11 +440,10 @@ const EmployeeLeaveRequest = () => {
   useEffect(() => {
     if (!authLoading && user) {
       loadEmployeeData();
+      loadHolidays();
 
-      // Get current PH date
       const today = formatPHDate(new Date());
 
-      // Calculate min start date (5 days from now in PH time)
       const minStartDate = getCurrentPHDate();
       minStartDate.setDate(minStartDate.getDate() + 5);
       const minStart = formatPHDate(minStartDate);
@@ -394,6 +458,11 @@ const EmployeeLeaveRequest = () => {
     }
   }, [user, authLoading]);
 
+  // Load holidays when component mounts
+  useEffect(() => {
+    loadHolidays();
+  }, [currentYear]);
+
   // Redirect if not authenticated
   useEffect(() => {
     if (!authLoading && !user) {
@@ -405,7 +474,7 @@ const EmployeeLeaveRequest = () => {
   useEffect(() => {
     const days = calculateDays(formData.startDate, formData.endDate);
     setFormData((prev) => ({ ...prev, numDays: days }));
-  }, [formData.startDate, formData.endDate]);
+  }, [formData.startDate, formData.endDate, holidays]);
 
   // Handle form input changes
   const handleInputChange = (e) => {
@@ -448,6 +517,7 @@ const EmployeeLeaveRequest = () => {
       setSelectedLocation("");
       setAbroadLocation("");
       setPhilippinesLocation("");
+      showSuccessToast("Vacation location saved successfully!");
     } else if (
       selectedLocation === "Philippines" &&
       philippinesLocation.trim()
@@ -458,15 +528,18 @@ const EmployeeLeaveRequest = () => {
       setSelectedLocation("");
       setAbroadLocation("");
       setPhilippinesLocation("");
+      showSuccessToast("Vacation location saved successfully!");
     } else if (!selectedLocation) {
-      alert("Please select a location (Abroad or Philippines).");
+      showErrorToast("Please select a location (Abroad or Philippines).");
     } else if (selectedLocation === "Abroad" && !abroadLocation.trim()) {
-      alert("Please specify the country and city for abroad location.");
+      showErrorToast(
+        "Please specify the country and city for abroad location."
+      );
     } else if (
       selectedLocation === "Philippines" &&
       !philippinesLocation.trim()
     ) {
-      alert(
+      showErrorToast(
         "Please specify the province and city/municipality for Philippines location."
       );
     }
@@ -475,16 +548,17 @@ const EmployeeLeaveRequest = () => {
   // Handle sick leave details confirmation
   const handleConfirmSickLeaveDetails = () => {
     if (!sickLeaveDetails.type) {
-      alert("Please select whether it's In hospital or Out patient.");
+      showErrorToast("Please select whether it's In hospital or Out patient.");
       return;
     }
 
     if (!sickLeaveDetails.illness.trim()) {
-      alert("Please specify the illness.");
+      showErrorToast("Please specify the illness.");
       return;
     }
 
     setShowSickLeaveModal(false);
+    showSuccessToast("Sick leave details saved successfully!");
   };
 
   // Close modals
@@ -509,7 +583,7 @@ const EmployeeLeaveRequest = () => {
     setPhilippinesLocation("");
   };
 
-  // NEW: Close insufficient balance modal
+  // Close insufficient balance modal
   const handleCloseInsufficientBalanceModal = () => {
     setShowInsufficientBalanceModal(false);
     setIsWithoutPay(false);
@@ -517,13 +591,47 @@ const EmployeeLeaveRequest = () => {
     setSubmitLoading(false);
   };
 
-  // NEW: Handle insufficient balance confirmation
+  // NEW: Close form modal
+  const handleCloseFormModal = () => {
+    setShowFormModal(false);
+    const today = formatPHDate(new Date());
+    const minStartDate = getCurrentPHDate();
+    minStartDate.setDate(minStartDate.getDate() + 5);
+    const minStart = formatPHDate(minStartDate);
+
+    setFormData({
+      employeeName: formData.employeeName,
+      dateOfFiling: today,
+      leaveType: "",
+      startDate: minStart,
+      endDate: minStart,
+      numDays: calculateDays(minStart, minStart),
+    });
+
+    setChosenLocation("");
+    setSelectedLocation("");
+    setAbroadLocation("");
+    setPhilippinesLocation("");
+    setSickLeaveDetails({
+      type: "",
+      illness: "",
+    });
+    setShowLocationModal(false);
+    setShowSickLeaveModal(false);
+    setErrorMessage("");
+    setIsWithoutPay(false);
+
+    showInfoToast("Form reset to default values");
+  };
+
+  // Handle insufficient balance confirmation
   const handleConfirmWithoutPay = () => {
     if (!isWithoutPay) {
-      alert("You must acknowledge that this will be leave without pay.");
+      showErrorToast(
+        "You must acknowledge that this will be leave without pay."
+      );
       return;
     }
-    // Continue with submission
     submitLeaveRequestFinal(leaveRequestData, true);
     setShowInsufficientBalanceModal(false);
   };
@@ -531,12 +639,17 @@ const EmployeeLeaveRequest = () => {
   // Submit leave request to Supabase - DO NOT deduct balance here
   const submitLeaveRequest = async (leaveRequestData) => {
     try {
-      // Set initial balance info but don't deduct yet
-      const balanceBefore = getLeaveBalanceForType(leaveRequestData.leave_type);
+      // Only get balance for leave types that require credits
+      let balanceBefore = 0;
+      if (requiresLeaveCredits(leaveRequestData.leave_type)) {
+        balanceBefore = await getCurrentLeaveBalance(
+          employeeId,
+          leaveRequestData.leave_type
+        );
+      }
 
-      // Store balance before but don't calculate balance after yet
       leaveRequestData.balance_before = balanceBefore;
-      leaveRequestData.balance_after = balanceBefore; // Same until approved
+      leaveRequestData.balance_after = balanceBefore;
 
       const { data, error } = await supabase
         .from("leave_requests")
@@ -553,22 +666,48 @@ const EmployeeLeaveRequest = () => {
     }
   };
 
-  // NEW: Final submission function WITHOUT balance deduction
+  // Final submission function WITHOUT balance deduction
   const submitLeaveRequestFinal = async (data, isWithoutPay = false) => {
     try {
-      // Store whether it's with or without pay
-      data.approve_for = isWithoutPay ? "without_pay" : "with_pay";
-      data.paid_days = isWithoutPay ? 0 : data.num_days;
-      data.unpaid_days = isWithoutPay ? data.num_days : 0;
+      const calendarDays = calculateCalendarDays(
+        data.start_date,
+        data.end_date
+      );
+      const workingDays = calculateWorkingDays(data.start_date, data.end_date);
+      const holidayDays = calendarDays - workingDays;
+
+      data.num_days = calendarDays;
+      data.working_days = workingDays;
+      data.holiday_days = holidayDays;
+
+      // For leaves without credit requirement, always mark as "special_leave" instead of with/without pay
+      if (!requiresLeaveCredits(data.leave_type)) {
+       data.approve_for = "with_pay";
+        data.paid_days = workingDays; // Special leaves are typically paid
+        data.unpaid_days = 0;
+      } else {
+        data.approve_for = isWithoutPay ? "without_pay" : "with_pay";
+        data.paid_days = isWithoutPay ? 0 : workingDays;
+        data.unpaid_days = isWithoutPay ? workingDays : 0;
+      }
 
       const result = await submitLeaveRequest(data);
 
       if (result.success) {
-        // Show success toast
-        setShowToast(true);
-        setTimeout(() => setShowToast(false), 3000);
+        if (!requiresLeaveCredits(data.leave_type)) {
+          showSuccessToast(
+            `${data.leave_type} leave request submitted successfully!`
+          );
+        } else if (isWithoutPay) {
+          showWarningToast(
+            "Leave request submitted as WITHOUT PAY. No credits deducted."
+          );
+        } else {
+          showSuccessToast(
+            "Leave request submitted successfully! Balance will be deducted upon approval."
+          );
+        }
 
-        // Reset form with PH dates
         const today = formatPHDate(new Date());
         const minStartDate = getCurrentPHDate();
         minStartDate.setDate(minStartDate.getDate() + 5);
@@ -588,12 +727,12 @@ const EmployeeLeaveRequest = () => {
         setErrorMessage("");
         setIsWithoutPay(false);
 
-        // Hide the important notice after successful submission
+        setShowFormModal(false);
         setShowImportantNotice(false);
       }
     } catch (error) {
       console.error("Error saving leave request:", error);
-      alert("Failed to submit leave request: " + error.message);
+      showErrorToast("Failed to submit leave request: " + error.message);
     } finally {
       setSubmitLoading(false);
     }
@@ -607,13 +746,13 @@ const EmployeeLeaveRequest = () => {
 
     // Validations
     if (!formData.leaveType) {
-      alert("Please select a leave type.");
+      showErrorToast("Please select a leave type.");
       setSubmitLoading(false);
       return;
     }
 
     if (formData.leaveType === "Vacation" && !chosenLocation) {
-      alert("Please select a location for vacation leave.");
+      showErrorToast("Please select a location for vacation leave.");
       setShowLocationModal(true);
       setSubmitLoading(false);
       return;
@@ -623,23 +762,33 @@ const EmployeeLeaveRequest = () => {
       formData.leaveType === "Sick" &&
       (!sickLeaveDetails.type || !sickLeaveDetails.illness)
     ) {
-      alert("Please provide sick leave details.");
+      showErrorToast("Please provide sick leave details.");
       setShowSickLeaveModal(true);
       setSubmitLoading(false);
       return;
     }
 
     if (!formData.startDate || !formData.endDate) {
-      alert("Please select both start and end dates.");
+      showErrorToast("Please select both start and end dates.");
       setSubmitLoading(false);
       return;
     }
 
     if (!formData.numDays || formData.numDays <= 0) {
-      alert("Please enter a valid number of days.");
+      showErrorToast("Please enter a valid number of days.");
       setSubmitLoading(false);
       return;
     }
+
+    // Calculate calendar and working days
+    const calendarDays = calculateCalendarDays(
+      formData.startDate,
+      formData.endDate
+    );
+    const workingDays = calculateWorkingDays(
+      formData.startDate,
+      formData.endDate
+    );
 
     // Prepare leave request data
     const leaveRequestData = {
@@ -657,8 +806,10 @@ const EmployeeLeaveRequest = () => {
       date_of_filing: formData.dateOfFiling,
       start_date: formData.startDate,
       end_date: formData.endDate,
-      num_days: parseFloat(formData.numDays),
-      status: "Pending", // Initial status
+      num_days: calendarDays,
+      working_days: workingDays,
+      holiday_days: calendarDays - workingDays,
+      status: "Pending",
       reason:
         formData.leaveType === "Sick"
           ? `${
@@ -667,7 +818,7 @@ const EmployeeLeaveRequest = () => {
                 : "Out patient"
             }: ${sickLeaveDetails.illness}`
           : `Leave request for ${formData.leaveType.toLowerCase()} leave`,
-      submitted_at: getPHTimestamp(), // Use PH timestamp
+      submitted_at: getPHTimestamp(),
       leave_balance_id: leaveBalanceId,
       illness_type:
         formData.leaveType === "Sick" ? sickLeaveDetails.type : null,
@@ -675,16 +826,21 @@ const EmployeeLeaveRequest = () => {
         formData.leaveType === "Sick" ? sickLeaveDetails.illness : null,
     };
 
-    // NEW: Check balance for informational purposes only
-    // Balance will only be deducted when approved
-    if (!hasSufficientBalance(formData.leaveType, formData.numDays)) {
-      // Store the request data and show modal
-      setLeaveRequestData(leaveRequestData);
-      setShowInsufficientBalanceModal(true);
-      return;
+    // Check if this leave type requires credits
+    if (requiresLeaveCredits(formData.leaveType)) {
+      // Only check balance for leave types that require credits
+      const hasBalance = await hasSufficientBalance(
+        employeeId,
+        formData.leaveType
+      );
+      if (!hasBalance) {
+        setLeaveRequestData(leaveRequestData);
+        setShowInsufficientBalanceModal(true);
+        return;
+      }
     }
 
-    // If sufficient balance, proceed with normal submission
+    // For leaves without credit requirement OR leaves with sufficient balance
     await submitLeaveRequestFinal(leaveRequestData);
   };
 
@@ -717,39 +873,13 @@ const EmployeeLeaveRequest = () => {
     setShowInsufficientBalanceModal(false);
     setErrorMessage("");
     setIsWithoutPay(false);
+
+    showInfoToast("Form has been reset");
   };
 
-  // Calculate progress percentages
-  const maxVacationSickDays = 15;
-  const maxEmergencyDays = 5;
-  const vacationPercent = Math.min(
-    (leaveBalance.vacation / maxVacationSickDays) * 100,
-    100
-  );
-  const sickPercent = Math.min(
-    (leaveBalance.sick / maxVacationSickDays) * 100,
-    100
-  );
-  const emergencyPercent = Math.min(
-    (leaveBalance.emergency / maxEmergencyDays) * 100,
-    100
-  );
-
-  // Loading state
+  // Show BFPPreloader when loading
   if (authLoading || isLoading) {
-    return (
-      <div className="app">
-        <EmployeeSidebar />
-        <Hamburger />
-        <div
-          className={`main-content ${isSidebarCollapsed ? "collapsed" : ""}`}
-        >
-          <div className={styles.leaveFormContainer}>
-            <div className={styles.loading}>Loading...</div>
-          </div>
-        </div>
-      </div>
-    );
+    return <BFPPreloader loading={true} />;
   }
 
   if (!user) return null;
@@ -760,11 +890,25 @@ const EmployeeLeaveRequest = () => {
       <Meta name="robots" content="noindex, nofollow" />
       <EmployeeSidebar />
       <Hamburger />
+
+      {/* Add ToastContainer here */}
+      <ToastContainer
+        position="top-right"
+        autoClose={5000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="colored"
+      />
+
       <div className={`main-content ${isSidebarCollapsed ? "collapsed" : ""}`}>
         <div className={styles.leaveFormContainer}>
           <h2 className={styles.pageTitle}>Request Leave</h2>
 
-          {/* Simple Info */}
           <div className={styles.formulaInfo}>
             <h4>Leave Credits Information:</h4>
             <p>
@@ -782,8 +926,11 @@ const EmployeeLeaveRequest = () => {
               <strong>Emergency Leave:</strong> 5 days per year (no monthly
               accrual)
             </p>
+            <p>
+              <strong>Special Leaves:</strong> Maternity, Paternity, and
+              Emergency leaves do not require leave credits.
+            </p>
 
-            {/* Important Notice - Only shown until first submission */}
             {showImportantNotice && (
               <p
                 style={{
@@ -795,16 +942,34 @@ const EmployeeLeaveRequest = () => {
                 }}
               >
                 ⚠️ <strong>Important Notice:</strong>
+                <br />
                 1. Leave credits will only be deducted when your leave is
                 approved.
                 <br />
-                2. You can still apply for leave even with insufficient credits,
-                but it will be considered as leave without pay.
+                2. Only working days (excluding weekends/holidays) are deducted
+                from your balance.
+                <br />
+                3. Maternity, Paternity, and Emergency leaves do not require
+                leave credits.
+                <br />
+                4. For Vacation and Sick leaves, you can still apply even with
+                insufficient credits, but it will be considered as leave without
+                pay.
               </p>
             )}
           </div>
+          <div className={styles.requestButtonContainer}>
+            <button
+              className={styles.requestButton}
+              onClick={() => setShowFormModal(true)}
+            >
+              <i className="fas fa-plus-circle"></i> Request New Leave
+            </button>
+          </div>
+          <div className={styles.leaveMeterTop}>
+            <LeaveMeter />
+          </div>
 
-          {/* Error Message */}
           {errorMessage && (
             <div className={styles.errorMessage}>
               <span className={styles.errorIcon}>⚠️</span>
@@ -812,217 +977,154 @@ const EmployeeLeaveRequest = () => {
             </div>
           )}
 
-          <div className={styles.contentWrapper}>
-            {/* Leave Balance Card */}
-            <div className={styles.leaveBalance}>
-              <h3>Leave Balance</h3>
-              <div className={styles.balanceInfo}>
-                <p>Max: Vacation/Sick: 15 days | Emergency: 5 days</p>
-                <p>Monthly accrual: 1.25 days (Vacation & Sick)</p>
-                <p>Credits accrue automatically on the 1st of each month</p>
-              </div>
-              <ul>
-                <li>
-                  <div className={styles.label}>
-                    <span>Vacation</span>
-                    <span>{leaveBalance.vacation.toFixed(2)} days</span>
-                  </div>
-                  <div className={styles.progress}>
-                    <div
-                      className={`${styles.progressBar} ${styles.progressVacation}`}
-                      style={{ width: `${vacationPercent}%` }}
-                    ></div>
-                  </div>
-                  <div className={styles.leavesTaken}>
-                    Used:{" "}
-                    {15 - leaveBalance.vacation > 0
-                      ? (15 - leaveBalance.vacation).toFixed(2)
-                      : "0.00"}{" "}
-                    days
-                  </div>
-                </li>
-                <li>
-                  <div className={styles.label}>
-                    <span>Sick</span>
-                    <span>{leaveBalance.sick.toFixed(2)} days</span>
-                  </div>
-                  <div className={styles.progress}>
-                    <div
-                      className={`${styles.progressBar} ${styles.progressSick}`}
-                      style={{ width: `${sickPercent}%` }}
-                    ></div>
-                  </div>
-                  <div className={styles.leavesTaken}>
-                    Used:{" "}
-                    {15 - leaveBalance.sick > 0
-                      ? (15 - leaveBalance.sick).toFixed(2)
-                      : "0.00"}{" "}
-                    days
-                  </div>
-                </li>
-                <li>
-                  <div className={styles.label}>
-                    <span>Emergency</span>
-                    <span>{leaveBalance.emergency.toFixed(2)} days</span>
-                  </div>
-                  <div className={styles.progress}>
-                    <div
-                      className={`${styles.progressBar} ${styles.progressEmergency}`}
-                      style={{ width: `${emergencyPercent}%` }}
-                    ></div>
-                  </div>
-                  <div className={styles.leavesTaken}>
-                    Used:{" "}
-                    {5 - leaveBalance.emergency > 0
-                      ? (5 - leaveBalance.emergency).toFixed(2)
-                      : "0.00"}{" "}
-                    days
-                  </div>
-                </li>
-              </ul>
-            </div>
+          {/* NEW: Form Modal */}
+          {showFormModal && (
+            <div
+              className={`${styles.modal} ${styles.formModal}`}
+              style={{ display: "flex" }}
+            >
+              <div className={styles.modalContent}>
+                <span
+                  className={styles.closeBtn}
+                  onClick={handleCloseFormModal}
+                >
+                  &times;
+                </span>
+                <h3>Request New Leave</h3>
 
-            {/* Leave Request Form */}
-            <form onSubmit={handleSubmit} className={styles.formCard}>
-              <div className={styles.formGrid}>
-                <div className={styles.formGroup}>
-                  <input
-                    type="text"
-                    name="employeeName"
-                    value={formData.employeeName}
-                    readOnly
-                    placeholder=" "
-                  />
-                  <label>Employee Name</label>
-                </div>
+                <form onSubmit={handleSubmit} className={styles.formCardModal}>
+                  <div className={styles.formGrid}>
+                    <div className={styles.formGroup}>
+                      <input
+                        type="text"
+                        name="employeeName"
+                        value={formData.employeeName}
+                        readOnly
+                        placeholder=" "
+                      />
+                      <label>Employee Name</label>
+                    </div>
 
-                <div className={styles.formGroup}>
-                  <input
-                    type="date"
-                    name="dateOfFiling"
-                    value={formData.dateOfFiling}
-                    onChange={handleInputChange}
-                    required
-                    max={formatPHDate(new Date())}
-                  />
-                  <label>Date of Filing</label>
-                </div>
+                    <div className={styles.formGroup}>
+                      <input
+                        type="date"
+                        name="dateOfFiling"
+                        value={formData.dateOfFiling}
+                        onChange={handleInputChange}
+                        required
+                        max={formatPHDate(new Date())}
+                      />
+                      <label>Date of Filing</label>
+                    </div>
 
-                <div className={styles.formGroup}>
-                  <select
-                    name="leaveType"
-                    value={formData.leaveType}
-                    onChange={handleInputChange}
-                    required
-                    disabled={submitLoading}
-                  >
-                    <option value="" disabled hidden></option>
-                    <option value="Vacation">Vacation Leave</option>
-                    <option value="Sick">Sick Leave</option>
-                    <option value="Emergency">Emergency Leave</option>
-                    <option value="Maternity">Maternity Leave</option>
-                    <option value="Paternity">Paternity Leave</option>
-                  </select>
-                  <label>Leave Type</label>
-                  {chosenLocation && formData.leaveType === "Vacation" && (
-                    <small className={styles.chosenLocation}>
-                      Location: {chosenLocation}
-                    </small>
-                  )}
-                  {formData.leaveType === "Sick" && sickLeaveDetails.type && (
-                    <small className={styles.chosenLocation}>
-                      Type:{" "}
-                      {sickLeaveDetails.type === "in_hospital"
-                        ? "In hospital"
-                        : "Out patient"}
-                      {sickLeaveDetails.illness &&
-                        ` - ${sickLeaveDetails.illness}`}
-                    </small>
-                  )}
-                  {formData.leaveType && (
-                    <small className={styles.availableBalance}>
-                      Available:{" "}
-                      {getLeaveBalanceForType(formData.leaveType).toFixed(2)}{" "}
-                      days
-                    </small>
-                  )}
-                </div>
-
-                <div className={styles.formGroup}>
-                  <input
-                    type="date"
-                    name="startDate"
-                    value={formData.startDate}
-                    onChange={handleInputChange}
-                    required
-                    min={formatPHDate(
-                      new Date(new Date().setDate(new Date().getDate() + 5))
-                    )}
-                    disabled={submitLoading}
-                  />
-                  <label>Start Date</label>
-                </div>
-
-                <div className={styles.formGroup}>
-                  <input
-                    type="date"
-                    name="endDate"
-                    value={formData.endDate}
-                    onChange={handleInputChange}
-                    required
-                    min={formData.startDate}
-                    disabled={submitLoading}
-                  />
-                  <label>End Date</label>
-                </div>
-
-                <div className={styles.formGroup}>
-                  <input
-                    type="number"
-                    name="numDays"
-                    value={formData.numDays}
-                    readOnly
-                    className={styles.numDaysInput}
-                  />
-                  <label>Number of Days</label>
-                  {formData.leaveType && formData.numDays > 0 && (
-                    <div className={styles.daysWarning}>
-                      {!hasSufficientBalance(
-                        formData.leaveType,
-                        formData.numDays
-                      ) ? (
-                        <span className={styles.warningText}>
-                          ⚠️ Insufficient balance (will be leave without pay)
-                        </span>
-                      ) : (
-                        <span className={styles.okText}>
-                          ✓ Balance will be deducted upon approval
-                        </span>
+                    <div className={styles.formGroupFull}>
+                      <select
+                        name="leaveType"
+                        value={formData.leaveType}
+                        onChange={handleInputChange}
+                        required
+                        disabled={submitLoading}
+                      >
+                        <option value="" disabled hidden></option>
+                        <option value="Vacation">Vacation Leave</option>
+                        <option value="Sick">Sick Leave</option>
+                        <option value="Emergency">Emergency Leave</option>
+                        <option value="Maternity">Maternity Leave</option>
+                        <option value="Paternity">Paternity Leave</option>
+                      </select>
+                      <label>Leave Type</label>
+                      {chosenLocation && formData.leaveType === "Vacation" && (
+                        <small className={styles.chosenLocation}>
+                          Location: {chosenLocation}
+                        </small>
+                      )}
+                      {formData.leaveType === "Sick" &&
+                        sickLeaveDetails.type && (
+                          <small className={styles.chosenLocation}>
+                            Type:{" "}
+                            {sickLeaveDetails.type === "in_hospital"
+                              ? "In hospital"
+                              : "Out patient"}
+                            {sickLeaveDetails.illness &&
+                              ` - ${sickLeaveDetails.illness}`}
+                          </small>
+                        )}
+                      {LEAVES_WITHOUT_CREDIT_REQUIREMENT.includes(
+                        formData.leaveType
+                      ) && (
+                        <small
+                          className={styles.chosenLocation}
+                          style={{ color: "#2e7d32", fontWeight: "bold" }}
+                        >
+                          ✓ This leave type does not require leave credits
+                        </small>
                       )}
                     </div>
-                  )}
-                </div>
-              </div>
 
-              <div className={styles.formButtons}>
-                <button
-                  type="button"
-                  onClick={handleReset}
-                  className={styles.btnSecondary}
-                  disabled={submitLoading}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className={styles.btnPrimary}
-                  disabled={submitLoading}
-                >
-                  {submitLoading ? "Submitting..." : "Submit Request"}
-                </button>
+                    <div className={styles.formGroup}>
+                      <input
+                        type="date"
+                        name="startDate"
+                        value={formData.startDate}
+                        onChange={handleInputChange}
+                        required
+                        min={formatPHDate(
+                          new Date(new Date().setDate(new Date().getDate() + 5))
+                        )}
+                        disabled={submitLoading}
+                      />
+                      <label>Start Date</label>
+                    </div>
+
+                    <div className={styles.formGroup}>
+                      <input
+                        type="date"
+                        name="endDate"
+                        value={formData.endDate}
+                        onChange={handleInputChange}
+                        required
+                        min={formData.startDate}
+                        disabled={submitLoading}
+                      />
+                      <label>End Date</label>
+                    </div>
+
+                    <div className={styles.formGroupFull}>
+                      <input
+                        type="number"
+                        name="numDays"
+                        value={formData.numDays}
+                        readOnly
+                        className={styles.numDaysInput}
+                      />
+                      <label>Working Days (for deduction)</label>
+                      <small className={styles.daysNote}>
+                        Excludes weekends and holidays
+                      </small>
+                    </div>
+                  </div>
+
+                  <div className={styles.formButtons}>
+                    <button
+                      type="button"
+                      onClick={handleCloseFormModal}
+                      className={styles.btnSecondary}
+                      disabled={submitLoading}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className={styles.btnPrimary}
+                      disabled={submitLoading}
+                    >
+                      {submitLoading ? "Submitting..." : "Submit Request"}
+                    </button>
+                  </div>
+                </form>
               </div>
-            </form>
-          </div>
+            </div>
+          )}
         </div>
 
         {/* Location Modal for Vacation Leave */}
@@ -1191,7 +1293,7 @@ const EmployeeLeaveRequest = () => {
           </div>
         )}
 
-        {/* NEW: Insufficient Balance Modal */}
+        {/* Insufficient Balance Modal */}
         {showInsufficientBalanceModal && leaveRequestData && (
           <div className={styles.modal} style={{ display: "flex" }}>
             <div className={styles.modalContent}>
@@ -1207,22 +1309,10 @@ const EmployeeLeaveRequest = () => {
 
               <div className={styles.warningBox}>
                 <p>
-                  <strong>You are out of leave credits!</strong>
+                  <strong>You don't have enough leave credits!</strong>
                 </p>
                 <p>
                   Leave Type: <strong>{leaveRequestData.leave_type}</strong>
-                </p>
-                <p>
-                  Requested Days: <strong>{leaveRequestData.num_days}</strong>
-                </p>
-                <p>
-                  Available Balance:{" "}
-                  <strong>
-                    {getLeaveBalanceForType(
-                      leaveRequestData.leave_type
-                    ).toFixed(2)}{" "}
-                    days
-                  </strong>
                 </p>
                 <hr style={{ margin: "15px 0", borderColor: "#ddd" }} />
                 <p
@@ -1272,17 +1362,6 @@ const EmployeeLeaveRequest = () => {
                 </button>
               </div>
             </div>
-          </div>
-        )}
-
-        {/* Toast Notification */}
-        {showToast && (
-          <div
-            className={styles.toast}
-            style={{ opacity: 1, transform: "translateY(0)" }}
-          >
-            ✅ Leave request submitted successfully! Balance will be deducted
-            upon approval.
           </div>
         )}
       </div>

@@ -31,7 +31,153 @@
   justify-content: center;
   text-align: center;
 }
+/* Add these to your existing CSS file */
 
+/* Accountability badge styles */
+.accountabilityContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-start;
+}
+
+.accountabilityBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.accountabilityAccountable {
+  background-color: #fee2e2;
+  color: #dc2626;
+  border: 1px solid #fca5a5;
+}
+
+.accountabilitySettled {
+  background-color: #dcfce7;
+  color: #16a34a;
+  border: 1px solid #86efac;
+}
+
+.accountabilityPending {
+  background-color: #fef3c7;
+  color: #d97706;
+  border: 1px solid #fcd34d;
+}
+
+.accountabilityOverdue {
+  background-color: #fef2f2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
+
+.accountabilityUnknown {
+  background-color: #f3f4f6;
+  color: #6b7280;
+  border: 1px solid #e5e7eb;
+}
+
+.outstandingAmount {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 6px;
+  background-color: #fef3c7;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #92400e;
+}
+
+.clearanceIndicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  background-color: #dbeafe;
+  border-radius: 50%;
+  font-size: 10px;
+  cursor: help;
+}
+
+/* Accountability flag in findings cell */
+.accountabilityFlag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  padding: 2px 6px;
+  background-color: #fef3c7;
+  border-radius: 6px;
+  font-size: 10px;
+  color: #92400e;
+}
+
+/* Action button for accountability */
+.IHAccountability {
+  background-color: #fee2e2;
+  color: #dc2626;
+  border: 1px solid #fca5a5;
+}
+
+.IHAccountability:hover {
+  background-color: #fecaca;
+  color: #b91c1c;
+}
+
+/* Update stats summary colors for accountability */
+.statCard:nth-child(3) {
+  border-left: 4px solid #dc2626;
+}
+
+.statCard:nth-child(4) {
+  border-left: 4px solid #d97706;
+}
+
+/* Loading state for accountability */
+.loadingBadge {
+  display: inline-block;
+  width: 60px;
+  height: 20px;
+  background-color: #f3f4f6;
+  border-radius: 12px;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* Additional styles for accountability display */
+.personnelDetails {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-top: 2px;
+}
+
+.rankBadge {
+  background-color: #e0e7ff;
+  color: #3730a3;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.badgeSeparator {
+  color: #9ca3af;
+  margin: 0 2px;
+}
 .headerActions {
   display: flex;
   flex-direction: column;

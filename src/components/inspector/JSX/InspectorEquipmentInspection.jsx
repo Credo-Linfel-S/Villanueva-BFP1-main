@@ -10,7 +10,7 @@ import { supabase } from "../../../lib/supabaseClient.js";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { Html5QrcodeScanner } from "html5-qrcode";
-import BFPPreloader from "../../BFPPreloader"; // Add this import
+import BFPPreloader from "../../BFPPreloader";
 
 const InspectorEquipmentInspection = () => {
   const { isSidebarCollapsed } = useSidebar();
@@ -20,7 +20,12 @@ const InspectorEquipmentInspection = () => {
   const [pendingClearances, setPendingClearances] = useState([]);
   const [personnelList, setPersonnelList] = useState([]);
   const [pendingInspectionsMap, setPendingInspectionsMap] = useState({});
-  // Add these loading states with your other useState declarations:
+
+  // Add these modal states near your other state declarations
+  const [showScanResultModal, setShowScanResultModal] = useState(false);
+  const [scanResult, setScanResult] = useState(null);
+  const [scannedEquipment, setScannedEquipment] = useState(null);
+
   const [isInspecting, setIsInspecting] = useState(false);
   const [isScheduling, setIsScheduling] = useState(false);
   const [recentSearch, setRecentSearch] = useState("");
@@ -37,14 +42,16 @@ const InspectorEquipmentInspection = () => {
   const [selectedClearance, setSelectedClearance] = useState(null);
   const [selectedEquipment, setSelectedEquipment] = useState([]);
   const [selectedSchedule, setSelectedSchedule] = useState(null);
+
   // View Details Modal State for Recent Inspections
   const [isRecentViewModalOpen, setIsRecentViewModalOpen] = useState(false);
   const [selectedRecentInspection, setSelectedRecentInspection] =
     useState(null);
+
   // Pagination states
   const [scheduledCurrentPage, setScheduledCurrentPage] = useState(1);
   const [recentCurrentPage, setRecentCurrentPage] = useState(1);
-  const rowsPerPage = 5; // Or however many you want per page
+  const rowsPerPage = 5;
 
   // Carousel state
   const [currentCarouselPage, setCurrentCarouselPage] = useState(0);
@@ -90,6 +97,202 @@ const InspectorEquipmentInspection = () => {
     "EQUIPMENT INSPECTION • Running Diagnostics..."
   );
 
+  // Bulk Delete states
+  const [selectedInspections, setSelectedInspections] = useState([]);
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+  const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
+
+  // Philippine Timezone Constants
+  const PH_TIMEZONE = "Asia/Manila";
+
+  // Convert any date to Philippine time
+  const toPHTime = (dateString) => {
+    if (!dateString) return null;
+
+    const date = new Date(dateString);
+    // Handle invalid dates
+    if (isNaN(date.getTime())) return null;
+
+    return new Date(date.toLocaleString("en-US", { timeZone: PH_TIMEZONE }));
+  };
+
+  // Get current Philippine date (date only for comparison)
+  const getTodayPHDate = () => {
+    const now = new Date();
+    const phTime = new Date(
+      now.toLocaleString("en-US", { timeZone: PH_TIMEZONE })
+    );
+    const year = phTime.getFullYear();
+    const month = String(phTime.getMonth() + 1).padStart(2, "0");
+    const day = String(phTime.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+
+  // Get current Philippine datetime
+  const getCurrentPHDateTime = () => {
+    const now = new Date();
+    return new Date(now.toLocaleString("en-US", { timeZone: PH_TIMEZONE }));
+  };
+
+  // Calculate schedule status based on Philippine time with 11:59 PM cutoff
+  const calculateScheduleStatus = (scheduleDate) => {
+    if (!scheduleDate) return "UPCOMING";
+
+    const scheduleDatePH = toPHTime(scheduleDate);
+    if (!scheduleDatePH) return "UPCOMING";
+
+    const currentPH = getCurrentPHDateTime();
+
+    // Set schedule date to end of day (11:59:59.999 PM)
+    const scheduleEndOfDay = new Date(
+      scheduleDatePH.getFullYear(),
+      scheduleDatePH.getMonth(),
+      scheduleDatePH.getDate(),
+      23,
+      59,
+      59,
+      999
+    );
+
+    // If current time is past 11:59 PM on the schedule date, it's MISSED
+    if (currentPH > scheduleEndOfDay) {
+      return "MISSED";
+    }
+
+    // Check if today is the schedule date
+    const scheduleDateOnly = new Date(
+      scheduleDatePH.getFullYear(),
+      scheduleDatePH.getMonth(),
+      scheduleDatePH.getDate()
+    );
+
+    const currentDateOnly = new Date(
+      currentPH.getFullYear(),
+      currentPH.getMonth(),
+      currentPH.getDate()
+    );
+
+    // If it's the same date and not past 11:59 PM yet, it's ONGOING
+    if (
+      scheduleDateOnly.getDate() === currentDateOnly.getDate() &&
+      scheduleDateOnly.getMonth() === currentDateOnly.getMonth() &&
+      scheduleDateOnly.getFullYear() === currentDateOnly.getFullYear()
+    ) {
+      return "ONGOING";
+    }
+
+    // Future date
+    return "UPCOMING";
+  };
+
+  // Helper functions for display (kept for backward compatibility)
+  const isScheduleToday = (scheduleDate) => {
+    if (!scheduleDate) return false;
+
+    const scheduleDatePH = toPHTime(scheduleDate);
+    if (!scheduleDatePH) return false;
+
+    const todayPH = getTodayPHDate();
+    const scheduleDateOnly = scheduleDatePH.toISOString().split("T")[0];
+
+    return scheduleDateOnly === todayPH;
+  };
+
+  const isScheduleFuture = (scheduleDate) => {
+    if (!scheduleDate) return false;
+
+    const scheduleDatePH = toPHTime(scheduleDate);
+    if (!scheduleDatePH) return false;
+
+    const todayPH = getTodayPHDate();
+    const scheduleDateOnly = scheduleDatePH.toISOString().split("T")[0];
+
+    return scheduleDateOnly > todayPH;
+  };
+
+  // Get schedule status for display
+  const getScheduleStatus = (inspection) => {
+    // First check if there's already a stored status
+    if (inspection.schedule_status) {
+      return inspection.schedule_status;
+    }
+
+    // Otherwise calculate based on date using Philippine time
+    return calculateScheduleStatus(inspection.scheduled_date);
+  };
+
+  // Bulk Delete Functions
+  const toggleInspectionSelection = (inspectionId, inspectionStatus) => {
+    // Only allow selection of PASSED inspections (status === "PASS")
+    if (inspectionStatus !== "PASS") {
+      toast.warning(
+        "Only inspections with PASS status can be selected for bulk delete"
+      );
+      return;
+    }
+
+    setSelectedInspections((prev) => {
+      if (prev.includes(inspectionId)) {
+        return prev.filter((id) => id !== inspectionId);
+      } else {
+        return [...prev, inspectionId];
+      }
+    });
+  };
+
+  const selectAllPassedInspections = () => {
+    const passedInspectionIds = recentInspections
+      .filter((inspection) => inspection.status === "PASS")
+      .map((inspection) => inspection.id)
+      .filter((id) => id); // Filter out any undefined/null IDs
+
+    setSelectedInspections(passedInspectionIds);
+  };
+
+  const clearAllSelections = () => {
+    setSelectedInspections([]);
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedInspections.length === 0) {
+      toast.warning("Please select inspections to delete");
+      return;
+    }
+
+    setIsBulkDeleting(true);
+    try {
+      // Delete inspections from the database
+      const { error } = await supabase
+        .from("inspections")
+        .delete()
+        .in("id", selectedInspections);
+
+      if (error) throw error;
+
+      toast.success(
+        `Successfully deleted ${selectedInspections.length} inspection(s)`
+      );
+
+      // Clear selections and refresh data
+      setSelectedInspections([]);
+      setShowBulkDeleteModal(false);
+      loadAllData();
+    } catch (error) {
+      console.error("Error deleting inspections:", error);
+      toast.error("Failed to delete inspections: " + error.message);
+    } finally {
+      setIsBulkDeleting(false);
+    }
+  };
+
+  const openBulkDeleteModal = () => {
+    if (selectedInspections.length === 0) {
+      toast.warning("Please select at least one PASSED inspection to delete");
+      return;
+    }
+    setShowBulkDeleteModal(true);
+  };
+
   // Open View Details Modal for Recent Inspections
   const openRecentViewModal = (inspection) => {
     setSelectedRecentInspection(inspection);
@@ -102,7 +305,7 @@ const InspectorEquipmentInspection = () => {
     setSelectedRecentInspection(null);
   };
 
-  // Add this function to get unique categories from recent inspections
+  // Get unique categories from recent inspections
   const getRecentCategories = () => {
     const categories = new Set();
     recentInspections.forEach((inspection) => {
@@ -119,26 +322,21 @@ const InspectorEquipmentInspection = () => {
 
     const setupRealtime = async () => {
       try {
-        // Subscribe to clearance_inventory table changes
         subscription = supabase
           .channel("clearance_inventory_changes")
           .on(
             "postgres_changes",
             {
-              event: "*", // Listen to INSERT, UPDATE, DELETE
+              event: "*",
               schema: "public",
               table: "clearance_inventory",
               filter: "status=eq.Pending",
             },
             (payload) => {
               console.log("Clearance inventory change detected:", payload);
-              // Refresh pending clearances when any change occurs
               loadPendingClearances();
-
-              // Also refresh other data that might be affected
               loadAllData();
 
-              // Optional: Show notification for new clearances
               if (payload.eventType === "INSERT") {
                 toast.info("New pending clearance added");
               }
@@ -154,7 +352,6 @@ const InspectorEquipmentInspection = () => {
             },
             (payload) => {
               console.log("Clearance request change detected:", payload);
-              // Refresh when clearance request status changes
               loadPendingClearances();
             }
           )
@@ -164,27 +361,24 @@ const InspectorEquipmentInspection = () => {
 
             if (status === "CHANNEL_ERROR") {
               console.error("Realtime channel error");
-              // Fallback to polling
               startPollingFallback();
             }
           });
       } catch (error) {
         console.error("Error setting up realtime:", error);
-        // Fallback to polling if realtime fails
         startPollingFallback();
       }
     };
 
     setupRealtime();
 
-    // Cleanup function
     return () => {
       if (subscription) {
         supabase.removeChannel(subscription);
       }
       stopPollingFallback();
     };
-  }, []); // Empty dependency array - only run once on mount
+  }, []);
 
   // Polling fallback state and functions
   const [pollingInterval, setPollingInterval] = useState(null);
@@ -193,18 +387,15 @@ const InspectorEquipmentInspection = () => {
   const startPollingFallback = () => {
     console.log("Starting polling fallback for pending clearances");
 
-    // Clear any existing interval
     if (pollingInterval) {
       clearInterval(pollingInterval);
     }
 
-    // Poll every 30 seconds
     const interval = setInterval(() => {
       console.log("Polling for pending clearance updates...");
       loadPendingClearances();
-      // Optional: refresh counter for UI indication
       setRefreshCounter((prev) => prev + 1);
-    }, 30000); // 30 seconds
+    }, 30000);
 
     setPollingInterval(interval);
   };
@@ -227,7 +418,7 @@ const InspectorEquipmentInspection = () => {
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
-  // Add this function to get unique equipment statuses from recent inspections
+  // Get unique equipment statuses from recent inspections
   const getRecentEquipmentStatuses = () => {
     const statuses = new Set();
     recentInspections.forEach((inspection) => {
@@ -238,7 +429,7 @@ const InspectorEquipmentInspection = () => {
     return Array.from(statuses).sort();
   };
 
-  // Add this function to filter recent inspections
+  // Filter recent inspections
   const filterRecentInspections = (inspections) => {
     const searchTerm = recentSearch.trim().toLowerCase();
     const categoryTerm = recentFilterCategory.trim().toLowerCase();
@@ -246,7 +437,6 @@ const InspectorEquipmentInspection = () => {
     const resultTerm = recentFilterResult.trim().toLowerCase();
 
     return inspections.filter((inspection) => {
-      // Text search across multiple fields
       const textSearch =
         searchTerm === "" ||
         (inspection.equipment_name &&
@@ -260,19 +450,16 @@ const InspectorEquipmentInspection = () => {
         (inspection.findings &&
           inspection.findings.toLowerCase().includes(searchTerm));
 
-      // Category filter
       const categoryMatch =
         categoryTerm === "" ||
         (inspection.equipment_category &&
           inspection.equipment_category.toLowerCase().includes(categoryTerm));
 
-      // Equipment status filter
       const statusMatch =
         statusTerm === "" ||
         (inspection.equipment_status &&
           inspection.equipment_status.toLowerCase().includes(statusTerm));
 
-      // Inspection result filter
       const resultMatch =
         resultTerm === "" ||
         (inspection.status &&
@@ -292,7 +479,7 @@ const InspectorEquipmentInspection = () => {
     recentFilterResult,
   ]);
 
-  // Add a function to reset recent filters
+  // Reset recent filters
   const resetRecentFilters = () => {
     setRecentSearch("");
     setRecentFilterCategory("");
@@ -301,7 +488,7 @@ const InspectorEquipmentInspection = () => {
     setRecentCurrentPage(1);
   };
 
-  // Add this function to format date for display
+  // Format date for display
   const formatDateForDisplay = (dateString) => {
     if (!dateString) return "N/A";
     try {
@@ -315,8 +502,6 @@ const InspectorEquipmentInspection = () => {
       return dateString;
     }
   };
-
-  // Checkup state
 
   // Equipment table for schedule creation
   const [selectedEquipmentForSchedule, setSelectedEquipmentForSchedule] =
@@ -339,7 +524,7 @@ const InspectorEquipmentInspection = () => {
     }).format(amount || 0);
   };
 
-  // Carousel calculations - moved to useMemo hooks
+  // Carousel calculations
   const chunkedClearances = useMemo(() => {
     const chunks = [];
     for (let i = 0; i < pendingClearances.length; i += cardsPerPage) {
@@ -357,11 +542,9 @@ const InspectorEquipmentInspection = () => {
     loadPersonnel();
   }, []);
 
-  // Add this NEW useEffect here - after the main data loading useEffect
   useEffect(() => {
     const loadClearanceForScheduled = async () => {
       if (scheduledInspections.length > 0) {
-        // Extract equipment IDs, filtering out any undefined/null values
         const equipmentIds = scheduledInspections
           .map((inspection) => inspection.equipment_id)
           .filter((id) => id !== undefined && id !== null);
@@ -382,167 +565,137 @@ const InspectorEquipmentInspection = () => {
     loadClearanceForScheduled();
   }, [scheduledInspections]);
 
-  // Philippine Time functions
-  const getTodayDate = () => {
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = String(today.getMonth() + 1).padStart(2, "0");
-    const day = String(today.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
-  };
-
-  // Simple check for display purposes only
-  const isScheduleToday = (scheduleDate) => {
-    if (!scheduleDate) return false;
-    const today = getTodayDate();
-    const scheduleDateOnly = scheduleDate.split("T")[0];
-    return scheduleDateOnly === today;
-  };
-
-  // Simple check for display purposes only
-  const isScheduleFuture = (scheduleDate) => {
-    if (!scheduleDate) return false;
-    const today = getTodayDate();
-    const scheduleDateOnly = scheduleDate.split("T")[0];
-    return scheduleDateOnly > today;
-  };
-
   // Function to check if equipment is in pending clearance
-const checkEquipmentClearanceStatus = async (inventoryIds) => {
-  try {
-    const cachedResults = {};
-    const idsToFetch = [];
+  const checkEquipmentClearanceStatus = async (inventoryIds) => {
+    try {
+      const cachedResults = {};
+      const idsToFetch = [];
 
-    inventoryIds.forEach((id) => {
-      if (clearanceCache[id] !== undefined) {
-        cachedResults[id] = clearanceCache[id];
-      } else {
-        idsToFetch.push(id);
-      }
-    });
-
-    if (idsToFetch.length === 0) {
-      return cachedResults;
-    }
-
-    console.log("Checking clearance status for inventory IDs:", idsToFetch);
-
-    // UPDATED QUERY: Remove .eq("clearance_requests.status", "Pending")
-    // This ensures we see ALL clearance requests, not just those with status "Pending"
-    const { data, error } = await supabase
-      .from("clearance_inventory")
-      .select(
-        `
-        id,
-        inventory_id,
-        status,
-        clearance_requests!inner (
-          id,
-          type,
-          status,
-          personnel_id
-        )
-      `
-      )
-      .in("inventory_id", idsToFetch)
-      .eq("status", "Pending") // This checks clearance_inventory status
-      .in("clearance_requests.type", [
-        "Resignation",
-        "Retirement",
-        "Equipment Completion",
-      ]);
-    // REMOVED: .eq("clearance_requests.status", "Pending")
-
-    if (error) {
-      console.error("Error checking clearance status:", error);
-      return cachedResults;
-    }
-
-    // Rest of the function remains the same...
-    const inventoryClearanceMap = {};
-
-    data?.forEach((item) => {
-      const inventoryId = item.inventory_id;
-      const request = item.clearance_requests;
-
-      if (!inventoryClearanceMap[inventoryId]) {
-        inventoryClearanceMap[inventoryId] = [];
-      }
-
-      inventoryClearanceMap[inventoryId].push({
-        requestId: request.id,
-        type: request.type,
-        personnelId: request.personnel_id,
-        clearanceInventoryId: item.id,
-        clearanceRequestStatus: request.status, // Add this for debugging
-      });
-    });
-
-    console.log("Clearance data found:", data);
-    console.log("Mapped clearance data:", inventoryClearanceMap);
-
-    // Process each inventory item
-    const newResults = {};
-
-    idsToFetch.forEach((id) => {
-      const clearances = inventoryClearanceMap[id] || [];
-
-      if (clearances.length > 0) {
-        // Log for debugging
-        console.log(
-          `Found ${clearances.length} clearances for inventory ${id}:`,
-          clearances
-        );
-
-        // Combine types
-        const clearanceTypes = [...new Set(clearances.map((c) => c.type))];
-
-        let displayType = "";
-        if (
-          clearanceTypes.includes("Retirement") &&
-          clearanceTypes.includes("Equipment Completion")
-        ) {
-          displayType = "Retirement & Equipment Completion";
-        } else if (
-          clearanceTypes.includes("Resignation") &&
-          clearanceTypes.includes("Equipment Completion")
-        ) {
-          displayType = "Resignation & Equipment Completion";
-        } else if (clearanceTypes.length === 1) {
-          displayType = clearanceTypes[0];
+      inventoryIds.forEach((id) => {
+        if (clearanceCache[id] !== undefined) {
+          cachedResults[id] = clearanceCache[id];
         } else {
-          displayType = clearanceTypes.join(", ");
+          idsToFetch.push(id);
+        }
+      });
+
+      if (idsToFetch.length === 0) {
+        return cachedResults;
+      }
+
+      console.log("Checking clearance status for inventory IDs:", idsToFetch);
+
+      const { data, error } = await supabase
+        .from("clearance_inventory")
+        .select(
+          `
+          id,
+          inventory_id,
+          status,
+          clearance_requests!inner (
+            id,
+            type,
+            status,
+            personnel_id
+          )
+        `
+        )
+        .in("inventory_id", idsToFetch)
+        .eq("status", "Pending")
+        .in("clearance_requests.type", [
+          "Resignation",
+          "Retirement",
+          "Equipment Completion",
+        ]);
+
+      if (error) {
+        console.error("Error checking clearance status:", error);
+        return cachedResults;
+      }
+
+      const inventoryClearanceMap = {};
+
+      data?.forEach((item) => {
+        const inventoryId = item.inventory_id;
+        const request = item.clearance_requests;
+
+        if (!inventoryClearanceMap[inventoryId]) {
+          inventoryClearanceMap[inventoryId] = [];
         }
 
-        // Get all request IDs
-        const requestIds = clearances.map((c) => c.requestId);
+        inventoryClearanceMap[inventoryId].push({
+          requestId: request.id,
+          type: request.type,
+          personnelId: request.personnel_id,
+          clearanceInventoryId: item.id,
+          clearanceRequestStatus: request.status,
+        });
+      });
 
-        newResults[id] = {
-          hasClearance: true,
-          type: displayType,
-          requestIds: requestIds,
-          clearanceInventoryIds: clearances.map((c) => c.clearanceInventoryId),
-          originalTypes: clearanceTypes,
-          personnelId: clearances[0].personnelId,
-          clearanceRequestStatuses: clearances.map(
-            (c) => c.clearanceRequestStatus
-          ), // Add statuses
-        };
-      } else {
-        newResults[id] = { hasClearance: false };
-      }
-    });
+      console.log("Clearance data found:", data);
+      console.log("Mapped clearance data:", inventoryClearanceMap);
 
-    const updatedCache = { ...clearanceCache, ...newResults };
-    setClearanceCache(updatedCache);
+      const newResults = {};
 
-    console.log("Final results:", newResults);
-    return { ...cachedResults, ...newResults };
-  } catch (error) {
-    console.error("Error in checkEquipmentClearanceStatus:", error);
-    return {};
-  }
-};
+      idsToFetch.forEach((id) => {
+        const clearances = inventoryClearanceMap[id] || [];
+
+        if (clearances.length > 0) {
+          console.log(
+            `Found ${clearances.length} clearances for inventory ${id}:`,
+            clearances
+          );
+
+          const clearanceTypes = [...new Set(clearances.map((c) => c.type))];
+
+          let displayType = "";
+          if (
+            clearanceTypes.includes("Retirement") &&
+            clearanceTypes.includes("Equipment Completion")
+          ) {
+            displayType = "Retirement & Equipment Completion";
+          } else if (
+            clearanceTypes.includes("Resignation") &&
+            clearanceTypes.includes("Equipment Completion")
+          ) {
+            displayType = "Resignation & Equipment Completion";
+          } else if (clearanceTypes.length === 1) {
+            displayType = clearanceTypes[0];
+          } else {
+            displayType = clearanceTypes.join(", ");
+          }
+
+          const requestIds = clearances.map((c) => c.requestId);
+
+          newResults[id] = {
+            hasClearance: true,
+            type: displayType,
+            requestIds: requestIds,
+            clearanceInventoryIds: clearances.map(
+              (c) => c.clearanceInventoryId
+            ),
+            originalTypes: clearanceTypes,
+            personnelId: clearances[0].personnelId,
+            clearanceRequestStatuses: clearances.map(
+              (c) => c.clearanceRequestStatus
+            ),
+          };
+        } else {
+          newResults[id] = { hasClearance: false };
+        }
+      });
+
+      const updatedCache = { ...clearanceCache, ...newResults };
+      setClearanceCache(updatedCache);
+
+      console.log("Final results:", newResults);
+      return { ...cachedResults, ...newResults };
+    } catch (error) {
+      console.error("Error in checkEquipmentClearanceStatus:", error);
+      return {};
+    }
+  };
+
   // Function to load clearance status for filtered equipment
   const loadEquipmentClearanceStatus = async (equipmentList) => {
     if (equipmentList.length === 0) {
@@ -568,22 +721,22 @@ const checkEquipmentClearanceStatus = async (inventoryIds) => {
         .from("inventory")
         .select(
           `
-        id, 
-        item_code, 
-        item_name, 
-        last_checked, 
-        assigned_to, 
-        status, 
-        category, 
-        assigned_personnel_id, 
-        purchase_date, 
-        serial_number, 
-        price,
-        assigned_date,   
-        last_assigned,     
-        unassigned_date,   
-        personnel:assigned_personnel_id(first_name, last_name, badge_number)
-      `
+          id, 
+          item_code, 
+          item_name, 
+          last_checked, 
+          assigned_to, 
+          status, 
+          category, 
+          assigned_personnel_id, 
+          purchase_date, 
+          serial_number, 
+          price,
+          assigned_date,   
+          last_assigned,     
+          unassigned_date,   
+          personnel:assigned_personnel_id(first_name, last_name, badge_number)
+        `
         )
         .order("item_name");
 
@@ -601,23 +754,23 @@ const checkEquipmentClearanceStatus = async (inventoryIds) => {
         .from("inspections")
         .select(
           `
-        id,
-        equipment_id,
-        schedule_inspection_date,
-        reschedule_inspection_date,
-        reschedule_reason,
-        status,
-        schedule_status,   
-        findings,
-        recommendations,
-        clearance_request_id,
-        inspector_id,
-        inspector:inspector_id (
-          first_name,
-          last_name,
-          badge_number
-        )
-      `
+          id,
+          equipment_id,
+          schedule_inspection_date,
+          reschedule_inspection_date,
+          reschedule_reason,
+          status,
+          schedule_status,   
+          findings,
+          recommendations,
+          clearance_request_id,
+          inspector_id,
+          inspector:inspector_id (
+            first_name,
+            last_name,
+            badge_number
+          )
+        `
         )
         .eq("status", "PENDING")
         .order("schedule_inspection_date", { ascending: true });
@@ -627,30 +780,32 @@ const checkEquipmentClearanceStatus = async (inventoryIds) => {
         throw scheduledError;
       }
 
-      // Now get inventory details separately and map personnel_id from inventory
       const scheduledInspectionsWithEquipment = await Promise.all(
         (scheduledData || []).map(async (inspection) => {
-          // Get inventory details for this equipment
           const { data: inventoryItem, error: invError } = await supabase
             .from("inventory")
             .select(
               `
-            item_name,
-            item_code,
-            assigned_to,
-            status,
-            category,
-            assigned_date,
-            last_checked,
-            assigned_personnel_id
-          `
+              item_name,
+              item_code,
+              assigned_to,
+              status,
+              category,
+              assigned_date,
+              last_checked,
+              assigned_personnel_id
+            `
             )
             .eq("id", inspection.equipment_id)
             .single();
 
-          // Find the assigned personnel ID from inventory
           const assignedPersonnelId =
             inventoryItem?.assigned_personnel_id || null;
+
+          // Calculate schedule status based on Philippine time
+          const scheduleStatus = calculateScheduleStatus(
+            inspection.schedule_inspection_date
+          );
 
           return {
             ...inspection,
@@ -665,14 +820,12 @@ const checkEquipmentClearanceStatus = async (inventoryIds) => {
             schedule_inspection_date: inspection.schedule_inspection_date,
             reschedule_inspection_date: inspection.reschedule_inspection_date,
             inspection_status: "Scheduled",
-            // Get personnel_id from inventory's assigned_personnel_id
             personnel_id: assignedPersonnelId,
             equipment_status: inventoryItem?.status || "Unknown",
             equipment_category: inventoryItem?.category || "Unknown",
             equipment_assigned_date: inventoryItem?.assigned_date || null,
             equipment_last_checked: inventoryItem?.last_checked || null,
-            schedule_status: inspection.schedule_status || "UPCOMING",
-            // Pass through the clearance_request_id
+            schedule_status: scheduleStatus, // Use calculated status
             clearance_request_id: inspection.clearance_request_id,
           };
         })
@@ -687,19 +840,19 @@ const checkEquipmentClearanceStatus = async (inventoryIds) => {
         .from("inspections")
         .select(
           `
-        id,
-        equipment_id,
-        schedule_inspection_date,
-        reschedule_inspection_date,
-        status,
-        schedule_status,
-        findings,
-        recommendations,
-        inspector:inspector_id (
-          first_name,
-          last_name
-        )
-      `
+          id,
+          equipment_id,
+          schedule_inspection_date,
+          reschedule_inspection_date,
+          status,
+          schedule_status,
+          findings,
+          recommendations,
+          inspector:inspector_id (
+            first_name,
+            last_name
+          )
+        `
         )
         .in("status", ["COMPLETED", "FAILED"])
         .order("schedule_inspection_date", { ascending: false })
@@ -709,22 +862,21 @@ const checkEquipmentClearanceStatus = async (inventoryIds) => {
         console.error("Recent inspections error:", recentError);
         setRecentInspections([]);
       } else {
-        // Get inventory details for recent inspections
         const recent = await Promise.all(
           (recentData || []).map(async (insp) => {
             const { data: inventoryItem, error: invError } = await supabase
               .from("inventory")
               .select(
                 `
-              item_name,
-              item_code,
-              assigned_to,
-              status,
-              category,
-              assigned_date,
-              last_checked,
-              assigned_personnel_id
-            `
+                item_name,
+                item_code,
+                assigned_to,
+                status,
+                category,
+                assigned_date,
+                last_checked,
+                assigned_personnel_id
+              `
               )
               .eq("id", insp.equipment_id)
               .single();
@@ -745,7 +897,6 @@ const checkEquipmentClearanceStatus = async (inventoryIds) => {
               schedule_status: insp.schedule_status || "UPCOMING",
               findings: insp.findings || "",
               assigned_to: inventoryItem?.assigned_to || "N/A",
-              // Add personnel_id from inventory for recent inspections too
               personnel_id: inventoryItem?.assigned_personnel_id || null,
             };
           })
@@ -767,147 +918,139 @@ const checkEquipmentClearanceStatus = async (inventoryIds) => {
   // Add loading state for clearances
   const [isLoadingClearances, setIsLoadingClearances] = useState(false);
 
-const loadPendingClearances = async () => {
-  setIsLoadingClearances(true);
-  try {
-    console.log("Loading pending clearance inspections...");
+  const loadPendingClearances = async () => {
+    setIsLoadingClearances(true);
+    try {
+      console.log("Loading pending clearance inspections...");
 
-    // UPDATED QUERY: Also look for "In Progress" status
-    const { data, error } = await supabase
-      .from("clearance_inventory")
-      .select(
-        `
-        id,
-        clearance_request_id,
-        inventory_id,
-        status,
-        remarks,
-        created_at,
-        updated_at,
-        clearance_requests!inner (
+      const { data, error } = await supabase
+        .from("clearance_inventory")
+        .select(
+          `
           id,
-          personnel_id,
-          type,
-          status,        
-          created_at, 
-          personnel:personnel_id (
-            first_name,
-            last_name,
-            badge_number
-          )
-        ),
-        inventory!inner (
-          id,
-          item_name,
-          item_code,
-          category,
+          clearance_request_id,
+          inventory_id,
           status,
-          assigned_to
+          remarks,
+          created_at,
+          updated_at,
+          clearance_requests!inner (
+            id,
+            personnel_id,
+            type,
+            status,        
+            created_at, 
+            personnel:personnel_id (
+              first_name,
+              last_name,
+              badge_number
+            )
+          ),
+          inventory!inner (
+            id,
+            item_name,
+            item_code,
+            category,
+            status,
+            assigned_to
+          )
+        `
         )
-      `
-      )
-      .eq("status", "Pending") // clearance_inventory status
-      .in("clearance_requests.status", ["Pending", "In Progress"]) // Accept both statuses
-      .order("created_at", { ascending: true });
+        .eq("status", "Pending")
+        .in("clearance_requests.status", ["Pending", "In Progress"])
+        .order("created_at", { ascending: true });
 
-    if (error) {
-      console.error("Clearance inventory query error:", error);
-      setPendingClearances([]);
-      return;
-    }
-
-    console.log("Raw clearance data loaded:", data);
-
-    // Group by personnel_id AND type combination
-    const groupedByPersonnelAndType = {};
-
-    data.forEach((item) => {
-      const request = item.clearance_requests;
-      const personnelId = request.personnel_id;
-      const type = request.type;
-
-      // Create a key that combines personnel and type
-      let groupKey = `${personnelId}`;
-
-      // Combine Retirement/Resignation with Equipment Completion for same personnel
-      if (type === "Equipment Completion") {
-        groupKey = `${personnelId}_combined`;
-      } else {
-        groupKey = `${personnelId}_${type}`;
+      if (error) {
+        console.error("Clearance inventory query error:", error);
+        setPendingClearances([]);
+        return;
       }
 
-      if (!groupedByPersonnelAndType[groupKey]) {
-        groupedByPersonnelAndType[groupKey] = {
-          id: request.id,
-          personnel_id: personnelId,
-          type: request.type,
-          request_status: request.status,
-          request_created_at: request.created_at,
-          personnel_name: request.personnel
-            ? `${request.personnel.first_name || ""} ${
-                request.personnel.last_name || ""
-              }`.trim()
-            : "Unknown",
-          badge_number: request.personnel?.badge_number || "N/A",
-          equipment_count: 0,
-          equipment_items: [],
-          originalTypes: new Set([request.type]),
-        };
-      }
+      console.log("Raw clearance data loaded:", data);
 
-      groupedByPersonnelAndType[groupKey].equipment_count++;
-      groupedByPersonnelAndType[groupKey].equipment_items.push({
-        inventory_id: item.inventory_id,
-        item_name: item.inventory?.item_name,
-        item_code: item.inventory?.item_code,
-        category: item.inventory?.category,
-        equipment_status: item.inventory?.status,
-        assigned_to: item.inventory?.assigned_to,
-        clearance_status: item.status,
-        clearance_inventory_id: item.id,
-        clearance_request_id: item.clearance_request_id,
-      });
+      const groupedByPersonnelAndType = {};
 
-      // Add type to set
-      groupedByPersonnelAndType[groupKey].originalTypes.add(request.type);
-    });
+      data.forEach((item) => {
+        const request = item.clearance_requests;
+        const personnelId = request.personnel_id;
+        const type = request.type;
 
-    // Process grouped data to combine types where needed
-    const equipmentClearances = Object.values(groupedByPersonnelAndType).map(
-      (clearance) => {
-        const typesArray = Array.from(clearance.originalTypes);
+        let groupKey = `${personnelId}`;
 
-        // Combine Retirement/Resignation with Equipment Completion
-        if (
-          typesArray.includes("Retirement") &&
-          typesArray.includes("Equipment Completion")
-        ) {
-          clearance.type = "Retirement & Equipment Completion";
-        } else if (
-          typesArray.includes("Resignation") &&
-          typesArray.includes("Equipment Completion")
-        ) {
-          clearance.type = "Resignation & Equipment Completion";
-        } else if (typesArray.length > 1) {
-          clearance.type = typesArray.join(", ");
+        if (type === "Equipment Completion") {
+          groupKey = `${personnelId}_combined`;
+        } else {
+          groupKey = `${personnelId}_${type}`;
         }
 
-        return clearance;
-      }
-    );
+        if (!groupedByPersonnelAndType[groupKey]) {
+          groupedByPersonnelAndType[groupKey] = {
+            id: request.id,
+            personnel_id: personnelId,
+            type: request.type,
+            request_status: request.status,
+            request_created_at: request.created_at,
+            personnel_name: request.personnel
+              ? `${request.personnel.first_name || ""} ${
+                  request.personnel.last_name || ""
+                }`.trim()
+              : "Unknown",
+            badge_number: request.personnel?.badge_number || "N/A",
+            equipment_count: 0,
+            equipment_items: [],
+            originalTypes: new Set([request.type]),
+          };
+        }
 
-    console.log("Processed clearances:", equipmentClearances);
-    setPendingClearances(equipmentClearances);
+        groupedByPersonnelAndType[groupKey].equipment_count++;
+        groupedByPersonnelAndType[groupKey].equipment_items.push({
+          inventory_id: item.inventory_id,
+          item_name: item.inventory?.item_name,
+          item_code: item.inventory?.item_code,
+          category: item.inventory?.category,
+          equipment_status: item.inventory?.status,
+          assigned_to: item.inventory?.assigned_to,
+          clearance_status: item.status,
+          clearance_inventory_id: item.id,
+          clearance_request_id: item.clearance_request_id,
+        });
 
-    // Store the last update time
-    localStorage.setItem("lastClearanceUpdate", new Date().toISOString());
-  } catch (error) {
-    console.error("Error loading pending clearances:", error);
-    setPendingClearances([]);
-  } finally {
-    setIsLoadingClearances(false);
-  }
-};
+        groupedByPersonnelAndType[groupKey].originalTypes.add(request.type);
+      });
+
+      const equipmentClearances = Object.values(groupedByPersonnelAndType).map(
+        (clearance) => {
+          const typesArray = Array.from(clearance.originalTypes);
+
+          if (
+            typesArray.includes("Retirement") &&
+            typesArray.includes("Equipment Completion")
+          ) {
+            clearance.type = "Retirement & Equipment Completion";
+          } else if (
+            typesArray.includes("Resignation") &&
+            typesArray.includes("Equipment Completion")
+          ) {
+            clearance.type = "Resignation & Equipment Completion";
+          } else if (typesArray.length > 1) {
+            clearance.type = typesArray.join(", ");
+          }
+
+          return clearance;
+        }
+      );
+
+      console.log("Processed clearances:", equipmentClearances);
+      setPendingClearances(equipmentClearances);
+
+      localStorage.setItem("lastClearanceUpdate", new Date().toISOString());
+    } catch (error) {
+      console.error("Error loading pending clearances:", error);
+      setPendingClearances([]);
+    } finally {
+      setIsLoadingClearances(false);
+    }
+  };
 
   const loadPersonnel = async () => {
     try {
@@ -1098,7 +1241,7 @@ const loadPendingClearances = async () => {
     formData.selected_personnel,
   ]);
 
-  // Add this inside your component, after filteredEquipment calculation
+  // Selectable equipment
   const selectableEquipment = useMemo(() => {
     return filteredEquipment.filter((item) => !pendingInspectionsMap[item.id]);
   }, [filteredEquipment, pendingInspectionsMap]);
@@ -1116,7 +1259,7 @@ const loadPendingClearances = async () => {
     setCurrentCarouselPage((prev) => (prev > 0 ? prev - 1 : 0));
   };
 
-  // NEW: Reset form when showing/hiding
+  // Reset form when showing/hiding
   useEffect(() => {
     if (showScheduleForm && filteredEquipment.length > 0) {
       const equipmentIds = filteredEquipment
@@ -1139,7 +1282,6 @@ const loadPendingClearances = async () => {
 
       setDebounceTimer(timer);
     } else if (!showScheduleForm) {
-      // Reset form data when hiding
       setSelectedEquipmentForSchedule([]);
       setEquipmentClearanceMap({});
       setPendingInspectionsMap({});
@@ -1160,7 +1302,7 @@ const loadPendingClearances = async () => {
     };
   }, [showScheduleForm, filteredEquipment.length]);
 
-  // NEW: Form reset function
+  // Form reset function
   const resetScheduleForm = () => {
     setSelectedEquipmentForSchedule([]);
     setEquipmentClearanceMap({});
@@ -1190,13 +1332,11 @@ const loadPendingClearances = async () => {
     const personnelSet = new Set();
     inventoryItems.forEach((item) => {
       if (item.assigned_to && item.assigned_to !== "Unassigned") {
-        // Clean up names - remove extra spaces
         const cleanName = item.assigned_to.trim().replace(/\s+/g, " ");
         personnelSet.add(cleanName);
       }
     });
 
-    // Sort by last name if possible
     return Array.from(personnelSet).sort((a, b) => {
       const aParts = a.split(" ");
       const bParts = b.split(" ");
@@ -1220,7 +1360,7 @@ const loadPendingClearances = async () => {
       return;
     }
 
-    setIsScheduling(true); // Start loading
+    setIsScheduling(true);
     try {
       const pendingMap = await checkEquipmentHasPendingInspection(
         selectedEquipmentForSchedule
@@ -1256,10 +1396,8 @@ const loadPendingClearances = async () => {
 
       const inspectorName = `${selectedInspector.first_name} ${selectedInspector.last_name}`;
 
-      // Get clearance request IDs for each equipment - GET ALL, NOT JUST FIRST ONE
       const schedules = await Promise.all(
         selectedEquipmentForSchedule.map(async (equipId) => {
-          // Check for ALL pending clearance requests for this equipment
           const { data: clearanceData, error: clearanceError } = await supabase
             .from("clearance_inventory")
             .select("clearance_request_id")
@@ -1268,24 +1406,16 @@ const loadPendingClearances = async () => {
 
           let clearanceRequestId = null;
 
-          // If there are multiple clearance requests, we need to handle them differently
           if (!clearanceError && clearanceData && clearanceData.length > 0) {
-            // If there's only one clearance request, store it
             if (clearanceData.length === 1) {
               clearanceRequestId = clearanceData[0].clearance_request_id;
               console.log(
                 `Found clearance request ${clearanceRequestId} for equipment ${equipId}`
               );
             } else {
-              // If there are multiple clearance requests, store the first one
-              // and log that there are multiple
               clearanceRequestId = clearanceData[0].clearance_request_id;
               console.log(
                 `Found ${clearanceData.length} clearance requests for equipment ${equipId}. Using first one: ${clearanceRequestId}`
-              );
-              console.log(
-                "All clearance request IDs:",
-                clearanceData.map((c) => c.clearance_request_id)
               );
             }
           }
@@ -1318,7 +1448,6 @@ const loadPendingClearances = async () => {
 
       toast.success(`Successfully scheduled ${schedules.length} inspection(s)`);
 
-      // Hide form on success
       setShowScheduleForm(false);
       resetScheduleForm();
       loadAllData();
@@ -1332,7 +1461,7 @@ const loadPendingClearances = async () => {
         );
       }
     } finally {
-      setIsScheduling(false); // Stop loading
+      setIsScheduling(false);
     }
   };
 
@@ -1376,162 +1505,154 @@ const loadPendingClearances = async () => {
     setShowInspectModal(true);
   };
 
-const checkAndUpdateClearanceStatus = async (
-  equipmentId,
-  clearanceStatus,
-  inspectionId
-) => {
-  try {
-    // Get ALL clearance_inventory records for this equipment
-    const { data: clearanceRecords, error } = await supabase
-      .from("clearance_inventory")
-      .select(
-        `
-        id,
-        clearance_request_id,
-        personnel_id,
-        status,
-        clearance_requests!inner (type, status)
-      `
-      )
-      .eq("inventory_id", equipmentId)
-      .eq("status", "Pending");
-
-    if (error) throw error;
-
-    if (clearanceRecords && clearanceRecords.length > 0) {
-      // Group by clearance request
-      const requestsMap = {};
-      clearanceRecords.forEach((record) => {
-        if (!requestsMap[record.clearance_request_id]) {
-          requestsMap[record.clearance_request_id] = {
-            requestId: record.clearance_request_id,
-            personnelId: record.personnel_id,
-            clearanceType: record.clearance_requests?.type,
-            currentStatus: record.clearance_requests?.status,
-            items: [],
-          };
-        }
-        requestsMap[record.clearance_request_id].items.push({
-          inventoryId: equipmentId,
-          originalStatus: record.status,
-          newStatus: clearanceStatus,
-        });
-      });
-
-      console.log("Processing clearance requests:", Object.keys(requestsMap));
-
-      // Update EACH clearance request separately
-      for (const requestId in requestsMap) {
-        const request = requestsMap[requestId];
-
-        // Get all items for this SPECIFIC clearance request
-        const { data: allItems, error: itemsError } = await supabase
-          .from("clearance_inventory")
-          .select(
-            `
-            id,
-            status,
-            inventory_id,
-            accountability_records!left (is_settled)
+  const checkAndUpdateClearanceStatus = async (
+    equipmentId,
+    clearanceStatus,
+    inspectionId
+  ) => {
+    try {
+      const { data: clearanceRecords, error } = await supabase
+        .from("clearance_inventory")
+        .select(
           `
-          )
-          .eq("clearance_request_id", requestId);
+          id,
+          clearance_request_id,
+          personnel_id,
+          status,
+          clearance_requests!inner (type, status)
+        `
+        )
+        .eq("inventory_id", equipmentId)
+        .eq("status", "Pending");
 
-        if (itemsError) {
-          console.error(
-            `Error getting items for request ${requestId}:`,
-            itemsError
-          );
-          continue;
-        }
+      if (error) throw error;
 
-        // Count statuses
-        const total = allItems.length;
-        const cleared = allItems.filter(
-          (item) => item.status === "Cleared"
-        ).length;
-        const pending = allItems.filter(
-          (item) => item.status === "Pending"
-        ).length;
-        const damaged = allItems.filter(
-          (item) => item.status === "Damaged"
-        ).length;
-        const lost = allItems.filter((item) => item.status === "Lost").length;
+      if (clearanceRecords && clearanceRecords.length > 0) {
+        const requestsMap = {};
+        clearanceRecords.forEach((record) => {
+          if (!requestsMap[record.clearance_request_id]) {
+            requestsMap[record.clearance_request_id] = {
+              requestId: record.clearance_request_id,
+              personnelId: record.personnel_id,
+              clearanceType: record.clearance_requests?.type,
+              currentStatus: record.clearance_requests?.status,
+              items: [],
+            };
+          }
+          requestsMap[record.clearance_request_id].items.push({
+            inventoryId: equipmentId,
+            originalStatus: record.status,
+            newStatus: clearanceStatus,
+          });
+        });
 
-        // Check accountability settlement status for THIS request
-        const { data: accountabilityData, error: accountabilityError } =
-          await supabase
-            .from("personnel_equipment_accountability_table")
-            .select("accountability_status")
-            .eq("personnel_id", request.personnelId)
-            .eq("clearance_request_id", requestId)
-            .maybeSingle();
+        console.log("Processing clearance requests:", Object.keys(requestsMap));
 
-        const isAccountabilitySettled =
-          !accountabilityError &&
-          accountabilityData?.accountability_status === "SETTLED";
+        for (const requestId in requestsMap) {
+          const request = requestsMap[requestId];
 
-        let newRequestStatus = "In Progress";
+          const { data: allItems, error: itemsError } = await supabase
+            .from("clearance_inventory")
+            .select(
+              `
+              id,
+              status,
+              inventory_id,
+              accountability_records!left (is_settled)
+            `
+            )
+            .eq("clearance_request_id", requestId);
 
-        if (pending === 0 && damaged === 0 && lost === 0) {
-          // All items cleared
-          newRequestStatus = "Pending for Approval";
-        } else if (damaged > 0 || lost > 0) {
-          // Check if accountability is settled FOR THIS SPECIFIC REQUEST
-          if (isAccountabilitySettled) {
+          if (itemsError) {
+            console.error(
+              `Error getting items for request ${requestId}:`,
+              itemsError
+            );
+            continue;
+          }
+
+          const total = allItems.length;
+          const cleared = allItems.filter(
+            (item) => item.status === "Cleared"
+          ).length;
+          const pending = allItems.filter(
+            (item) => item.status === "Pending"
+          ).length;
+          const damaged = allItems.filter(
+            (item) => item.status === "Damaged"
+          ).length;
+          const lost = allItems.filter((item) => item.status === "Lost").length;
+
+          const { data: accountabilityData, error: accountabilityError } =
+            await supabase
+              .from("personnel_equipment_accountability_table")
+              .select("accountability_status")
+              .eq("personnel_id", request.personnelId)
+              .eq("clearance_request_id", requestId)
+              .maybeSingle();
+
+          const isAccountabilitySettled =
+            !accountabilityError &&
+            accountabilityData?.accountability_status === "SETTLED";
+
+          let newRequestStatus = "In Progress";
+
+          if (pending === 0 && damaged === 0 && lost === 0) {
             newRequestStatus = "Pending for Approval";
-          } else {
+          } else if (damaged > 0 || lost > 0) {
+            if (isAccountabilitySettled) {
+              newRequestStatus = "Pending for Approval";
+            } else {
+              newRequestStatus = "In Progress";
+            }
+          } else if (cleared > 0 && pending > 0) {
             newRequestStatus = "In Progress";
           }
-        } else if (cleared > 0 && pending > 0) {
-          newRequestStatus = "In Progress";
-        }
 
-        console.log(`Request ${requestId} status analysis:`, {
-          total,
-          cleared,
-          pending,
-          damaged,
-          lost,
-          isAccountabilitySettled,
-          newStatus: newRequestStatus,
-        });
+          console.log(`Request ${requestId} status analysis:`, {
+            total,
+            cleared,
+            pending,
+            damaged,
+            lost,
+            isAccountabilitySettled,
+            newStatus: newRequestStatus,
+          });
 
-        // Update clearance request status
-        if (newRequestStatus !== request.currentStatus) {
-          const { error: updateError } = await supabase
-            .from("clearance_requests")
-            .update({
-              status: newRequestStatus,
-              updated_at: new Date().toISOString(),
-            })
-            .eq("id", requestId);
+          if (newRequestStatus !== request.currentStatus) {
+            const { error: updateError } = await supabase
+              .from("clearance_requests")
+              .update({
+                status: newRequestStatus,
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", requestId);
 
-          if (updateError) {
-            console.error(
-              `Error updating clearance request ${requestId}:`,
-              updateError
-            );
-          } else {
-            console.log(
-              `✅ Updated clearance request ${requestId} to ${newRequestStatus}`
-            );
+            if (updateError) {
+              console.error(
+                `Error updating clearance request ${requestId}:`,
+                updateError
+              );
+            } else {
+              console.log(
+                `✅ Updated clearance request ${requestId} to ${newRequestStatus}`
+              );
+            }
           }
         }
       }
+    } catch (error) {
+      console.error("Error updating clearance status:", error);
     }
-  } catch (error) {
-    console.error("Error updating clearance status:", error);
-  }
-};
+  };
+
   const submitInspection = async () => {
     if (!inspectionData.findings) {
       toast.error("Please enter findings");
       return;
     }
 
-    setIsInspecting(true); // Start loading
+    setIsInspecting(true);
     try {
       const inspectorName = selectedSchedule.inspector_name;
       const inspectorId = selectedSchedule.inspector_id;
@@ -1546,24 +1667,20 @@ const checkAndUpdateClearanceStatus = async (
       console.log("🔍 Equipment ID:", selectedSchedule.equipment_id);
       console.log("🔍 Inspector:", inspectorName, "ID:", inspectorId);
 
-      // 1. FIRST: Find all clearance_inventory records for this equipment
-      console.log("🔍 Searching for clearance_inventory records...");
-  const { data: clearanceRecords, error: findError } = await supabase
-    .from("clearance_inventory")
-    .select("clearance_request_id")
-    .eq("inventory_id", selectedSchedule.equipment_id)
-    .eq("status", "Pending");
+      const { data: clearanceRecords, error: findError } = await supabase
+        .from("clearance_inventory")
+        .select("clearance_request_id")
+        .eq("inventory_id", selectedSchedule.equipment_id)
+        .eq("status", "Pending");
 
-  let allClearanceRequestIds = [];
-  if (!findError && clearanceRecords) {
-    // Get UNIQUE clearance request IDs
-    allClearanceRequestIds = [
-      ...new Set(clearanceRecords.map((r) => r.clearance_request_id)),
-    ];
-    console.log("Found clearance requests:", allClearanceRequestIds);
-  }
+      let allClearanceRequestIds = [];
+      if (!findError && clearanceRecords) {
+        allClearanceRequestIds = [
+          ...new Set(clearanceRecords.map((r) => r.clearance_request_id)),
+        ];
+        console.log("Found clearance requests:", allClearanceRequestIds);
+      }
 
-      // Determine clearance status based on equipment status
       let clearanceStatus;
       switch (inspectionData.equipmentStatus) {
         case "Good":
@@ -1584,7 +1701,6 @@ const checkAndUpdateClearanceStatus = async (
 
       console.log("🔍 Determined clearance status:", clearanceStatus);
 
-      // 2. Update the inspection record
       const inspectionStatus =
         inspectionData.status === "PASS" ? "COMPLETED" : "FAILED";
 
@@ -1610,17 +1726,12 @@ const checkAndUpdateClearanceStatus = async (
       }
 
       console.log("✅ Inspection record updated");
-      console.log(
-        "✅ Database trigger will automatically set schedule_status = 'DONE'"
-      );
 
-      // 3. Check and update clearance status
       await checkAndUpdateClearanceStatus(
         selectedSchedule.equipment_id,
         clearanceStatus
       );
 
-      // 4. Update inventory status
       const { error: inventoryError } = await supabase
         .from("inventory")
         .update({
@@ -1637,7 +1748,6 @@ const checkAndUpdateClearanceStatus = async (
 
       console.log("✅ Inventory record updated");
 
-      // 5. Update clearance_inventory records if they exist
       if (clearanceRecords && clearanceRecords.length > 0) {
         console.log("📝 Updating clearance_inventory records...");
 
@@ -1651,7 +1761,6 @@ const checkAndUpdateClearanceStatus = async (
           updated_at: new Date().toISOString(),
         };
 
-        // Try to update all clearance records
         const { error: updateError } = await supabase
           .from("clearance_inventory")
           .update(updatePayload)
@@ -1666,7 +1775,6 @@ const checkAndUpdateClearanceStatus = async (
           );
         }
 
-        // 6. Check each clearance request
         const clearanceRequestIds = [
           ...new Set(clearanceRecords.map((r) => r.clearance_request_id)),
         ];
@@ -1686,44 +1794,40 @@ const checkAndUpdateClearanceStatus = async (
         console.log("ℹ️ No pending clearance records found for this equipment");
       }
 
-      // 7. Create accountability record if needed
-  const isAccountabilityCase =
-    inspectionData.equipmentStatus === "Lost" ||
-    inspectionData.equipmentStatus === "Damaged";
+      const isAccountabilityCase =
+        inspectionData.equipmentStatus === "Lost" ||
+        inspectionData.equipmentStatus === "Damaged";
 
-  if (isAccountabilityCase) {
-    await createAccountabilityRecord(
-      selectedSchedule.id,
-      selectedSchedule.equipment_id,
-      selectedSchedule.personnel_id || null,
-      inspectionData.equipmentStatus,
-      inspectionData.findings,
-      allClearanceRequestIds // Pass ALL request IDs
-    );
-  }
+      if (isAccountabilityCase) {
+        await createAccountabilityRecord(
+          selectedSchedule.id,
+          selectedSchedule.equipment_id,
+          selectedSchedule.personnel_id || null,
+          inspectionData.equipmentStatus,
+          inspectionData.findings,
+          allClearanceRequestIds
+        );
+      }
 
-      // 8. Show success message
       toast.success(
         `Inspection ${inspectionStatus.toLowerCase()} and marked as DONE`
       );
 
       setShowInspectModal(false);
 
-      // 9. Reload data to see the updated schedule_status
       loadAllData();
       loadPendingClearances();
     } catch (error) {
       console.error("❌ Error submitting inspection:", error);
       toast.error("Failed to submit inspection: " + error.message);
     } finally {
-      setIsInspecting(false); // Stop loading
+      setIsInspecting(false);
     }
   };
 
-  // Add this test function temporarily
+  // Test function
   const testClearanceUpdate = async () => {
     try {
-      // Test updating one specific clearance_inventory record
       const { data, error } = await supabase
         .from("clearance_inventory")
         .update({
@@ -1750,11 +1854,9 @@ const checkAndUpdateClearanceStatus = async (
       console.log(`🔍 Checking equipment status for personnel ${personnelId}`);
       console.log(`🔍 Checking clearance request IDs:`, requestIds);
 
-      // Check EACH clearance request separately
       for (const requestId of requestIds) {
         console.log(`🔍 Checking clearance request ${requestId}...`);
 
-        // Get ALL equipment statuses for this clearance request
         const { data: allEquipment, error } = await supabase
           .from("clearance_inventory")
           .select("id, status, clearance_request_id")
@@ -1776,7 +1878,6 @@ const checkAndUpdateClearanceStatus = async (
           continue;
         }
 
-        // Count statuses
         const totalEquipment = allEquipment.length;
         const pendingCount = allEquipment.filter(
           (e) => e.status === "Pending"
@@ -1798,7 +1899,6 @@ const checkAndUpdateClearanceStatus = async (
         console.log(`   Damaged: ${damagedCount}`);
         console.log(`   Lost: ${lostCount}`);
 
-        // Get current clearance request status
         const { data: clearanceRequest, error: requestError } = await supabase
           .from("clearance_requests")
           .select("type, status")
@@ -1818,9 +1918,7 @@ const checkAndUpdateClearanceStatus = async (
             `✅ All equipment inspected for clearance request ${requestId}`
           );
 
-          // Check current status
           if (clearanceRequest.status === "Pending") {
-            // If it was Pending and now all equipment is inspected, mark as In Progress
             const { error: updateError } = await supabase
               .from("clearance_requests")
               .update({
@@ -1855,9 +1953,7 @@ const checkAndUpdateClearanceStatus = async (
             `⏳ Still ${pendingCount} pending equipment items for clearance request ${requestId}`
           );
 
-          // If there are still pending items and status is Pending, update to In Progress
           if (clearanceRequest.status === "Pending" && clearedCount > 0) {
-            // At least one equipment has been inspected
             const { error: updateError } = await supabase
               .from("clearance_requests")
               .update({
@@ -1886,14 +1982,7 @@ const checkAndUpdateClearanceStatus = async (
 
   // Function to update schedule status based on dates
   const updateScheduleStatus = async (inspectionId, scheduledDate) => {
-    const todayPST = getTodayInPST();
-    let scheduleStatus = "UPCOMING";
-
-    if (scheduledDate === todayPST) {
-      scheduleStatus = "ONGOING";
-    } else if (scheduledDate < todayPST) {
-      scheduleStatus = "MISSED";
-    }
+    const scheduleStatus = calculateScheduleStatus(scheduledDate);
 
     try {
       const { error } = await supabase
@@ -1912,7 +2001,7 @@ const checkAndUpdateClearanceStatus = async (
     }
   };
 
-  // QR Scanner functions
+  // QR Scanner functions - UPDATED VERSION WITH MODAL
   const startScanner = async () => {
     setIsRequestingPermission(true);
     try {
@@ -1950,25 +2039,35 @@ const checkAndUpdateClearanceStatus = async (
               if (error && error.code !== "PGRST116") throw error;
 
               if (data) {
-                toast.success(`Scanned: ${data.item_name}`);
-
-                if (showInspectModal && selectedSchedule) {
-                  if (data.id === selectedSchedule.equipment_id) {
-                    toast.success(
-                      "Equipment matched! Proceed with inspection."
-                    );
-                  } else {
-                    toast.warning(
-                      "Scanned equipment does not match scheduled equipment"
-                    );
-                  }
-                }
+                // Store scan result and show modal instead of toast
+                setScannedEquipment(data);
+                setScanResult({
+                  success: true,
+                  message: `Scanned: ${data.item_name}`,
+                  matched:
+                    showInspectModal && selectedSchedule
+                      ? data.id === selectedSchedule.equipment_id
+                      : null,
+                });
+                setShowScanResultModal(true);
               } else {
-                toast.info("No equipment found with this barcode");
+                // Show modal for no equipment found
+                setScanResult({
+                  success: false,
+                  message: "No equipment found with this barcode",
+                  barcode: decodedText,
+                });
+                setShowScanResultModal(true);
               }
             } catch (err) {
               console.error("Error fetching equipment:", err);
-              toast.info("Scanned barcode: " + decodedText);
+              // Show modal for error
+              setScanResult({
+                success: false,
+                message: "Error scanning barcode",
+                barcode: decodedText,
+              });
+              setShowScanResultModal(true);
             }
 
             stopScanner();
@@ -2026,248 +2125,244 @@ const checkAndUpdateClearanceStatus = async (
     recentStart + rowsPerPage
   );
 
-const createAccountabilityRecord = async (
-  inspectionId,
-  equipmentId,
-  personnelId,
-  status,
-  findings,
-  clearanceRequestIds = [] // Accept MULTIPLE request IDs
-) => {
-  try {
-    // Get equipment details
-    const { data: equipment, error: equipmentError } = await supabase
-      .from("inventory")
-      .select(`
-        assigned_personnel_id,
-        current_value,
-        price,
-        item_name,
-        assigned_to
-      `)
-      .eq("id", equipmentId)
-      .single();
+  const createAccountabilityRecord = async (
+    inspectionId,
+    equipmentId,
+    personnelId,
+    status,
+    findings,
+    clearanceRequestIds = []
+  ) => {
+    try {
+      const { data: equipment, error: equipmentError } = await supabase
+        .from("inventory")
+        .select(
+          `
+          assigned_personnel_id,
+          current_value,
+          price,
+          item_name,
+          assigned_to
+        `
+        )
+        .eq("id", equipmentId)
+        .single();
 
-    if (equipmentError) throw equipmentError;
+      if (equipmentError) throw equipmentError;
 
-    let targetPersonnelId = personnelId || equipment.assigned_personnel_id;
+      let targetPersonnelId = personnelId || equipment.assigned_personnel_id;
 
-    if (!targetPersonnelId) {
-      console.log("No personnel ID found for equipment");
-      return false;
-    }
+      if (!targetPersonnelId) {
+        console.log("No personnel ID found for equipment");
+        return false;
+      }
 
-    // Calculate amount due
-    const baseValue = equipment.current_value || equipment.price || 0;
-    const amountDue = status.toUpperCase() === "LOST" ? baseValue : baseValue * 0.5;
+      const baseValue = equipment.current_value || equipment.price || 0;
+      const amountDue =
+        status.toUpperCase() === "LOST" ? baseValue : baseValue * 0.5;
 
-    // Create accountability records for EACH clearance request
-    const recordsData = [];
+      const recordsData = [];
 
-    // If there are multiple clearance requests, create records for EACH one
-    if (clearanceRequestIds && clearanceRequestIds.length > 0) {
-      clearanceRequestIds.forEach((clearanceRequestId) => {
+      if (clearanceRequestIds && clearanceRequestIds.length > 0) {
+        clearanceRequestIds.forEach((clearanceRequestId) => {
+          recordsData.push({
+            personnel_id: targetPersonnelId,
+            inventory_id: equipmentId,
+            inspection_id: inspectionId,
+            record_type: status.toUpperCase(),
+            amount_due: amountDue,
+            remarks: `Equipment "${
+              equipment.item_name
+            }" marked as ${status.toLowerCase()} during inspection. Findings: ${
+              findings || "No findings specified"
+            }`,
+            is_settled: false,
+            source_type: "clearance-linked",
+            record_date: new Date().toISOString().split("T")[0],
+            clearance_request_id: clearanceRequestId,
+          });
+        });
+      } else {
         recordsData.push({
           personnel_id: targetPersonnelId,
           inventory_id: equipmentId,
           inspection_id: inspectionId,
           record_type: status.toUpperCase(),
           amount_due: amountDue,
-          remarks: `Equipment "${equipment.item_name}" marked as ${status.toLowerCase()} during inspection. Findings: ${findings || "No findings specified"}`,
+          remarks: `Equipment "${
+            equipment.item_name
+          }" marked as ${status.toLowerCase()} during inspection. Findings: ${
+            findings || "No findings specified"
+          }`,
           is_settled: false,
-          source_type: "clearance-linked",
+          source_type: "routine",
           record_date: new Date().toISOString().split("T")[0],
-          clearance_request_id: clearanceRequestId, // SPECIFIC clearance request
         });
-      });
-    } else {
-      // Create a non-clearance linked record for general accountability
-      recordsData.push({
-        personnel_id: targetPersonnelId,
-        inventory_id: equipmentId,
-        inspection_id: inspectionId,
-        record_type: status.toUpperCase(),
-        amount_due: amountDue,
-        remarks: `Equipment "${equipment.item_name}" marked as ${status.toLowerCase()} during inspection. Findings: ${findings || "No findings specified"}`,
-        is_settled: false,
-        source_type: "routine",
-        record_date: new Date().toISOString().split("T")[0],
-      });
-    }
-
-    // Insert all accountability records
-    const { data: records, error: recordError } = await supabase
-      .from("accountability_records")
-      .insert(recordsData)
-      .select();
-
-    if (recordError) throw recordError;
-
-    console.log(`Created ${records.length} accountability record(s) for equipment ${equipmentId}`);
-
-    // Update personnel accountability summary for EACH clearance request
-    if (clearanceRequestIds && clearanceRequestIds.length > 0) {
-      for (const clearanceRequestId of clearanceRequestIds) {
-        await updatePersonnelAccountabilitySummary(
-          targetPersonnelId,
-          clearanceRequestId
-        );
       }
-    } else {
-      // Update summary for non-clearance records
-      await updatePersonnelAccountabilitySummary(targetPersonnelId, null);
-    }
 
-    return true;
-  } catch (error) {
-    console.error("Error creating accountability record:", error);
-    return false;
-  }
-};
+      const { data: records, error: recordError } = await supabase
+        .from("accountability_records")
+        .insert(recordsData)
+        .select();
+
+      if (recordError) throw recordError;
+
+      console.log(
+        `Created ${records.length} accountability record(s) for equipment ${equipmentId}`
+      );
+
+      if (clearanceRequestIds && clearanceRequestIds.length > 0) {
+        for (const clearanceRequestId of clearanceRequestIds) {
+          await updatePersonnelAccountabilitySummary(
+            targetPersonnelId,
+            clearanceRequestId
+          );
+        }
+      } else {
+        await updatePersonnelAccountabilitySummary(targetPersonnelId, null);
+      }
+
+      return true;
+    } catch (error) {
+      console.error("Error creating accountability record:", error);
+      return false;
+    }
+  };
 
   // Helper function to update the summary table
-const updatePersonnelAccountabilitySummary = async (
-  personnelId,
-  clearanceRequestId = null
-) => {
-  try {
-    // Build query based on whether we're looking for clearance-linked or general records
-    let query = supabase
-      .from("accountability_records")
-      .select(
+  const updatePersonnelAccountabilitySummary = async (
+    personnelId,
+    clearanceRequestId = null
+  ) => {
+    try {
+      let query = supabase
+        .from("accountability_records")
+        .select(
+          `
+          amount_due,
+          record_type,
+          inventory:inventory_id(item_name, current_value),
+          clearance_requests!left (type, status)
         `
-        amount_due,
-        record_type,
-        inventory:inventory_id(item_name, current_value),
-        clearance_requests!left (type, status)
-      `
-      )
-      .eq("personnel_id", personnelId)
-      .eq("is_settled", false)
-      .in("record_type", ["LOST", "DAMAGED"]);
+        )
+        .eq("personnel_id", personnelId)
+        .eq("is_settled", false)
+        .in("record_type", ["LOST", "DAMAGED"]);
 
-    // If clearanceRequestId is provided, get only records for that specific clearance
-    // If null, get only non-clearance records
-    if (clearanceRequestId !== null) {
-      query = query.eq("clearance_request_id", clearanceRequestId);
-    } else {
-      query = query.is("clearance_request_id", null);
-    }
-
-    const { data: records, error } = await query;
-
-    if (error) throw error;
-
-    let total_outstanding_amount = 0;
-    let lost_equipment_count = 0;
-    let damaged_equipment_count = 0;
-    let lost_equipment_value = 0;
-    let damaged_equipment_value = 0;
-
-    records?.forEach((record) => {
-      const amount = record.amount_due || record.inventory?.current_value || 0;
-      total_outstanding_amount += amount;
-
-      if (record.record_type === "LOST") {
-        lost_equipment_count++;
-        lost_equipment_value += amount;
-      } else if (record.record_type === "DAMAGED") {
-        damaged_equipment_count++;
-        damaged_equipment_value += amount;
+      if (clearanceRequestId !== null) {
+        query = query.eq("clearance_request_id", clearanceRequestId);
+      } else {
+        query = query.is("clearance_request_id", null);
       }
-    });
 
-    // Get personnel info
-    const { data: personnel, error: personnelError } = await supabase
-      .from("personnel")
-      .select("first_name, last_name, rank, badge_number")
-      .eq("id", personnelId)
-      .single();
+      const { data: records, error } = await query;
 
-    if (personnelError) throw personnelError;
+      if (error) throw error;
 
-    const personnel_name = `${personnel.first_name} ${personnel.last_name}`;
+      let total_outstanding_amount = 0;
+      let lost_equipment_count = 0;
+      let damaged_equipment_count = 0;
+      let lost_equipment_value = 0;
+      let damaged_equipment_value = 0;
 
-    // Prepare summary data
-    const summaryData = {
-      personnel_id: personnelId,
-      personnel_name: personnel_name,
-      rank: personnel.rank,
-      badge_number: personnel.badge_number,
-      total_equipment_count: lost_equipment_count + damaged_equipment_count,
-      lost_equipment_count: lost_equipment_count,
-      damaged_equipment_count: damaged_equipment_count,
-      lost_equipment_value: lost_equipment_value,
-      damaged_equipment_value: damaged_equipment_value,
-      total_outstanding_amount: total_outstanding_amount,
-      accountability_status:
-        total_outstanding_amount > 0 ? "UNSETTLED" : "SETTLED",
-      last_inspection_date: new Date().toISOString().split("T")[0],
-      updated_at: new Date().toISOString(),
-      calculated_at: new Date().toISOString(),
-    };
+      records?.forEach((record) => {
+        const amount =
+          record.amount_due || record.inventory?.current_value || 0;
+        total_outstanding_amount += amount;
 
-    // Add clearance_request_id only if it exists
-    if (clearanceRequestId !== null) {
-      summaryData.clearance_request_id = clearanceRequestId;
+        if (record.record_type === "LOST") {
+          lost_equipment_count++;
+          lost_equipment_value += amount;
+        } else if (record.record_type === "DAMAGED") {
+          damaged_equipment_count++;
+          damaged_equipment_value += amount;
+        }
+      });
 
-      // Get clearance type and status for this specific request
-      const { data: clearanceRequest, error: clearanceError } = await supabase
-        .from("clearance_requests")
-        .select("type, status")
-        .eq("id", clearanceRequestId)
+      const { data: personnel, error: personnelError } = await supabase
+        .from("personnel")
+        .select("first_name, last_name, rank, badge_number")
+        .eq("id", personnelId)
         .single();
 
-      if (!clearanceError && clearanceRequest) {
-        summaryData.clearance_type = clearanceRequest.type;
-        summaryData.clearance_status = clearanceRequest.status;
+      if (personnelError) throw personnelError;
+
+      const personnel_name = `${personnel.first_name} ${personnel.last_name}`;
+
+      const summaryData = {
+        personnel_id: personnelId,
+        personnel_name: personnel_name,
+        rank: personnel.rank,
+        badge_number: personnel.badge_number,
+        total_equipment_count: lost_equipment_count + damaged_equipment_count,
+        lost_equipment_count: lost_equipment_count,
+        damaged_equipment_count: damaged_equipment_count,
+        lost_equipment_value: lost_equipment_value,
+        damaged_equipment_value: damaged_equipment_value,
+        total_outstanding_amount: total_outstanding_amount,
+        accountability_status:
+          total_outstanding_amount > 0 ? "UNSETTLED" : "SETTLED",
+        last_inspection_date: new Date().toISOString().split("T")[0],
+        updated_at: new Date().toISOString(),
+        calculated_at: new Date().toISOString(),
+      };
+
+      if (clearanceRequestId !== null) {
+        summaryData.clearance_request_id = clearanceRequestId;
+
+        const { data: clearanceRequest, error: clearanceError } = await supabase
+          .from("clearance_requests")
+          .select("type, status")
+          .eq("id", clearanceRequestId)
+          .single();
+
+        if (!clearanceError && clearanceRequest) {
+          summaryData.clearance_type = clearanceRequest.type;
+          summaryData.clearance_status = clearanceRequest.status;
+        }
       }
-    }
 
-    // Check if record exists
-    let checkQuery = supabase
-      .from("personnel_equipment_accountability_table")
-      .select("id")
-      .eq("personnel_id", personnelId);
-
-    if (clearanceRequestId !== null) {
-      checkQuery = checkQuery.eq("clearance_request_id", clearanceRequestId);
-    } else {
-      checkQuery = checkQuery.is("clearance_request_id", null);
-    }
-
-    const { data: existingRecord, error: checkError } =
-      await checkQuery.maybeSingle();
-
-    if (checkError) throw checkError;
-
-    if (existingRecord) {
-      // Update existing record
-      const { error: updateError } = await supabase
+      let checkQuery = supabase
         .from("personnel_equipment_accountability_table")
-        .update(summaryData)
-        .eq("id", existingRecord.id);
+        .select("id")
+        .eq("personnel_id", personnelId);
 
-      if (updateError) throw updateError;
-    } else {
-      // Insert new record
-      const { error: insertError } = await supabase
-        .from("personnel_equipment_accountability_table")
-        .insert([summaryData]);
+      if (clearanceRequestId !== null) {
+        checkQuery = checkQuery.eq("clearance_request_id", clearanceRequestId);
+      } else {
+        checkQuery = checkQuery.is("clearance_request_id", null);
+      }
 
-      if (insertError) throw insertError;
+      const { data: existingRecord, error: checkError } =
+        await checkQuery.maybeSingle();
+
+      if (checkError) throw checkError;
+
+      if (existingRecord) {
+        const { error: updateError } = await supabase
+          .from("personnel_equipment_accountability_table")
+          .update(summaryData)
+          .eq("id", existingRecord.id);
+
+        if (updateError) throw updateError;
+      } else {
+        const { error: insertError } = await supabase
+          .from("personnel_equipment_accountability_table")
+          .insert([summaryData]);
+
+        if (insertError) throw insertError;
+      }
+
+      console.log(
+        `Updated accountability summary for personnel ${personnelId}, clearance ${
+          clearanceRequestId || "routine"
+        }`
+      );
+    } catch (error) {
+      console.error("Error updating accountability summary:", error);
+      throw error;
     }
-
-    console.log(
-      `Updated accountability summary for personnel ${personnelId}, clearance ${
-        clearanceRequestId || "routine"
-      }`
-    );
-  } catch (error) {
-    console.error("Error updating accountability summary:", error);
-    throw error;
-  }
-};
+  };
 
   // Render pagination buttons function
   const renderPaginationButtons = (
@@ -2278,7 +2373,6 @@ const updatePersonnelAccountabilitySummary = async (
   ) => {
     const buttons = [];
 
-    // Previous button
     buttons.push(
       <button
         key="prev"
@@ -2292,7 +2386,6 @@ const updatePersonnelAccountabilitySummary = async (
       </button>
     );
 
-    // Always show first page
     buttons.push(
       <button
         key={1}
@@ -2306,7 +2399,6 @@ const updatePersonnelAccountabilitySummary = async (
       </button>
     );
 
-    // Show ellipsis after first page if needed
     if (currentPage > 3) {
       buttons.push(
         <span key="ellipsis1" className={styles.IEIPaginationEllipsis}>
@@ -2315,21 +2407,17 @@ const updatePersonnelAccountabilitySummary = async (
       );
     }
 
-    // Show pages around current page (max 5 pages total including first and last)
     let startPage = Math.max(2, currentPage - 1);
     let endPage = Math.min(totalPages - 1, currentPage + 1);
 
-    // Adjust if we're near the beginning
     if (currentPage <= 3) {
       endPage = Math.min(totalPages - 1, 4);
     }
 
-    // Adjust if we're near the end
     if (currentPage >= totalPages - 2) {
       startPage = Math.max(2, totalPages - 3);
     }
 
-    // Generate middle page buttons
     for (let i = startPage; i <= endPage; i++) {
       if (i > 1 && i < totalPages) {
         buttons.push(
@@ -2347,7 +2435,6 @@ const updatePersonnelAccountabilitySummary = async (
       }
     }
 
-    // Show ellipsis before last page if needed
     if (currentPage < totalPages - 2) {
       buttons.push(
         <span key="ellipsis2" className={styles.IEIPaginationEllipsis}>
@@ -2356,7 +2443,6 @@ const updatePersonnelAccountabilitySummary = async (
       );
     }
 
-    // Always show last page if there is more than 1 page
     if (totalPages > 1) {
       buttons.push(
         <button
@@ -2372,7 +2458,6 @@ const updatePersonnelAccountabilitySummary = async (
       );
     }
 
-    // Next button
     buttons.push(
       <button
         key="next"
@@ -2389,7 +2474,6 @@ const updatePersonnelAccountabilitySummary = async (
     return buttons;
   };
 
-  // Display BFP Preloader while page is loading
   return (
     <div className="AppInspectorInventoryControl">
       <Title>Inspector Equipment Inspection | BFP Villanueva</Title>
@@ -2424,7 +2508,6 @@ const updatePersonnelAccountabilitySummary = async (
       <Hamburger />
 
       <div className={`main-content ${isSidebarCollapsed ? "collapsed" : ""}`}>
-        {/* Add mobile header with title and hamburger if needed */}
         {isMobile && (
           <div className={styles.mobileHeader}>
             <h1>Equipment Inspection</h1>
@@ -2549,7 +2632,7 @@ const updatePersonnelAccountabilitySummary = async (
           </div>
         </section>
 
-        {/* Rest of your component remains the same */}
+        {/* Schedule Section */}
         <section className={styles.IEISection}>
           <div className={styles.scheduleCard}>
             <div className={styles.scheduleCardHeader}>
@@ -2565,7 +2648,6 @@ const updatePersonnelAccountabilitySummary = async (
               </button>
             </div>
 
-            {/* UPDATED: Show/hide form instead of modal */}
             <div
               ref={scheduleFormRef}
               className={`${styles.scheduleForm} ${
@@ -2574,14 +2656,12 @@ const updatePersonnelAccountabilitySummary = async (
             >
               <div className={styles.scheduleFormContent}>
                 <div className={styles.scheduleFormRow}>
-                  {/* UPDATED Schedule Date Field with Flatpickr */}
                   <div className={styles.scheduleFormGroup}>
                     <div className={styles.floatingGroup}>
                       <Flatpickr
                         value={formData.scheduled_date}
                         onChange={([date]) => {
                           if (date) {
-                            // Option A: Use local date string (safer)
                             const year = date.getFullYear();
                             const month = String(date.getMonth() + 1).padStart(
                               2,
@@ -2652,7 +2732,6 @@ const updatePersonnelAccountabilitySummary = async (
                     </div>
                   </div>
 
-                  {/* In your schedule form - Update the personnel filter */}
                   <div className={styles.scheduleFormGroup}>
                     <div className={styles.floatingGroup}>
                       <select
@@ -2785,10 +2864,8 @@ const updatePersonnelAccountabilitySummary = async (
                                   selectedEquipmentForSchedule.length ===
                                   selectableEquipmentCount
                                 ) {
-                                  // Deselect all
                                   setSelectedEquipmentForSchedule([]);
                                 } else {
-                                  // Select only equipment WITHOUT pending inspections
                                   const selectableIds = filteredEquipment
                                     .filter(
                                       (item) => !pendingInspectionsMap[item.id]
@@ -3035,12 +3112,8 @@ const updatePersonnelAccountabilitySummary = async (
                       inspection.scheduled_date
                     );
 
-                    // The schedule_status is now handled by the database trigger
-                    // Just use what's in the database
-                    const displayScheduleStatus =
-                      inspection.schedule_status || "UPCOMING";
+                    const displayScheduleStatus = getScheduleStatus(inspection);
 
-                    // Get clearance type for this equipment
                     const clearanceInfo =
                       equipmentClearanceMap[inspection.equipment_id];
                     const hasClearance = clearanceInfo?.hasClearance || false;
@@ -3079,7 +3152,6 @@ const updatePersonnelAccountabilitySummary = async (
                         </td>
                         <td>{formatDate(inspection.scheduled_date)}</td>
                         <td>
-                          {/* Schedule Status Badge - now includes DONE */}
                           <span
                             className={`${styles.scheduleStatusBadge} ${
                               styles[displayScheduleStatus?.toLowerCase()]
@@ -3089,7 +3161,6 @@ const updatePersonnelAccountabilitySummary = async (
                           </span>
                         </td>
                         <td>{inspection.assigned_to}</td>
-                        {/* Clearance Type Column */}
                         <td>
                           {hasClearance ? (
                             <div className={styles.clearanceIndicator}>
@@ -3140,7 +3211,6 @@ const updatePersonnelAccountabilitySummary = async (
                         </td>
                         <td>
                           <div className={styles.actionButtons}>
-                            {/* Only show Inspect button if status is PENDING and schedule is not DONE */}
                             {inspection.status === "PENDING" &&
                               inspection.schedule_status !== "DONE" &&
                               isToday && (
@@ -3152,7 +3222,6 @@ const updatePersonnelAccountabilitySummary = async (
                                 </button>
                               )}
 
-                            {/* Show Reschedule button only for pending inspections */}
                             {inspection.status === "PENDING" && (
                               <button
                                 className={`${styles.IEIBtn} ${styles.IEIReschedule}`}
@@ -3164,7 +3233,6 @@ const updatePersonnelAccountabilitySummary = async (
                               </button>
                             )}
 
-                            {/* Show status if inspection is completed/failed/cancelled */}
                             {inspection.status === "COMPLETED" && (
                               <span className={styles.completedText}>
                                 ✓ Completed
@@ -3218,7 +3286,8 @@ const updatePersonnelAccountabilitySummary = async (
           </div>
         </section>
 
-        {/* Recent Inspections Section with Filters */}
+        {/* Recent Inspections Section with Filters and Bulk Delete */}
+        {/* Recent Inspections Section with Filters and Bulk Delete */}
         <section className={styles.IEISection}>
           <div className={styles.IEISectionHeader}>
             <h2>Recent Inspections</h2>
@@ -3351,6 +3420,74 @@ const updatePersonnelAccountabilitySummary = async (
             </div>
           </div>
 
+          {/* Bulk Delete Controls - MOVED HERE UNDER FILTRATION */}
+          <div className={styles.bulkDeleteControlsSection}>
+            {/* Bulk Delete Action Bar (when items are selected) */}
+            {selectedInspections.length > 0 && (
+              <div className={styles.bulkDeleteActionBar}>
+                <div className={styles.bulkDeleteActionInfo}>
+                  <span className={styles.bulkDeleteSelectedCount}>
+                    {selectedInspections.length} inspection(s) selected
+                  </span>
+                  <button
+                    className={styles.bulkDeleteActionBtn}
+                    onClick={openBulkDeleteModal}
+                    disabled={isBulkDeleting}
+                  >
+                    {isBulkDeleting ? (
+                      <>
+                        <span className={styles.submissionSpinner}></span>
+                        Deleting...
+                      </>
+                    ) : (
+                      `Delete Selected (${selectedInspections.length})`
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Bulk Selection Controls */}
+            <div className={styles.bulkSelectionControls}>
+              <div className={styles.bulkSelectionHeader}>
+                <h4>Bulk Delete Options</h4>
+                <p className={styles.bulkSelectionDescription}>
+                  Select PASSED inspections to delete. Only inspections with
+                  PASS status can be deleted.
+                </p>
+              </div>
+
+              <div className={styles.bulkSelectionContent}>
+                <div className={styles.bulkSelectionStatus}>
+                  <div className={styles.selectionCountDisplay}>
+                    <span className={styles.selectionCountLabel}>
+                      Currently selected:
+                    </span>
+                    <span className={styles.selectionCountValue}>
+                      {selectedInspections.length}
+                    </span>
+                  </div>
+
+                  <div className={styles.bulkSelectionButtons}>
+                    <button
+                      className={styles.bulkSelectBtn}
+                      onClick={selectAllPassedInspections}
+                    >
+                      Select All PASSED
+                    </button>
+                    <button
+                      className={styles.bulkClearBtn}
+                      onClick={clearAllSelections}
+                      disabled={selectedInspections.length === 0}
+                    >
+                      Clear Selection
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Pagination */}
           <div className={styles.IEITopPagination}>
             {renderPaginationButtons(
@@ -3367,6 +3504,7 @@ const updatePersonnelAccountabilitySummary = async (
               <table className={styles.IEITable}>
                 <thead>
                   <tr>
+                    <th style={{ width: "50px" }}>Select</th>
                     <th>Equipment Name</th>
                     <th>Item Code</th>
                     <th>Category</th>
@@ -3382,7 +3520,32 @@ const updatePersonnelAccountabilitySummary = async (
                 </thead>
                 <tbody>
                   {paginatedRecent.map((inspection, index) => (
-                    <tr key={inspection.id || index}>
+                    <tr
+                      key={inspection.id || index}
+                      className={
+                        selectedInspections.includes(inspection.id)
+                          ? styles.selectedRow
+                          : ""
+                      }
+                    >
+                      <td>
+                        <input
+                          type="checkbox"
+                          checked={selectedInspections.includes(inspection.id)}
+                          onChange={() =>
+                            toggleInspectionSelection(
+                              inspection.id,
+                              inspection.status
+                            )
+                          }
+                          disabled={inspection.status !== "PASS"}
+                          title={
+                            inspection.status !== "PASS"
+                              ? "Only PASS inspections can be selected for deletion"
+                              : "Select for bulk delete"
+                          }
+                        />
+                      </td>
                       <td>{inspection.equipment_name}</td>
                       <td>{inspection.item_code}</td>
                       <td>{inspection.equipment_category}</td>
@@ -3545,10 +3708,10 @@ const updatePersonnelAccountabilitySummary = async (
                   <textarea
                     id="checkupFindings"
                     rows="4"
-                    value={checkupData.findings}
+                    value={inspectionData.findings}
                     onChange={(e) =>
-                      setCheckupData({
-                        ...checkupData,
+                      setInspectionData({
+                        ...inspectionData,
                         findings: e.target.value,
                       })
                     }
@@ -3561,9 +3724,12 @@ const updatePersonnelAccountabilitySummary = async (
                   <label htmlFor="checkupStatus">Equipment Status *</label>
                   <select
                     id="checkupStatus"
-                    value={checkupData.status}
+                    value={inspectionData.equipmentStatus}
                     onChange={(e) =>
-                      setCheckupData({ ...checkupData, status: e.target.value })
+                      setInspectionData({
+                        ...inspectionData,
+                        equipmentStatus: e.target.value,
+                      })
                     }
                     required
                   >
@@ -3585,7 +3751,7 @@ const updatePersonnelAccountabilitySummary = async (
                   <button
                     type="button"
                     className={`${styles.IEIBtn} ${styles.IEISubmitBtn}`}
-                    onClick={submitCheckup}
+                    onClick={submitInspection}
                   >
                     Complete Checkup
                   </button>
@@ -4075,6 +4241,199 @@ const updatePersonnelAccountabilitySummary = async (
                 >
                   Close
                 </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Scan Result Modal - NEW */}
+        {showScanResultModal && scanResult && (
+          <div className={styles.IEIModal}>
+            <div className={styles.IEIModalContent}>
+              <div className={styles.IEIModalHeader}>
+                <h3>Scan Result</h3>
+                <button
+                  className={styles.IEIModalClose}
+                  onClick={() => {
+                    setShowScanResultModal(false);
+                    setScanResult(null);
+                    setScannedEquipment(null);
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className={styles.scanResultContent}>
+                {scanResult.success ? (
+                  <>
+                    <div className={styles.scanResultIcon}>
+                      <span style={{ fontSize: "48px", color: "#28a745" }}>
+                        ✓
+                      </span>
+                    </div>
+                    <div className={styles.scanResultMessage}>
+                      <h4>Barcode Scanned Successfully</h4>
+                      <p>{scanResult.message}</p>
+
+                      {scannedEquipment && (
+                        <div className={styles.scannedEquipmentDetails}>
+                          <p>
+                            <strong>Equipment Name:</strong>{" "}
+                            {scannedEquipment.item_name}
+                          </p>
+                          <p>
+                            <strong>Barcode:</strong>{" "}
+                            {scannedEquipment.item_code}
+                          </p>
+                          <p>
+                            <strong>Category:</strong>{" "}
+                            {scannedEquipment.category}
+                          </p>
+                          <p>
+                            <strong>Status:</strong> {scannedEquipment.status}
+                          </p>
+                          <p>
+                            <strong>Assigned To:</strong>{" "}
+                            {scannedEquipment.assigned_to}
+                          </p>
+                        </div>
+                      )}
+
+                      {scanResult.matched !== null && (
+                        <div className={styles.matchStatus}>
+                          {scanResult.matched ? (
+                            <p style={{ color: "#28a745", fontWeight: "bold" }}>
+                              ✓ Equipment matched! Proceed with inspection.
+                            </p>
+                          ) : (
+                            <p style={{ color: "#dc3545", fontWeight: "bold" }}>
+                              ⚠️ Scanned equipment does not match scheduled
+                              equipment
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className={styles.scanResultIcon}>
+                      <span style={{ fontSize: "48px", color: "#dc3545" }}>
+                        ✗
+                      </span>
+                    </div>
+                    <div className={styles.scanResultMessage}>
+                      <h4>Scan Result</h4>
+                      <p>{scanResult.message}</p>
+                      {scanResult.barcode && (
+                        <p>
+                          <strong>Scanned Barcode:</strong> {scanResult.barcode}
+                        </p>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+
+              <div className={styles.scanResultActions}>
+                <button
+                  className={styles.scanResultCloseBtn}
+                  onClick={() => {
+                    setShowScanResultModal(false);
+                    setScanResult(null);
+                    setScannedEquipment(null);
+                  }}
+                >
+                  Close
+                </button>
+
+                {scanResult.success && scanResult.matched === true && (
+                  <button
+                    className={styles.scanResultProceedBtn}
+                    onClick={() => {
+                      setShowScanResultModal(false);
+                      setScanResult(null);
+                      setScannedEquipment(null);
+                    }}
+                  >
+                    Proceed with Inspection
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Bulk Delete Confirmation Modal */}
+        {showBulkDeleteModal && (
+          <div className={styles.IEIModal}>
+            <div className={styles.IEIModalContent}>
+              <div className={styles.IEIModalHeader}>
+                <h3>Confirm Bulk Delete</h3>
+                <button
+                  className={styles.IEIModalClose}
+                  onClick={() => setShowBulkDeleteModal(false)}
+                  disabled={isBulkDeleting}
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className={styles.bulkDeleteModalContent}>
+                <div className={styles.bulkDeleteWarning}>
+                  <span
+                    style={{
+                      fontSize: "48px",
+                      color: "#ff6b6b",
+                      marginBottom: "16px",
+                    }}
+                  >
+                    ⚠️
+                  </span>
+                  <h4>
+                    Are you sure you want to delete {selectedInspections.length}{" "}
+                    inspection(s)?
+                  </h4>
+                  <p>
+                    This action cannot be undone. The following will be deleted:
+                  </p>
+                  <ul className={styles.bulkDeleteList}>
+                    <li>Selected inspection records</li>
+                    <li>Inspection findings and recommendations</li>
+                    <li>Inspection dates and results</li>
+                  </ul>
+                  <p className={styles.bulkDeleteNote}>
+                    <strong>Note:</strong> Only inspections with PASS status are
+                    selected for deletion.
+                  </p>
+                </div>
+
+                <div className={styles.bulkDeleteModalActions}>
+                  <button
+                    type="button"
+                    className={styles.bulkDeleteCancelBtn}
+                    onClick={() => setShowBulkDeleteModal(false)}
+                    disabled={isBulkDeleting}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.bulkDeleteConfirmBtn}
+                    onClick={handleBulkDelete}
+                    disabled={isBulkDeleting}
+                  >
+                    {isBulkDeleting ? (
+                      <>
+                        <span className={styles.submissionSpinner}></span>
+                        Deleting...
+                      </>
+                    ) : (
+                      `Delete ${selectedInspections.length} Inspection(s)`
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
           </div>

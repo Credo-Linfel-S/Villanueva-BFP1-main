@@ -36,7 +36,7 @@ const AdminGearIcon = () => {
   const adminRoleOptions = [
     { value: "system_admin", label: "System Administrator" },
     { value: "inspector_admin", label: "Inspector Administrator" },
-    { value: "view_only", label: "View Only" },
+ 
   ];
 
   // Form state for editing admin

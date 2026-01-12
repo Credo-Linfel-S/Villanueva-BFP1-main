@@ -230,9 +230,9 @@ const PersonnelRegister = () => {
     birth_date: "",
     date_hired: "",
     hired_time: "",
-    vacation_balance: 0,
-    sick_balance: 0,
-    emergency_balance: 0,
+    vacation_balance: "",
+    sick_balance: "",
+    emergency_balance: "",
   });
 
   const parseDateTimeString = (datetimeStr) => {
@@ -715,9 +715,9 @@ const TransferModal = () => {
     birth_date: "",
     date_hired: "",
     hired_time: "",
-    vacation_balance: 0,
-    sick_balance: 0,
-    emergency_balance: 0,
+    vacation_balance: "",
+    sick_balance: "",
+
   });
 
   const [statusSummary, setStatusSummary] = useState({
@@ -2299,12 +2299,7 @@ const TransferModal = () => {
       let hiredTimeValue = null;
       let hiredAtDisplayValue = "8:00 AM";
       // Add this validation in handleEditSubmit before saving
-      const emergencyBalance = parseFloat(editFormData.emergency_balance) || 0;
-      if (emergencyBalance > 5) {
-        toast.error("Emergency leave cannot exceed 5 days");
-        setIsSavingEdit(false);
-        return;
-      }
+
       if (editFormData.hired_time) {
         const [hours, minutes] = editFormData.hired_time.split(":");
         const hourNum = parseInt(hours);
@@ -2410,8 +2405,8 @@ const TransferModal = () => {
 
       if (
         editFormData.vacation_balance !== existingCredits?.vacation_balance ||
-        editFormData.sick_balance !== existingCredits?.sick_balance ||
-        editFormData.emergency_balance !== existingCredits?.emergency_balance
+        editFormData.sick_balance !== existingCredits?.sick_balance
+      
       ) {
         const leaveData = {
           personnel_id: editingPerson.id,
@@ -2544,9 +2539,9 @@ const TransferModal = () => {
         birth_date: birthDateValue,
         date_hired: hiredDateValue,
         hired_time: timeValue,
-        vacation_balance: existingCredits?.vacation_balance || 0,
-        sick_balance: existingCredits?.sick_balance || 0,
-        emergency_balance: emergencyBalance,
+        vacation_balance: existingCredits?.vacation_balance || "",
+        sick_balance: existingCredits?.sick_balance || "",
+
       });
 
       // Set rank
@@ -5801,31 +5796,34 @@ const StatusManagementModal = () => {
                     parseFloat(editFormData.vacation_balance || 0) !==
                       parseFloat(existingCredits?.vacation_balance || 0) ||
                     parseFloat(editFormData.sick_balance || 0) !==
-                      parseFloat(existingCredits?.sick_balance || 0) ||
-                    parseFloat(editFormData.emergency_balance || 0) !==
-                      parseFloat(existingCredits?.emergency_balance || 0)
+                      parseFloat(existingCredits?.sick_balance || 0)
                   ) {
+                    // Update the leaveData object creation:
                     const leaveData = {
                       personnel_id: editingPerson.id,
                       year: currentYear,
                       vacation_balance:
-                        parseFloat(editFormData.vacation_balance) || 0,
-                      sick_balance: parseFloat(editFormData.sick_balance) || 0,
-                      emergency_balance:
-                        parseFloat(editFormData.emergency_balance) || 0,
+                        editFormData.vacation_balance === ""
+                          ? 0
+                          : parseFloat(editFormData.vacation_balance) || 0,
+                      sick_balance:
+                        editFormData.sick_balance === ""
+                          ? 0
+                          : parseFloat(editFormData.sick_balance) || 0,
                       updated_at: new Date().toISOString(),
                     };
 
                     if (!existingCredits) {
                       leaveData.initial_vacation_credits =
-                        parseFloat(editFormData.vacation_balance) || 0;
+                        editFormData.vacation_balance === ""
+                          ? 0
+                          : parseFloat(editFormData.vacation_balance) || 0;
                       leaveData.initial_sick_credits =
-                        parseFloat(editFormData.sick_balance) || 0;
-                      leaveData.initial_emergency_credits =
-                        parseFloat(editFormData.emergency_balance) || 0;
+                        editFormData.sick_balance === ""
+                          ? 0
+                          : parseFloat(editFormData.sick_balance) || 0;
                       leaveData.vacation_used = 0;
                       leaveData.sick_used = 0;
-                      leaveData.emergency_used = 0;
                     }
 
                     await supabase.from("leave_balances").upsert([leaveData], {
@@ -6240,7 +6238,7 @@ const StatusManagementModal = () => {
                           id="edit-vacation-balance"
                           className={styles.floatingInput}
                           placeholder=" "
-                          value={editFormData.vacation_balance || 0}
+                          value={editFormData.vacation_balance || ""}
                           onChange={(e) =>
                             setEditFormData((prev) => ({
                               ...prev,
@@ -6268,7 +6266,7 @@ const StatusManagementModal = () => {
                           id="edit-sick-balance"
                           className={styles.floatingInput}
                           placeholder=" "
-                          value={editFormData.sick_balance || 0}
+                          value={editFormData.sick_balance || ""}
                           onChange={(e) =>
                             setEditFormData((prev) => ({
                               ...prev,
@@ -6289,60 +6287,7 @@ const StatusManagementModal = () => {
                       </div>
                     </div>
 
-                    <div className={styles.prFormGroup}>
-                      <div className={styles.floatingGroup}>
-                        <input
-                          type="number"
-                          id="edit-emergency-balance"
-                          className={styles.floatingInput}
-                          placeholder=" "
-                          value={editFormData.emergency_balance || 0}
-                          onChange={(e) => {
-                            const newValue = parseFloat(e.target.value) || 0;
-                            // Prevent increasing if already at max
-                            if (emergencyMaxReached && newValue > 5) {
-                              toast.warning(
-                                "Emergency leave cannot exceed 5 days"
-                              );
-                              return;
-                            }
-                            setEditFormData((prev) => ({
-                              ...prev,
-                              emergency_balance: newValue,
-                            }));
-                          }}
-                          min="0"
-                          max="5"
-                          step="0.01"
-                          disabled={emergencyMaxReached}
-                          title={
-                            emergencyMaxReached
-                              ? "Emergency leave already at maximum (5 days)"
-                              : ""
-                          }
-                        />
-                        <label
-                          htmlFor="edit-emergency-balance"
-                          className={styles.floatingLabel}
-                        >
-                          Emergency Leave
-                          {emergencyMaxReached && (
-                            <span
-                              className={styles.maxLimitIndicator}
-                              title="Maximum reached"
-                            >
-                              (Max: 5)
-                            </span>
-                          )}
-                        </label>
-                        <span className={styles.leaveCreditUnit}>days</span>
-                        {emergencyMaxReached && (
-                          <div className={styles.maxLimitMessage}>
-                            <small>Maximum of 5 days reached</small>
-                          </div>
-                        )}
-                      </div>
-                    </div>
+              
                   </div>
 
                   <div className={styles.prFormActions}>

@@ -3040,14 +3040,10 @@ const loadClearanceRequests = async () => {
                           >
                             {req.lost_equipment_count}
                             {req.lost_equipment_status.includes("Unsettled")
-                              ? "⚠️"
+                              ? " ⚠️Equipment Needs Settlement"
                               : "✅"}
                           </span>
-                          {req.lost_equipment_status.includes("Unsettled") && (
-                            <span className={styles.lostEquipmentWarningText}>
-                              Needs settlement
-                            </span>
-                          )}
+       
                         </div>
                       ) : (
                         <span className={styles.noLostEquipment}>None</span>

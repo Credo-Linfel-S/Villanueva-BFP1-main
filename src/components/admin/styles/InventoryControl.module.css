@@ -13,6 +13,27 @@
   align-items: center;
   z-index: 9999;
 }
+
+.inventoryScannerLoading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+}
+
+.inventoryScannerLoadingSpinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #1060af;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
 .inventoryEditScannerInfo {
   background-color: #f0f7ff;
   border: 1px solid #cce5ff;
@@ -321,7 +342,7 @@ text-indent: 90px;
 }
 
 .barcodeDownloadBtn {
-  background-color: #2196F3;
+  background-color: #4b21f3;
 }
 
 .barcodeDownloadBtn:hover {
@@ -422,7 +443,7 @@ text-indent: 90px;
 .barcodeCloseBtn {
   flex: 1;
   min-width: 150px;
-  padding: 12px;
+  padding: 8px;
   font-size: 14px;
   white-space: nowrap;
 }
@@ -700,7 +721,7 @@ text-indent: 90px;
 
   .inventoryPaginationEllipsis {
     padding: 6px 8px;
-    color: var(--text-secondary);
+    color:#00488f;
     font-weight: bold;
   }
   /* Right Sidebar Styles */

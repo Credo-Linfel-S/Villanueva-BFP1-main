@@ -9,8 +9,9 @@ import BFPPreloader from "../../BFPPreloader.jsx";
 import { filterActivePersonnel } from "../../filterActivePersonnel.js"; // Import the utility
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import FloatingNotificationBell from "../../FloatingNotificationBell.jsx";
+
 import { useUserId } from "../../hooks/useUserId.js";
+import defaultPersonnelPhoto from "../../../assets/Firefighter.png";
 const Promotion = () => {
   const [personnel, setPersonnel] = useState([]);
   const [filteredPersonnel, setFilteredPersonnel] = useState([]);
@@ -57,7 +58,7 @@ const { userId, isAuthenticated, userRole } = useUserId();
 
   // Function to get personnel photo URL
   const getPersonnelPhotoUrl = (person) => {
-    if (!person) return "/bfp.jpg";
+    if (!person) return defaultPersonnelPhoto;
 
     // Try photo_url first
     if (person.photo_url) {
@@ -69,11 +70,11 @@ const { userId, isAuthenticated, userRole } = useUserId();
       const { data: urlData } = supabase.storage
         .from("personnel-documents")
         .getPublicUrl(person.photo_path);
-      return urlData?.publicUrl || "/bfp.jpg";
+      return urlData?.publicUrl || defaultPersonnelPhoto;
     }
 
     // Fallback to default image
-    return "/bfp.jpg";
+    return defaultPersonnelPhoto;
   };
 
   const calculateYears = (dateString) => {
@@ -164,10 +165,10 @@ const { userId, isAuthenticated, userRole } = useUserId();
   };
 
   // Helper for personnel photo error handling
-  const handlePersonnelPhotoError = (e) => {
-    e.target.onerror = null;
-    e.target.src = "/bfp.jpg";
-  };
+const handlePersonnelPhotoError = (e) => {
+  e.target.onerror = null;
+  e.target.src = defaultPersonnelPhoto; // Use imported default
+};
 
   // Filtering logic
   const applyFilters = (items) => {

@@ -5,19 +5,18 @@ import Hamburger from "../../Hamburger.jsx";
 import { useSidebar } from "../../SidebarContext.jsx";
 import { Title, Meta } from "react-head";
 import { supabase } from "../../../lib/supabaseClient.js";
-// Import the BFP preloader component and its styles
 import BFPPreloader from "../../BFPPreloader.jsx";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-// Import your utility functions
 import {
   filterActivePersonnel,
   getAssignablePersonnel,
   isPersonnelActive,
-} from "../../filterActivePersonnel.js"; // Adjust path as needed
+} from "../../filterActivePersonnel.js";
 import logo from "../../../assets/Firefighter.png";
 import FloatingNotificationBell from "../../FloatingNotificationBell.jsx";
 import { useUserId } from "../../hooks/useUserId.js";
+
 const Placement = () => {
   const [personnel, setPersonnel] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -26,7 +25,8 @@ const Placement = () => {
   // Preloader state
   const [showPreloader, setShowPreloader] = useState(true);
   const [loadingProgress, setLoadingProgress] = useState(0);
-const { userId, isAuthenticated, userRole } = useUserId();
+  const { userId, isAuthenticated, userRole } = useUserId();
+
   // State variables for table functionality
   const [currentPage, setCurrentPage] = useState(1);
   const rowsPerPage = 5;
@@ -38,20 +38,14 @@ const { userId, isAuthenticated, userRole } = useUserId();
 
   // Use useMemo to filter active personnel whenever personnel changes
   const activePersonnel = useMemo(() => {
-    // Use the utility function to filter out inactive personnel
     return filterActivePersonnel(personnel);
   }, [personnel]);
 
-  // You can also use getAssignablePersonnel if you need sorted active personnel
   const assignablePersonnel = useMemo(() => {
     return getAssignablePersonnel(personnel);
   }, [personnel]);
 
-  // Load personnel data from Supabase on component mount
-  useEffect(() => {
-    loadPersonnelData();
-  }, []);
-  // Add this before or after your imports
+  // Rank options
   const rankOptions = [
     {
       rank: "FO1",
@@ -103,111 +97,117 @@ const { userId, isAuthenticated, userRole } = useUserId();
       }/storage/v1/object/public/rank_images/SFO4.png`,
     },
   ];
-  // Helper function to get rank image
+
+  // Helper functions
   const getRankImage = (rank) => {
     const rankOption = rankOptions.find((option) => option.rank === rank);
     return rankOption ? rankOption.image : null;
   };
 
-  // Helper function to get rank name
   const getRankName = (rank) => {
     const rankOption = rankOptions.find((option) => option.rank === rank);
     return rankOption ? rankOption.name : rank || "N/A";
   };
-  // Update loading progress
+
   const updateLoadingProgress = (progress) => {
     setLoadingProgress(progress);
   };
-const PhotoCell = ({ person }) => {
-  const [isLoading, setIsLoading] = useState(true);
-  const [imageSrc, setImageSrc] = useState(logo);
 
-  useEffect(() => {
-    const loadPhoto = async () => {
-      setIsLoading(true);
+  // Photo cell component
+  const PhotoCell = ({ person }) => {
+    const [isLoading, setIsLoading] = useState(true);
+    const [imageSrc, setImageSrc] = useState(logo);
 
-      try {
-        let url = logo;
+    useEffect(() => {
+      const loadPhoto = async () => {
+        setIsLoading(true);
 
-        // Check if personnel has a photo_url from Supabase
-        if (person.photo_url && person.photo_url.startsWith("http")) {
-          // Test if the photo_url is accessible
-          const isValid = await testImage(person.photo_url);
-          if (isValid) {
-            url = person.photo_url;
-          } else {
-            // Try photo_path as fallback
-            if (person.photo_path) {
-              const { data: urlData } = supabase.storage
-                .from("personnel-documents")
-                .getPublicUrl(person.photo_path);
-              const pathUrl = urlData?.publicUrl;
-              if (pathUrl && (await testImage(pathUrl))) {
-                url = pathUrl;
-              } else {
-                url = logo;
+        try {
+          let url = logo;
+
+          // Check if personnel has a photo_url from Supabase
+          if (person.photo_url && person.photo_url.startsWith("http")) {
+            const isValid = await testImage(person.photo_url);
+            if (isValid) {
+              url = person.photo_url;
+            } else {
+              // Try photo_path as fallback
+              if (person.photo_path) {
+                const { data: urlData } = supabase.storage
+                  .from("personnel-documents")
+                  .getPublicUrl(person.photo_path);
+                const pathUrl = urlData?.publicUrl;
+                if (pathUrl && (await testImage(pathUrl))) {
+                  url = pathUrl;
+                } else {
+                  url = logo;
+                }
               }
             }
+          } else if (person.photo_path) {
+            // Use photo_path if photo_url is not available
+            const { data: urlData } = supabase.storage
+              .from("personnel-documents")
+              .getPublicUrl(person.photo_path);
+            const pathUrl = urlData?.publicUrl;
+            if (pathUrl && (await testImage(pathUrl))) {
+              url = pathUrl;
+            } else {
+              url = logo;
+            }
           }
-        } else if (person.photo_path) {
-          // Use photo_path if photo_url is not available
-          const { data: urlData } = supabase.storage
-            .from("personnel-documents")
-            .getPublicUrl(person.photo_path);
-          const pathUrl = urlData?.publicUrl;
-          if (pathUrl && (await testImage(pathUrl))) {
-            url = pathUrl;
-          } else {
-            url = logo;
-          }
-        }
 
-        setImageSrc(url);
-      } catch (error) {
-        console.error("Error loading photo:", error);
-        setImageSrc(logo);
-      } finally {
-        setTimeout(() => setIsLoading(false), 100);
-      }
+          setImageSrc(url);
+        } catch (error) {
+          console.error("Error loading photo:", error);
+          setImageSrc(logo);
+        } finally {
+          setTimeout(() => setIsLoading(false), 100);
+        }
+      };
+
+      loadPhoto();
+    }, [person]);
+
+    // Test if image URL is accessible
+    const testImage = (url) => {
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => resolve(true);
+        img.onerror = () => resolve(false);
+        img.src = url;
+        setTimeout(() => resolve(false), 2000);
+      });
     };
 
-    loadPhoto();
-  }, [person]);
-
-  // Test if image URL is accessible
-  const testImage = (url) => {
-    return new Promise((resolve) => {
-      const img = new Image();
-      img.onload = () => resolve(true);
-      img.onerror = () => resolve(false);
-      img.src = url;
-      setTimeout(() => resolve(false), 2000);
-    });
+    return (
+      <div className={styles.PMTPhotoContainer}>
+        {isLoading ? (
+          <div className={styles.PMTPhotoLoading}>
+            <div className={styles.PMTPhotoSpinner}></div>
+            <small>Loading...</small>
+          </div>
+        ) : (
+          <img
+            src={imageSrc}
+            alt={`${person.first_name || ""} ${person.last_name || ""}`}
+            className={styles.PMTPhotoThumb}
+            onError={(e) => {
+              e.target.onerror = null;
+              e.target.src = logo;
+            }}
+            loading="lazy"
+          />
+        )}
+      </div>
+    );
   };
 
-  return (
-    <div className={styles.PMTPhotoContainer}>
-      {isLoading ? (
-        <div className={styles.PMTPhotoLoading}>
-          <div className={styles.PMTPhotoSpinner}></div>
-          <small>Loading...</small>
-        </div>
-      ) : (
-        <img
-          src={imageSrc}
-          alt={`${person.first_name || ""} ${person.last_name || ""}`}
-          className={styles.PMTPhotoThumb}
-          onError={(e) => {
-            e.target.onerror = null;
-            e.target.src = logo;
-          }}
-          loading="lazy"
-        />
-      )}
-    </div>
-  );
-};
-  // Handle retry from preloader
+  // Load personnel data
+  useEffect(() => {
+    loadPersonnelData();
+  }, []);
+
   const handleRetryFromPreloader = () => {
     setShowPreloader(true);
     setLoadingProgress(0);
@@ -238,7 +238,6 @@ const PhotoCell = ({ person }) => {
         "records"
       );
 
-      // Log active vs inactive count for debugging
       const activeCount = filterActivePersonnel(personnelData || []).length;
       const totalCount = personnelData?.length || 0;
       console.log(`Active personnel: ${activeCount}/${totalCount}`);
@@ -250,7 +249,6 @@ const PhotoCell = ({ person }) => {
       // Small delay to show completion
       setTimeout(() => {
         updateLoadingProgress(100);
-        // Hide preloader after a short delay to show completion
         setTimeout(() => {
           setShowPreloader(false);
         }, 500);
@@ -262,13 +260,11 @@ const PhotoCell = ({ person }) => {
     }
   };
 
-  // Helper function to format dates for display
+  // Helper functions for data formatting
   const formatDateForDisplay = (dateValue) => {
     if (!dateValue) return "N/A";
 
-    // If it's already a string, return it
     if (typeof dateValue === "string") {
-      // Try to format it nicely
       try {
         const date = new Date(dateValue);
         if (!isNaN(date.getTime())) {
@@ -279,12 +275,11 @@ const PhotoCell = ({ person }) => {
           });
         }
       } catch {
-        // If parsing fails, return the original string
+        return dateValue;
       }
       return dateValue;
     }
 
-    // If it's a Date object, format it
     if (dateValue instanceof Date) {
       return dateValue.toLocaleDateString("en-US", {
         year: "numeric",
@@ -293,7 +288,6 @@ const PhotoCell = ({ person }) => {
       });
     }
 
-    // If it's a timestamp or other value, try to convert
     try {
       const date = new Date(dateValue);
       return isNaN(date.getTime())
@@ -369,7 +363,7 @@ const PhotoCell = ({ person }) => {
         throw error;
       }
 
-      // Update local state by mapping through personnel array
+      // Update local state
       setPersonnel((prevPersonnel) =>
         prevPersonnel.map((person) => (person.id === data.id ? data : person))
       );
@@ -403,17 +397,15 @@ const PhotoCell = ({ person }) => {
     return `${firstName} ${middleName} ${lastName}`.trim() || "N/A";
   };
 
-  // Get the date hired for calculations
   const getDateHired = (person) => {
     return person.date_hired;
   };
 
-  // Get the last promotion date
   const getLastPromotionDate = (person) => {
     return person.last_promoted || person.date_hired;
   };
 
-  // Filtering & pagination logic - Use activePersonnel instead of personnel
+  // Filtering & pagination logic
   function applyFilters(items) {
     let filtered = [...items];
 
@@ -462,7 +454,7 @@ const PhotoCell = ({ person }) => {
   const pageStart = (currentPage - 1) * rowsPerPage;
   const paginated = filteredPersonnel.slice(pageStart, pageStart + rowsPerPage);
 
-  // Pagination function
+  // Pagination function - copied from inventory
   const renderPaginationButtons = () => {
     const pageCount = Math.max(
       1,
@@ -472,12 +464,11 @@ const PhotoCell = ({ person }) => {
 
     const buttons = [];
 
-    // Previous button
     buttons.push(
       <button
         key="prev"
-        className={`${styles.PMTPaginationBtn} ${
-          hasNoData ? styles.PMTDisabled : ""
+        className={`${styles.inventoryPaginationBtn} ${
+          hasNoData ? styles.inventoryDisabled : ""
         }`}
         disabled={currentPage === 1 || hasNoData}
         onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
@@ -486,13 +477,12 @@ const PhotoCell = ({ person }) => {
       </button>
     );
 
-    // Always show first page
     buttons.push(
       <button
         key={1}
-        className={`${styles.PMTPaginationBtn} ${
-          1 === currentPage ? styles.PMTActive : ""
-        } ${hasNoData ? styles.PMTDisabled : ""}`}
+        className={`${styles.inventoryPaginationBtn} ${
+          1 === currentPage ? styles.inventoryActive : ""
+        } ${hasNoData ? styles.inventoryDisabled : ""}`}
         onClick={() => setCurrentPage(1)}
         disabled={hasNoData}
       >
@@ -500,38 +490,33 @@ const PhotoCell = ({ person }) => {
       </button>
     );
 
-    // Show ellipsis after first page if needed
     if (currentPage > 3) {
       buttons.push(
-        <span key="ellipsis1" className={styles.PMTPaginationEllipsis}>
+        <span key="ellipsis1" className={styles.inventoryPaginationEllipsis}>
           ...
         </span>
       );
     }
 
-    // Show pages around current page (max 5 pages total including first and last)
     let startPage = Math.max(2, currentPage - 1);
     let endPage = Math.min(pageCount - 1, currentPage + 1);
 
-    // Adjust if we're near the beginning
     if (currentPage <= 3) {
       endPage = Math.min(pageCount - 1, 4);
     }
 
-    // Adjust if we're near the end
     if (currentPage >= pageCount - 2) {
       startPage = Math.max(2, pageCount - 3);
     }
 
-    // Generate middle page buttons
     for (let i = startPage; i <= endPage; i++) {
       if (i > 1 && i < pageCount) {
         buttons.push(
           <button
             key={i}
-            className={`${styles.PMTPaginationBtn} ${
-              i === currentPage ? styles.PMTActive : ""
-            } ${hasNoData ? styles.PMTDisabled : ""}`}
+            className={`${styles.inventoryPaginationBtn} ${
+              i === currentPage ? styles.inventoryActive : ""
+            } ${hasNoData ? styles.inventoryDisabled : ""}`}
             onClick={() => setCurrentPage(i)}
             disabled={hasNoData}
           >
@@ -541,23 +526,21 @@ const PhotoCell = ({ person }) => {
       }
     }
 
-    // Show ellipsis before last page if needed
     if (currentPage < pageCount - 2) {
       buttons.push(
-        <span key="ellipsis2" className={styles.PMTPaginationEllipsis}>
+        <span key="ellipsis2" className={styles.inventoryPaginationEllipsis}>
           ...
         </span>
       );
     }
 
-    // Always show last page if there is more than 1 page
     if (pageCount > 1) {
       buttons.push(
         <button
           key={pageCount}
-          className={`${styles.PMTPaginationBtn} ${
-            pageCount === currentPage ? styles.PMTActive : ""
-          } ${hasNoData ? styles.PMTDisabled : ""}`}
+          className={`${styles.inventoryPaginationBtn} ${
+            pageCount === currentPage ? styles.inventoryActive : ""
+          } ${hasNoData ? styles.inventoryDisabled : ""}`}
           onClick={() => setCurrentPage(pageCount)}
           disabled={hasNoData}
         >
@@ -566,12 +549,11 @@ const PhotoCell = ({ person }) => {
       );
     }
 
-    // Next button
     buttons.push(
       <button
         key="next"
-        className={`${styles.PMTPaginationBtn} ${
-          hasNoData ? styles.PMTDisabled : ""
+        className={`${styles.inventoryPaginationBtn} ${
+          hasNoData ? styles.inventoryDisabled : ""
         }`}
         disabled={currentPage === pageCount || hasNoData}
         onClick={() => setCurrentPage(Math.min(pageCount, currentPage + 1))}
@@ -618,23 +600,35 @@ const PhotoCell = ({ person }) => {
       <Title>Personnel Placement | BFP Villanueva</Title>
       <Meta name="robots" content="noindex, nofollow" />
 
-    
-
       <Hamburger />
       <Sidebar />
+
+      <ToastContainer
+        position="top-right"
+        autoClose={2500}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="light"
+      />
+
       <div className={`main-content ${isSidebarCollapsed ? "collapsed" : ""}`}>
         <h1 className={styles.PMTTitle}>Personnel Placement</h1>
 
-        {/* You can add a badge showing active personnel count */}
+        {/* Active personnel badge */}
         <div className={styles.PMTActiveBadge}>
           Showing {activePersonnel.length} active personnel
         </div>
 
-        {/* Top Controls */}
-        <div className={styles.PMTTopControls}>
-          <div className={styles.PMTTableHeader}>
+        {/* ========== COPIED INVENTORY TABLE UI ========== */}
+        <div className={styles.inventoryTopControls}>
+          <div className={styles.inventoryTableHeader}>
             <select
-              className={styles.PMTFilterType}
+              className={styles.inventoryFilterCategory}
               value={filterRank}
               onChange={(e) => {
                 setFilterRank(e.target.value);
@@ -653,7 +647,7 @@ const PhotoCell = ({ person }) => {
 
             <input
               type="text"
-              className={styles.PMTSearchBar}
+              className={styles.inventorySearchBar}
               placeholder="🔍 Search personnel..."
               value={search}
               onChange={(e) => {
@@ -664,48 +658,61 @@ const PhotoCell = ({ person }) => {
           </div>
         </div>
 
-        {/* Summary Cards */}
-        <div className={styles.PMTSummary}>
+        {/* Summary Cards - Copied from inventory */}
+        <div
+          id={styles.inventorySummary}
+          style={{ display: "flex", gap: 20, margin: 20 }}
+        >
           <button
-            className={`${styles.PMTSummaryCard} ${styles.PMTTotal} ${
-              currentFilterCard === "total" ? styles.PMTActive : ""
-            }`}
+            className={`${styles.inventorySummaryCard} ${
+              styles.inventoryTotal
+            } ${currentFilterCard === "total" ? styles.inventoryActive : ""}`}
+            data-filter="total"
             onClick={() => handleCardClick("total")}
           >
             <h3>Active Personnel</h3>
-            <p>{totalItems}</p>
+            <p id={styles.inventoryTotalItems}>{totalItems}</p>
           </button>
           <button
-            className={`${styles.PMTSummaryCard} ${styles.PMTEligibleCard} ${
-              currentFilterCard === "eligible" ? styles.PMTActive : ""
+            className={`${styles.inventorySummaryCard} ${
+              styles.inventoryAssigned
+            } ${
+              currentFilterCard === "eligible" ? styles.inventoryActive : ""
             }`}
+            data-filter="eligible"
             onClick={() => handleCardClick("eligible")}
           >
-            <h3>Eligible for Promotion</h3>
-            <p>{eligibleItems}</p>
+            <h3>Eligible</h3>
+            <p id={styles.inventoryAssignedItems}>{eligibleItems}</p>
           </button>
           <button
-            className={`${styles.PMTSummaryCard} ${styles.PMTNotEligibleCard} ${
-              currentFilterCard === "not-eligible" ? styles.PMTActive : ""
+            className={`${styles.inventorySummaryCard} ${
+              styles.inventoryStorage
+            } ${
+              currentFilterCard === "not-eligible" ? styles.inventoryActive : ""
             }`}
+            data-filter="not-eligible"
             onClick={() => handleCardClick("not-eligible")}
           >
             <h3>Not Eligible</h3>
-            <p>{notEligibleItems}</p>
+            <p id={styles.inventoryStorageItems}>{notEligibleItems}</p>
           </button>
         </div>
 
-        {/* Table */}
-        <div className={styles.PMTTableContainer}>
-          <div className={styles.PMTPaginationContainer}>
-            {renderPaginationButtons()}
-          </div>
+        {/* Top Pagination */}
+        <div
+          className={`${styles.inventoryPaginationContainer} ${styles.inventoryTopPagination}`}
+        >
+          {renderPaginationButtons()}
+        </div>
 
-          <table className={styles.PMTTable}>
+        {/* Table Wrapper - Copied from inventory */}
+        <div className={styles.tableWrapper}>
+          <table className={styles.inventoryTable}>
             <thead>
               <tr>
                 <th>Photo</th>
-                <th>Employee</th>
+                <th>Personnel</th>
                 <th>Rank</th>
                 <th>Current Designation</th>
                 <th>Station/Unit</th>
@@ -715,17 +722,28 @@ const PhotoCell = ({ person }) => {
                 <th>Actions</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody id={styles.inventoryTableBody}>
               {paginated.length === 0 ? (
                 <tr>
-                  <td colSpan="9" className={styles.PMTNoDataTable}>
+                  <td
+                    colSpan="9"
+                    style={{ textAlign: "center", padding: "40px" }}
+                  >
                     <div style={{ fontSize: "48px", marginBottom: "16px" }}>
                       <span className={styles.animatedEmoji}>👨‍🚒</span>
                     </div>
-                    <h3>No Active Personnel Records Found</h3>
-                    <p>
-                      There are no active personnel records matching your
-                      criteria.
+                    <h3
+                      style={{
+                        fontSize: "18px",
+                        fontWeight: "600",
+                        color: "#2b2b2b",
+                        marginBottom: "8px",
+                      }}
+                    >
+                      No Active Personnel Found
+                    </h3>
+                    <p style={{ fontSize: "14px", color: "#999" }}>
+                      Ready to serve but no personnel records yet
                     </p>
                   </td>
                 </tr>
@@ -737,46 +755,68 @@ const PhotoCell = ({ person }) => {
                   const isEditing = editingIndex === index;
 
                   return (
-                    <tr key={person.id} className={styles.PMTRow}>
-                      <td className={styles.PMTPhotoCell}>
+                    <tr key={person.id}>
+                      <td>
                         <PhotoCell person={person} />
                       </td>
                       <td>{getFullName(person)}</td>
                       <td>
-                        <div className={styles.rankDisplay}>
-                          <div className={styles.rankImageContainer}>
-                            {getRankImage(person.rank) ? (
-                              <img
-                                src={getRankImage(person.rank)}
-                                alt={person.rank || "Rank"}
-                                className={styles.rankImage}
-                                onError={(e) => {
-                                  e.target.onerror = null;
-                                  e.target.src =
-                                    "https://via.placeholder.com/40x40/cccccc/ffffff?text=Rank";
-                                }}
-                              />
-                            ) : (
-                              <div className={styles.rankPlaceholder}>
-                                {person.rank?.charAt(0) || "R"}
+                        <div className={styles.rankCell}>
+                          {(() => {
+                            const rankImg = getRankImage(person.rank);
+                            if (rankImg) {
+                              return (
+                                <>
+                                  <img
+                                    src={rankImg}
+                                    alt={person.rank || "Rank"}
+                                    className={styles.rankImage}
+                                    onError={(e) => {
+                                      e.target.onerror = null;
+                                      e.target.style.display = "none";
+                                      const placeholder =
+                                        e.target.parentNode.querySelector(
+                                          `.${styles.rankPlaceholder}`
+                                        );
+                                      if (placeholder)
+                                        placeholder.style.display = "flex";
+                                    }}
+                                  />
+                                  <div
+                                    className={`${styles.rankPlaceholder} ${styles.hidden}`}
+                                  >
+                                    <span
+                                      className={styles.rankPlaceholderText}
+                                    >
+                                      {person.rank?.charAt(0) || "R"}
+                                    </span>
+                                  </div>
+                                </>
+                              );
+                            }
+
+                            // Show placeholder if no rank image
+                            return (
+                              <div
+                                className={`${styles.rankPlaceholder} ${styles.show}`}
+                              >
+                                <span className={styles.rankPlaceholderText}>
+                                  {person.rank?.charAt(0) || "R"}
+                                </span>
                               </div>
-                            )}
-                          </div>
-                          <div className={styles.rankInfo}>
-                            <div className={styles.rankAbbreviation}>
-                              {person.rank || "N/A"}
-                            </div>
-                            <div className={styles.rankFullName}>
-                              {getRankName(person.rank)}
-                            </div>
-                          </div>
+                            );
+                          })()}
+
+                          <span className={styles.rankText}>
+                            {person.rank || "N/A"}
+                          </span>
                         </div>
                       </td>
                       <td>
                         {isEditing ? (
                           <input
                             type="text"
-                            className={styles.PMTInputField}
+                            className={styles.inventoryModalInput}
                             value={editData.designation}
                             onChange={(e) =>
                               handleInputChange("designation", e.target.value)
@@ -791,7 +831,7 @@ const PhotoCell = ({ person }) => {
                         {isEditing ? (
                           <input
                             type="text"
-                            className={styles.PMTInputField}
+                            className={styles.inventoryModalInput}
                             value={editData.station}
                             onChange={(e) =>
                               handleInputChange("station", e.target.value)
@@ -806,26 +846,29 @@ const PhotoCell = ({ person }) => {
                       <td>{formatDateForDisplay(lastPromoted)}</td>
                       <td>
                         <span
-                          className={`${styles.PMTStatus} ${
-                            isEligible
-                              ? styles.PMTEligible
-                              : styles.PMTNotEligible
-                          }`}
+                          style={{
+                            padding: "6px 12px",
+                            borderRadius: "20px",
+                            fontSize: "12px",
+                            fontWeight: "600",
+                            backgroundColor: isEligible ? "#d4edda" : "#f8d7da",
+                            color: isEligible ? "#155724" : "#721c24",
+                          }}
                         >
                           {isEligible ? "Eligible" : "Not Eligible"}
                         </span>
                       </td>
                       <td>
                         {isEditing ? (
-                          <div className={styles.PMTActionGroup}>
+                          <div style={{ display: "flex", gap: "5px" }}>
                             <button
-                              className={`${styles.PMTBtn} ${styles.PMTSaveBtn}`}
+                              className={styles.inventoryEditBtn}
                               onClick={() => handleSave(index)}
                             >
                               Save
                             </button>
                             <button
-                              className={`${styles.PMTBtn} ${styles.PMTCancelBtn}`}
+                              className={styles.inventoryDeleteBtn}
                               onClick={handleCancel}
                             >
                               Cancel
@@ -833,7 +876,7 @@ const PhotoCell = ({ person }) => {
                           </div>
                         ) : (
                           <button
-                            className={`${styles.PMTBtn} ${styles.PMTEditBtn}`}
+                            className={styles.inventoryEditBtn}
                             onClick={() => handleEdit(index)}
                           >
                             Manage
@@ -847,6 +890,11 @@ const PhotoCell = ({ person }) => {
             </tbody>
           </table>
         </div>
+
+        <div className={styles.tableBottomPagination}>
+          {renderPaginationButtons()}
+        </div>
+        {/* ========== END COPIED INVENTORY TABLE UI ========== */}
       </div>
     </div>
   );

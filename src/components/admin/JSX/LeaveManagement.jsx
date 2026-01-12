@@ -76,7 +76,29 @@ const LeaveManagement = () => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminUsername, setAdminUsername] = useState("");
   const [currentUser, setCurrentUser] = useState(null);
+  // Add this function to identify leave types that count holidays/weekends as paid
+  const isSpecialLeaveType = (leaveType) => {
+    if (!leaveType) return false;
+    const type = leaveType.toLowerCase().trim();
+    return (
+      type === "maternity" ||
+      type === "paternity" ||
+      type === "emergency" ||
+      type === "emergency leave"
+    );
+  };
 
+  // Also add this for leave types that don't require credits
+  const doesRequireLeaveCredits = (leaveType) => {
+    if (!leaveType) return true;
+    const type = leaveType.toLowerCase().trim();
+    // Emergency, Maternity, Paternity don't require credits
+    return !(
+      type.includes("emergency") ||
+      type === "maternity" ||
+      type === "paternity"
+    );
+  };
   // Dynamic card count based on sidebar state
   const rowsPerPage = 5;
   const rowsPerPageCards = isSidebarCollapsed ? 8 : 6; // Dynamic card count
@@ -204,22 +226,25 @@ const LeaveManagement = () => {
         return 0;
       }
 
-      // Make sure leaveType is not undefined and normalize it
       const normalizedLeaveType = leaveType?.trim() || "Vacation";
+      let balanceValue = 0;
 
       switch (normalizedLeaveType) {
         case "Vacation":
-          return parseFloat(balance.vacation_balance) || 0;
+          balanceValue = parseFloat(balance.vacation_balance) || 0;
+          break;
         case "Sick":
-          return parseFloat(balance.sick_balance) || 0;
+          balanceValue = parseFloat(balance.sick_balance) || 0;
+          break;
         case "Emergency":
-          return parseFloat(balance.emergency_balance) || 0;
+          balanceValue = parseFloat(balance.emergency_balance) || 0;
+          break;
         default:
-          console.warn(
-            `Unknown leave type: ${normalizedLeaveType}, defaulting to Vacation`
-          );
-          return parseFloat(balance.vacation_balance) || 0;
+          balanceValue = parseFloat(balance.vacation_balance) || 0;
       }
+
+      // Return with 2 decimal places for precision
+      return parseFloat(balanceValue.toFixed(2));
     } catch (error) {
       console.error("Error in getLeaveBalanceForType:", error);
       return 0;
@@ -1409,945 +1434,1332 @@ const LeaveManagement = () => {
     setSelectedRequestForApproval(request);
     setShowApprovalOptionsModal(true);
   };
+const handleApproveWithOptions = async (
+  requestId,
+  approveFor,
+  withPayDays = null
+) => {
+  try {
+    setProcessingAction(requestId);
+    const request = leaveRequests.find((req) => req.id === requestId);
+    if (!request) {
+      toast.error("Leave request not found");
+      return;
+    }
 
-  const handleApproveWithOptions = async (
-    requestId,
-    approveFor,
-    withPayDays = null
-  ) => {
-    try {
-      setProcessingAction(requestId);
-      const request = leaveRequests.find((req) => req.id === requestId);
-      if (!request) {
-        toast.error("Leave request not found");
-        return;
-      }
+    const leaveType = request.leaveType || request.leave_type || "Vacation";
+    const numDays = request.numDays || request.num_days || 0;
 
-      const leaveType = request.leaveType || request.leave_type || "Vacation";
-      const numDays = request.numDays || request.num_days || 0;
+    // Check if it's a special leave type directly
+    const isSpecialLeave = () => {
+      if (!leaveType) return false;
+      const type = leaveType.toLowerCase().trim();
+      return (
+        type === "maternity" ||
+        type === "paternity" ||
+        type === "emergency" ||
+        type === "emergency leave"
+      );
+    };
 
-      console.log("=== APPROVAL DEBUG ===");
-      console.log("Request ID:", requestId);
-      console.log("Approve For:", approveFor);
-      console.log("With Pay Days Input:", withPayDays);
-      console.log("Total Calendar Days:", numDays);
+    const isSpecial = isSpecialLeave();
+    const requiresCredits = !isSpecial; // Special leaves don't require credits
 
-      // Get the LeaveCalculator
-      const calculator = new LeaveCalculator(holidays);
+    // Get the LeaveCalculator
+    const calculator = new LeaveCalculator(holidays);
 
-      // Calculate total working days (excluding holidays/weekends)
-      const totalWorkingDays = calculator.calculateWorkingDays(
+    // For special leaves, use calendar days; otherwise use working days
+    let totalDaysToConsider = 0;
+    let holidayDays = 0;
+    let totalWorkingDays = 0;
+
+    if (isSpecial) {
+      // For maternity/paternity/emergency: count ALL calendar days
+      totalDaysToConsider = numDays; // Use calendar days
+      holidayDays = 0; // Holidays/weekends count as paid
+      totalWorkingDays = numDays; // All days are considered "working" for payment
+    } else {
+      // For regular leaves: count only working days
+      totalWorkingDays = calculator.calculateWorkingDays(
         request.startDate,
         request.endDate
       );
-      const holidayDays = numDays - totalWorkingDays;
+      holidayDays = numDays - totalWorkingDays;
+      totalDaysToConsider = totalWorkingDays;
+    }
 
-      console.log(
-        "Total Working Days (excluding holidays/weekends):",
-        totalWorkingDays
-      );
-      console.log("Holiday/Weekend Days:", holidayDays);
+    // Get available balance (only if credits are required)
+    let availableBalance = 0;
+    let usableBalance = 0;
+    const MINIMUM_BALANCE = requiresCredits ? 1.25 : 0; // No minimum for special leaves
 
-      // Get available balance
-      const availableBalance = await getLeaveBalanceForType(
+    if (requiresCredits) {
+      availableBalance = await getLeaveBalanceForType(
         leaveType,
         request.personnel_id
       );
-      console.log("Available Balance:", availableBalance);
+      usableBalance = Math.max(0, availableBalance - MINIMUM_BALANCE);
+    } else {
+      // Special leaves don't require credits, so all days are "usable"
+      usableBalance = totalDaysToConsider;
+    }
 
-      // Calculate paidDays and unpaidDays based on approval type
-      let paidDays = 0;
-      let unpaidDays = 0;
-      let totalDeducted = 0;
+    console.log("=== LEAVE TYPE ANALYSIS ===");
+    console.log("Leave Type:", leaveType);
+    console.log("Is Special Leave:", isSpecial);
+    console.log("Requires Credits:", requiresCredits);
+    console.log("Total Calendar Days:", numDays);
+    console.log("Days to Consider (for payment):", totalDaysToConsider);
+    console.log("Holidays/Weekends:", holidayDays);
 
-      if (approveFor === "with_pay") {
-        // ALL working days are paid
-        paidDays = totalWorkingDays;
+    let finalApproveFor = approveFor;
+    let paidDays = 0;
+    let unpaidDays = 0;
+    let totalDeducted = 0;
+
+    if (approveFor === "with_pay") {
+      if (isSpecial || !requiresCredits) {
+        // Special leaves: all days are paid, no credit deduction
+        paidDays = totalDaysToConsider;
         unpaidDays = 0;
-        totalDeducted = totalWorkingDays; // All working days deducted
-
-        console.log("With Pay - All working days are paid and deducted");
-        console.log("Paid Days:", paidDays);
-        console.log("Unpaid Days:", unpaidDays);
-        console.log("Total Deducted:", totalDeducted);
-      } else if (approveFor === "without_pay") {
-        // ALL working days are unpaid (BUT STILL DEDUCTED!)
-        paidDays = 0;
-        unpaidDays = totalWorkingDays;
-        totalDeducted = totalWorkingDays; // All working days still deducted
-
-        console.log(
-          "Without Pay - All working days are unpaid but still deducted"
-        );
-        console.log("Paid Days:", paidDays);
-        console.log("Unpaid Days:", unpaidDays);
-        console.log("Total Deducted:", totalDeducted);
-      } else if (approveFor === "both") {
-        // Split working days between paid and unpaid
-        console.log("Partial mixed calculation:");
-        console.log("Requested withPayDays:", withPayDays);
-        console.log("Total Working Days:", totalWorkingDays);
-
-        // Validate withPayDays doesn't exceed total working days
-        const validatedWithPayDays = Math.min(
-          Math.max(0, withPayDays || 0),
-          totalWorkingDays
-        );
-
-        console.log("Validated With Pay Days:", validatedWithPayDays);
-
-        // Split working days
-        paidDays = validatedWithPayDays;
-        unpaidDays = totalWorkingDays - validatedWithPayDays;
-        totalDeducted = totalWorkingDays; // ALL working days deducted
-
-        console.log("Final Calculated for Both:");
-        console.log("Paid Days:", paidDays);
-        console.log("Unpaid Days:", unpaidDays);
-        console.log("Total Deducted (ALL working days):", totalDeducted);
-      }
-
-      // Calculate balance after deduction
-      const balanceAfter = Math.max(0, availableBalance - totalDeducted);
-      console.log("Balance Before:", availableBalance);
-      console.log("Balance After Deduction:", balanceAfter);
-
-      // Update leave request with payment details
-      const updateData = {
-        status: "Approved",
-        approve_for: approveFor,
-        paid_days: paidDays,
-        unpaid_days: unpaidDays,
-        working_days: totalWorkingDays,
-        holiday_days: holidayDays,
-        updated_at: new Date().toISOString(),
-        approved_by: adminUsername,
-        balance_before: availableBalance,
-        balance_after: balanceAfter,
-      };
-
-      console.log("Updating database with:", updateData);
-
-      // Update in database
-      const { error } = await supabase
-        .from("leave_requests")
-        .update(updateData)
-        .eq("id", requestId);
-
-      if (error) {
-        console.error("Database update error:", error);
-        toast.error("Failed to update leave request in database");
-        throw error;
-      }
-
-      // CRITICAL: Deduct ALL working days from leave balance
-      // Both paid AND unpaid days are deducted
-      if (totalDeducted > 0) {
-        if (request.leave_balance_id) {
-          await updateLeaveBalanceForApproval(
-            request.leave_balance_id,
-            leaveType,
-            totalDeducted
-          );
-          console.log(
-            `Deducted ${totalDeducted} days from leave_balance_id: ${request.leave_balance_id}`
-          );
+        totalDeducted = 0; // No credits deducted
+        finalApproveFor = "with_pay";
+      } else {
+        // Regular leaves: check credit balance
+        if (usableBalance >= totalDaysToConsider) {
+          paidDays = totalDaysToConsider;
+          unpaidDays = 0;
+          totalDeducted = totalDaysToConsider;
+          finalApproveFor = "with_pay";
         } else {
-          // Fallback to personnel table
-          await updatePersonnelLeaveBalance(
-            request.personnel_id,
-            leaveType,
-            totalDeducted,
-            false
-          );
-          console.log(
-            `Deducted ${totalDeducted} days from personnel_id: ${request.personnel_id}`
+          // Insufficient balance - auto-split
+          paidDays = Math.min(usableBalance, totalDaysToConsider);
+          unpaidDays = totalDaysToConsider - paidDays;
+          totalDeducted = paidDays;
+          finalApproveFor = "both";
+
+          toast.info(
+            `⚠️ To preserve minimum balance of ${MINIMUM_BALANCE}, ` +
+              `only ${usableBalance.toFixed(2)} credits are usable. ` +
+              `${paidDays.toFixed(2)} days will be paid, ${unpaidDays.toFixed(
+                2
+              )} days will be unpaid.`,
+            { duration: 5000 }
           );
         }
       }
-
-      // Update local state
-      const updatedRequest = {
-        ...request,
-        ...updateData,
-        status: "Approved",
-        approve_for: approveFor,
-        paid_days: paidDays,
-        unpaid_days: unpaidDays,
-      };
-
-      setLeaveRequests((prev) =>
-        prev.map((req) => (req.id === requestId ? updatedRequest : req))
+    } else if (approveFor === "without_pay") {
+      // All days are unpaid
+      paidDays = 0;
+      unpaidDays = totalDaysToConsider;
+      totalDeducted = 0;
+      console.log("Without Pay - No days deducted");
+    } else if (approveFor === "both") {
+      // For partial approval
+      let validatedWithPayDays = Math.min(
+        Math.max(0, withPayDays || 0),
+        totalDaysToConsider
       );
 
-      setFilteredRequests((prev) =>
-        prev.map((req) => (req.id === requestId ? updatedRequest : req))
+      if (isSpecial || !requiresCredits) {
+        // Special leaves: all requested paid days are approved
+        paidDays = validatedWithPayDays;
+        unpaidDays = totalDaysToConsider - paidDays;
+        totalDeducted = 0; // No credits deducted
+      } else {
+        // Regular leaves: check against usable balance
+        if (validatedWithPayDays > usableBalance) {
+          const adjustedPaidDays = Math.min(usableBalance, totalDaysToConsider);
+          const adjustedUnpaidDays = totalDaysToConsider - adjustedPaidDays;
+
+          paidDays = adjustedPaidDays;
+          unpaidDays = adjustedUnpaidDays;
+          totalDeducted = paidDays;
+
+          toast.info(
+            `⚠️ To preserve minimum balance of ${MINIMUM_BALANCE}, ` +
+              `only ${usableBalance.toFixed(2)} credits are usable. ` +
+              `Auto-adjusted to ${paidDays.toFixed(
+                2
+              )} paid, ${unpaidDays.toFixed(2)} unpaid.`,
+            { duration: 5000 }
+          );
+        } else {
+          paidDays = validatedWithPayDays;
+          unpaidDays = totalDaysToConsider - paidDays;
+          totalDeducted = paidDays;
+        }
+      }
+    }
+
+    // Calculate balance after deduction
+    let balanceAfter = availableBalance;
+    if (requiresCredits) {
+      balanceAfter = Math.max(
+        MINIMUM_BALANCE,
+        availableBalance - totalDeducted
       );
+    }
 
-      console.log("✅ Leave request updated successfully:", {
-        id: requestId,
-        approve_for: approveFor,
-        paid_days: paidDays,
-        unpaid_days: unpaidDays,
-        total_working_days: totalWorkingDays,
-        total_deduction: totalDeducted,
-        balance_before: availableBalance,
-        balance_after: balanceAfter,
-      });
+    console.log("=== FINAL CALCULATION ===");
+    console.log("Leave Type:", leaveType);
+    console.log("Requires Credits:", requiresCredits);
+    console.log("Balance Before:", availableBalance);
+    console.log("Paid Days:", paidDays);
+    console.log("Unpaid Days:", unpaidDays);
+    console.log("Total Deducted from balance:", totalDeducted);
+    console.log("Balance After:", balanceAfter);
+    console.log("Payment Type:", finalApproveFor);
 
-      // Show success message with clear details
-      let message = `✅ Leave approved successfully!\n\n`;
+    // Update leave request with payment details (REMOVED is_special_leave and requires_credits columns)
+    const updateData = {
+      status: "Approved",
+      approve_for: finalApproveFor,
+      paid_days: paidDays,
+      unpaid_days: unpaidDays,
+      working_days: totalWorkingDays,
+      holiday_days: holidayDays,
+      updated_at: new Date().toISOString(),
+      approved_by: adminUsername,
+      balance_before: requiresCredits ? availableBalance : 0,
+      balance_after: requiresCredits ? balanceAfter : 0,
+      minimum_balance_preserved: requiresCredits ? MINIMUM_BALANCE : 0,
+      usable_balance_used: requiresCredits
+        ? usableBalance
+        : totalDaysToConsider,
+    };
 
-      // Add breakdown details
-      message += `📊 **Breakdown:**\n`;
-      message += `• Calendar Days: ${numDays}\n`;
+    // Update in database
+    const { error } = await supabase
+      .from("leave_requests")
+      .update(updateData)
+      .eq("id", requestId);
+
+    if (error) {
+      console.error("Database update error:", error);
+      toast.error("Failed to update leave request in database");
+      throw error;
+    }
+
+    // Deduct ONLY paid days from leave balance (only if credits are required)
+    if (totalDeducted > 0 && requiresCredits) {
+      if (request.leave_balance_id) {
+        await updateLeaveBalanceForApproval(
+          request.leave_balance_id,
+          leaveType,
+          totalDeducted
+        );
+      } else {
+        await updatePersonnelLeaveBalance(
+          request.personnel_id,
+          leaveType,
+          totalDeducted,
+          false
+        );
+      }
+    }
+
+    // Update local state
+    const updatedRequest = {
+      ...request,
+      ...updateData,
+      status: "Approved",
+      approve_for: finalApproveFor,
+      paid_days: paidDays,
+      unpaid_days: unpaidDays,
+    };
+
+    setLeaveRequests((prev) =>
+      prev.map((req) => (req.id === requestId ? updatedRequest : req))
+    );
+
+    setFilteredRequests((prev) =>
+      prev.map((req) => (req.id === requestId ? updatedRequest : req))
+    );
+
+    // Show success message
+    let message = `✅ Leave approved successfully!\n\n`;
+    message += `📊 **Breakdown:**\n`;
+    message += `• Calendar Days: ${numDays}\n`;
+
+    if (!isSpecial) {
       message += `• Working Days: ${totalWorkingDays}\n`;
-
       if (holidayDays > 0) {
         message += `• Holidays/Weekends: ${holidayDays}\n`;
       }
-
-      message += `\n💰 **Payment Details:**\n`;
-
-      if (approveFor === "with_pay") {
-        message += `• ${paidDays} paid working days\n`;
-      } else if (approveFor === "without_pay") {
-        message += `• ${unpaidDays} unpaid working days\n`;
-      } else if (approveFor === "both") {
-        message += `• ${paidDays} paid working days\n`;
-        message += `• ${unpaidDays} unpaid working days\n`;
-      }
-
-      // Add deduction information
-      message += `\n📉 **Leave Credits:**\n`;
-      message += `• Balance Before: ${availableBalance} days\n`;
-      message += `• Deducted: ${totalDeducted} working days\n`;
-      message += `• Balance After: ${balanceAfter} days\n`;
-
-      // Add accrual impact
-      message += `\n📈 **Accrual Impact:**\n`;
-      if (approveFor === "without_pay") {
-        message += `• ❌ No monthly accrual for this period`;
-      } else if (approveFor === "both" && unpaidDays > 0) {
-        message += `• ⚠️ Partial monthly accrual (blocked for ${unpaidDays} unpaid days)`;
-      } else {
-        message += `• ✅ Eligible for full monthly accrual`;
-      }
-
-      toast.success(message, {
-        duration: 5000,
-        position: "top-right",
-      });
-
-      // Close modal
-      setShowApprovalOptionsModal(false);
-      setSelectedRequestForApproval(null);
-
-      // Refresh data after a short delay
-      setTimeout(() => {
-        loadLeaveRequests();
-      }, 1000);
-    } catch (error) {
-      console.error("Error approving leave:", error);
-      toast.error(`Failed to approve leave: ${error.message}`);
-    } finally {
-      setProcessingAction(null);
     }
+
+    message += `\n💰 **Payment Details:**\n`;
+
+    if (finalApproveFor === "with_pay") {
+      if (isSpecial) {
+        message += `• ${paidDays.toFixed(
+          2
+        )} paid days (all calendar days counted)\n`;
+        message += `• ✅ Special leave - holidays/weekends count as paid\n`;
+      } else {
+        message += `• ${paidDays.toFixed(2)} paid working days\n`;
+        if (unpaidDays > 0) {
+          message += `• ${unpaidDays.toFixed(2)} unpaid working days\n`;
+          message += `• ⚠️ Auto-split to preserve minimum balance of ${MINIMUM_BALANCE}\n`;
+        }
+      }
+    } else if (finalApproveFor === "without_pay") {
+      message += `• ${unpaidDays.toFixed(2)} unpaid days\n`;
+    } else if (finalApproveFor === "both") {
+      message += `• ${paidDays.toFixed(2)} paid days\n`;
+      message += `• ${unpaidDays.toFixed(2)} unpaid days\n`;
+      if (paidDays < withPayDays) {
+        message += `• ⚠️ Auto-adjusted to preserve minimum balance of ${MINIMUM_BALANCE}\n`;
+      }
+    }
+
+    // Replace the entire success message section with just a simple success message:
+    toast.success("Leave request approved successfully!", {
+      duration: 3000,
+      position: "top-right",
+    });
+
+    // Close modal
+    setShowApprovalOptionsModal(false);
+    setSelectedRequestForApproval(null);
+
+    // Refresh data after a short delay
+    setTimeout(() => {
+      loadLeaveRequests();
+    }, 1000);
+  } catch (error) {
+    console.error("Error approving leave:", error);
+    toast.error(`Failed to approve leave: ${error.message}`);
+  } finally {
+    setProcessingAction(null);
+  }
+};
+
+const ApprovalOptionsModal = ({ request, onClose, onApprove }) => {
+  // Helper functions for leave type analysis
+  const isSpecialLeaveType = (leaveType) => {
+    if (!leaveType) return false;
+    const type = leaveType.toLowerCase().trim();
+    return (
+      type === "maternity" ||
+      type === "paternity" ||
+      type === "emergency" ||
+      type === "emergency leave"
+    );
   };
 
-  // Add this component before the final return statement
-  const ApprovalOptionsModal = ({ request, onClose, onApprove }) => {
-    const [approveFor, setApproveFor] = useState("with_pay");
-    const [withPayDays, setWithPayDays] = useState(0);
-    const [breakdown, setBreakdown] = useState(null);
-    const [totalWorkingDays, setTotalWorkingDays] = useState(0);
-    const [holidayDays, setHolidayDays] = useState(0);
-    const [isCalculating, setIsCalculating] = useState(false);
+  const doesRequireLeaveCredits = (leaveType) => {
+    if (!leaveType) return true;
+    const type = leaveType.toLowerCase().trim();
+    // Emergency, Maternity, Paternity don't require credits
+    return !(
+      type.includes("emergency") ||
+      type === "maternity" ||
+      type === "paternity"
+    );
+  };
 
-    // Initialize values based on request
-    useEffect(() => {
-      const calculateInitialValues = async () => {
-        if (!request) return;
+  const [approveFor, setApproveFor] = useState("");
+  const [withPayDays, setWithPayDays] = useState(0);
+  const [breakdown, setBreakdown] = useState(null);
+  const [totalWorkingDays, setTotalWorkingDays] = useState(0);
+  const [holidayDays, setHolidayDays] = useState(0);
+  const [isCalculating, setIsCalculating] = useState(false);
+  const [availableBalance, setAvailableBalance] = useState(0);
+  const [requiresCredits, setRequiresCredits] = useState(true);
+  const [isSpecialLeave, setIsSpecialLeave] = useState(false);
+  const [MINIMUM_BALANCE, setMinimumBalance] = useState(1.25);
+  const [usableBalance, setUsableBalance] = useState(0);
+  const [leaveType, setLeaveType] = useState("");
 
-        setIsCalculating(true);
-
-        try {
-          const calculator = new LeaveCalculator(holidays);
-
-          // Calculate total working days (excluding holidays/weekends)
-          const totalWorkingDaysCalc = calculator.calculateWorkingDays(
-            request.startDate,
-            request.endDate
-          );
-
-          const numDays = request.numDays || request.num_days || 0;
-          const holidayDaysCalc = numDays - totalWorkingDaysCalc;
-
-          setTotalWorkingDays(totalWorkingDaysCalc);
-          setHolidayDays(holidayDaysCalc);
-
-          // Default withPayDays to all working days for "with_pay"
-          setWithPayDays(totalWorkingDaysCalc);
-
-          console.log("Initial calculation:", {
-            totalCalendarDays: numDays,
-            totalWorkingDays: totalWorkingDaysCalc,
-            holidayDays: holidayDaysCalc,
-          });
-        } catch (error) {
-          console.error("Error calculating initial values:", error);
-        } finally {
-          setIsCalculating(false);
-        }
-      };
-
-      calculateInitialValues();
-    }, [request, holidays]);
-
-    // Recalculate breakdown when options change
-    useEffect(() => {
-      calculateBreakdown();
-    }, [approveFor, withPayDays]);
-
-    const calculateBreakdown = async () => {
-      if (!request || isCalculating) return;
+  // Initialize values based on request
+  useEffect(() => {
+    const calculateInitialValues = async () => {
+      if (!request) return;
 
       setIsCalculating(true);
 
       try {
+        const currentLeaveType =
+          request.leaveType || request.leave_type || "Vacation";
+        setLeaveType(currentLeaveType);
+
+        const specialLeave = isSpecialLeaveType(currentLeaveType);
+        const needsCredits = doesRequireLeaveCredits(currentLeaveType);
+
+        setIsSpecialLeave(specialLeave);
+        setRequiresCredits(needsCredits);
+
+        // Set minimum balance: 0 for special leaves, 1.25 for others
+        const minBalance = needsCredits ? 1.25 : 0;
+        setMinimumBalance(minBalance);
+
         const calculator = new LeaveCalculator(holidays);
-        const availableBalance = await getLeaveBalanceForType(
-          request.leaveType,
-          request.personnel_id
-        );
+        const numDays = request.numDays || request.num_days || 0;
 
-        // Validate withPayDays for "both" mode
-        let validatedWithPayDays = withPayDays;
-        let calculatedPaidDays = 0;
-        let calculatedUnpaidDays = 0;
+        let totalWorkingDaysCalc = 0;
+        let holidayDaysCalc = 0;
 
-        if (approveFor === "with_pay") {
-          // All working days are paid
-          calculatedPaidDays = totalWorkingDays;
-          calculatedUnpaidDays = 0;
-          validatedWithPayDays = totalWorkingDays;
-        } else if (approveFor === "without_pay") {
-          // No working days are paid
-          calculatedPaidDays = 0;
-          calculatedUnpaidDays = totalWorkingDays;
-          validatedWithPayDays = 0;
-        } else if (approveFor === "both") {
-          // Split working days
-          validatedWithPayDays = Math.min(
-            Math.max(0, withPayDays),
-            totalWorkingDays
+        if (specialLeave) {
+          // For special leaves: all calendar days count
+          totalWorkingDaysCalc = numDays;
+          holidayDaysCalc = 0;
+        } else {
+          // For regular leaves: exclude holidays/weekends
+          totalWorkingDaysCalc = calculator.calculateWorkingDays(
+            request.startDate,
+            request.endDate
           );
-          if (validatedWithPayDays !== withPayDays) {
-            setWithPayDays(validatedWithPayDays);
-          }
-          calculatedPaidDays = validatedWithPayDays;
-          calculatedUnpaidDays = totalWorkingDays - validatedWithPayDays;
+          holidayDaysCalc = numDays - totalWorkingDaysCalc;
         }
 
-        // Calculate breakdown
-        const result = calculator.calculateLeaveBreakdown(
-          {
-            ...request,
-            approveFor,
-            withPayDays: validatedWithPayDays,
-          },
-          availableBalance
-        );
+        setTotalWorkingDays(totalWorkingDaysCalc);
+        setHolidayDays(holidayDaysCalc);
 
-        setBreakdown({
-          ...result,
-          totalWorkingDays: totalWorkingDays,
-          paidDays: calculatedPaidDays,
-          unpaidDays: calculatedUnpaidDays,
-          holidayDays: holidayDays,
-          availableBalance: availableBalance,
-          balanceAfter: Math.max(
-            0,
-            availableBalance - (calculatedPaidDays + calculatedUnpaidDays)
-          ),
+        // Get available balance only if credits are required
+        let balance = 0;
+        if (needsCredits) {
+          balance = await getLeaveBalanceForType(
+            currentLeaveType,
+            request.personnel_id
+          );
+        }
+        setAvailableBalance(balance);
+
+        // Calculate usable balance
+        const usable = needsCredits
+          ? Math.max(0, balance - minBalance)
+          : totalWorkingDaysCalc; // All days are usable for special leaves
+
+        setUsableBalance(usable);
+
+        // Default withPayDays to usable balance
+        const defaultWithPayDays = Math.min(usable, totalWorkingDaysCalc);
+        setWithPayDays(defaultWithPayDays);
+
+        console.log("Initial calculation:", {
+          leaveType: currentLeaveType,
+          isSpecialLeave: specialLeave,
+          requiresCredits: needsCredits,
+          totalCalendarDays: numDays,
+          totalWorkingDays: totalWorkingDaysCalc,
+          holidayDays: holidayDaysCalc,
+          availableBalance: balance,
+          usableBalance: usable,
+          minimumBalance: minBalance,
         });
       } catch (error) {
-        console.error("Error calculating breakdown:", error);
+        console.error("Error calculating initial values:", error);
       } finally {
         setIsCalculating(false);
       }
     };
 
-    const handleWithPayDaysChange = (value) => {
-      const parsedValue = parseInt(value) || 0;
-      // Clamp value between 0 and total working days
-      const clampedValue = Math.max(0, Math.min(parsedValue, totalWorkingDays));
-      setWithPayDays(clampedValue);
+    calculateInitialValues();
+  }, [request, holidays]);
+
+  // Recalculate breakdown when options change
+  useEffect(() => {
+    if (approveFor) {
+      // Only calculate if an option is selected
+      calculateBreakdown();
+    } else {
+      setBreakdown(null); // Clear breakdown if no option selected
+    }
+  }, [approveFor, withPayDays]);
+
+  const calculateBreakdown = async () => {
+    if (!request || isCalculating || !approveFor) return;
+
+    setIsCalculating(true);
+
+    try {
+      let validatedWithPayDays = withPayDays;
+      let calculatedPaidDays = 0;
+      let calculatedUnpaidDays = 0;
+      let totalDeducted = 0;
+
+      if (approveFor === "with_pay") {
+        if (isSpecialLeave || !requiresCredits) {
+          // Special leaves: all days are paid, no credit deduction
+          calculatedPaidDays = totalWorkingDays;
+          calculatedUnpaidDays = 0;
+          validatedWithPayDays = totalWorkingDays;
+          totalDeducted = 0;
+        } else {
+          // Regular leaves: check credit balance
+          if (usableBalance >= totalWorkingDays) {
+            calculatedPaidDays = totalWorkingDays;
+            calculatedUnpaidDays = 0;
+            validatedWithPayDays = totalWorkingDays;
+            totalDeducted = totalWorkingDays;
+          } else {
+            // Insufficient balance - auto-split
+            calculatedPaidDays = Math.min(usableBalance, totalWorkingDays);
+            calculatedUnpaidDays = totalWorkingDays - calculatedPaidDays;
+            validatedWithPayDays = calculatedPaidDays;
+            totalDeducted = calculatedPaidDays;
+          }
+        }
+      } else if (approveFor === "without_pay") {
+        calculatedPaidDays = 0;
+        calculatedUnpaidDays = totalWorkingDays;
+        validatedWithPayDays = 0;
+        totalDeducted = 0;
+      } else if (approveFor === "both") {
+        // Validate withPayDays
+        validatedWithPayDays = Math.min(
+          Math.max(0, withPayDays),
+          totalWorkingDays
+        );
+
+        if (isSpecialLeave || !requiresCredits) {
+          // Special leaves: all requested paid days are approved
+          calculatedPaidDays = validatedWithPayDays;
+          calculatedUnpaidDays = totalWorkingDays - validatedWithPayDays;
+          totalDeducted = 0;
+        } else {
+          // Regular leaves: check against usable balance
+          if (validatedWithPayDays > usableBalance) {
+            const adjustedPaidDays = Math.min(usableBalance, totalWorkingDays);
+            const adjustedUnpaidDays = totalWorkingDays - adjustedPaidDays;
+
+            calculatedPaidDays = adjustedPaidDays;
+            calculatedUnpaidDays = adjustedUnpaidDays;
+            validatedWithPayDays = adjustedPaidDays;
+            totalDeducted = calculatedPaidDays;
+          } else {
+            calculatedPaidDays = validatedWithPayDays;
+            calculatedUnpaidDays = totalWorkingDays - validatedWithPayDays;
+            totalDeducted = calculatedPaidDays;
+          }
+        }
+      }
+
+      // Calculate final balance after deduction
+      const balanceAfter = requiresCredits
+        ? Math.max(MINIMUM_BALANCE, availableBalance - totalDeducted)
+        : availableBalance; // No change for special leaves
+
+      setBreakdown({
+        totalWorkingDays: totalWorkingDays,
+        paidDays: calculatedPaidDays,
+        unpaidDays: calculatedUnpaidDays,
+        holidayDays: holidayDays,
+        availableBalance: availableBalance,
+        usableBalance: usableBalance,
+        minimumBalance: MINIMUM_BALANCE,
+        balanceAfter: balanceAfter,
+        totalDeducted: totalDeducted,
+        isSpecialLeave: isSpecialLeave,
+        requiresCredits: requiresCredits,
+        // Validation flags
+        canFullyPay: usableBalance >= totalWorkingDays,
+        canPartiallyPay: usableBalance > 0 && usableBalance < totalWorkingDays,
+        cannotPay: usableBalance === 0 && requiresCredits,
+        // Special flags for UI
+        requiresAutoSplit:
+          approveFor === "with_pay" &&
+          requiresCredits &&
+          usableBalance < totalWorkingDays,
+        requiresAdjustment:
+          approveFor === "both" &&
+          requiresCredits &&
+          withPayDays > usableBalance,
+      });
+    } catch (error) {
+      console.error("Error calculating breakdown:", error);
+    } finally {
+      setIsCalculating(false);
+    }
+  };
+
+  // Check if options should be disabled
+  const getOptionDisabledStatus = () => {
+    if (isSpecialLeave || !requiresCredits) {
+      // Special leaves: all options available
+      return {
+        withPayDisabled: false,
+        withoutPayDisabled: false,
+        partialDisabled: false,
+        sliderDisabled: approveFor !== "both",
+      };
+    }
+
+    return {
+      // "With Pay" should be disabled if usable balance is 0
+      withPayDisabled: usableBalance === 0,
+      withoutPayDisabled: false,
+      // "Partial" should be disabled if usable balance is 0
+      partialDisabled: usableBalance === 0,
+      // Slider should be disabled if usable balance is 0 or no option selected
+      sliderDisabled: usableBalance === 0 || approveFor !== "both",
     };
+  };
 
-    const handleSliderChange = (value) => {
-      const parsedValue = parseInt(value) || 0;
-      setWithPayDays(parsedValue);
-    };
+  const disabledStatus = getOptionDisabledStatus();
 
-    const handleApprove = () => {
-      if (isCalculating) return;
+  const handleWithPayDaysChange = (value) => {
+    const parsedValue = parseFloat(value) || 0;
+    let maxValue = totalWorkingDays;
 
-      // For "with_pay" and "without_pay", don't pass withPayDays
-      const finalWithPayDays = approveFor === "both" ? withPayDays : undefined;
-      onApprove(request.id, approveFor, finalWithPayDays);
-    };
+    if (requiresCredits) {
+      maxValue = Math.min(totalWorkingDays, usableBalance);
+    }
 
-    // Calculate days without pay for display
-    const daysWithoutPay = totalWorkingDays - withPayDays;
+    const clampedValue = Math.max(0, Math.min(parsedValue, maxValue));
+    setWithPayDays(clampedValue);
+  };
 
-    return (
-      <div className={styles.confirmationModalOverlay} onClick={onClose}>
-        <div
-          className={`${styles.confirmationModal} ${styles.landscapeModal}`}
-          onClick={(e) => e.stopPropagation()}
-        >
-          {/* HEADER */}
-          <div className={styles.confirmationHeader}>
-            <div className={styles.headerContent}>
-              <h2>Approve Leave Request</h2>
-              <div className={styles.headerInfo}>
-                <div className={styles.employeeBadge}>
-                  <span className={styles.employeeName}>
-                    {request?.employeeName || "Unknown"}
-                  </span>
-                  <span className={styles.leaveType}>
-                    {request?.leaveType || "N/A"} Leave
-                  </span>
-                </div>
-                <div className={styles.leaveDates}>
-                  {request?.startDate ? formatDate(request.startDate) : "N/A"} →{" "}
-                  {request?.endDate ? formatDate(request.endDate) : "N/A"}
-                  <span className={styles.daysBadge}>
-                    {request?.numDays || request?.num_days || 0} days
-                  </span>
-                </div>
+  const handleSliderChange = (value) => {
+    const parsedValue = parseFloat(value) || 0;
+    setWithPayDays(parsedValue);
+  };
+
+  const handleApprove = () => {
+    if (isCalculating || !approveFor) return;
+
+    // For "with_pay" and "without_pay", don't pass withPayDays
+    const finalWithPayDays = approveFor === "both" ? withPayDays : undefined;
+
+    onApprove(request.id, approveFor, finalWithPayDays);
+  };
+
+  // Calculate days without pay for display
+  const daysWithoutPay = totalWorkingDays - withPayDays;
+
+  // Format leave type for display
+  const formatLeaveTypeDisplay = (type) => {
+    if (!type) return "N/A";
+    return type.charAt(0).toUpperCase() + type.slice(1).toLowerCase();
+  };
+
+  return (
+    <div className={styles.confirmationModalOverlay} onClick={onClose}>
+      <div
+        className={`${styles.confirmationModal} ${styles.landscapeModal}`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* HEADER */}
+        <div className={styles.confirmationHeader}>
+          <div className={styles.headerContent}>
+            <h2>Approve Leave Request</h2>
+            <div className={styles.headerInfo}>
+              <div className={styles.employeeBadge}>
+                <span className={styles.employeeName}>
+                  {request?.employeeName || "Unknown"}
+                </span>
+                <span className={styles.leaveType}>
+                  {formatLeaveTypeDisplay(request?.leaveType)} Leave
+                  {isSpecialLeave && (
+                    <span className={styles.specialLeaveBadge}>SPECIAL</span>
+                  )}
+                </span>
+              </div>
+              <div className={styles.leaveDates}>
+                {request?.startDate ? formatDate(request.startDate) : "N/A"} →{" "}
+                {request?.endDate ? formatDate(request.endDate) : "N/A"}
+                <span className={styles.daysBadge}>
+                  {request?.numDays || request?.num_days || 0} days
+                </span>
               </div>
             </div>
-            <button className={styles.confirmationCloseBtn} onClick={onClose}>
-              &times;
-            </button>
           </div>
+          <button className={styles.confirmationCloseBtn} onClick={onClose}>
+            &times;
+          </button>
+        </div>
 
-          {/* MAIN CONTENT */}
-          <div className={styles.landscapeContent}>
-            {/* LEFT COLUMN - PAYMENT OPTIONS */}
-            <div className={styles.leftColumn}>
-              <div className={styles.sectionCard}>
-                <h3 className={styles.sectionTitle}>
-                  <span className={styles.sectionIcon}>💰</span>
-                  Payment Type
-                </h3>
+        {/* MAIN CONTENT */}
+        <div className={styles.landscapeContent}>
+          {/* LEFT COLUMN - PAYMENT OPTIONS */}
+          <div className={styles.leftColumn}>
+            <div className={styles.sectionCard}>
+              <h3 className={styles.sectionTitle}>
+                <span className={styles.sectionIcon}>💰</span>
+                Payment Type
+                {isSpecialLeave && (
+                  <span className={styles.specialTypeIndicator}>
+                    • Special Leave
+                  </span>
+                )}
+              </h3>
 
-                {isCalculating && (
-                  <div className={styles.calculatingOverlay}>
-                    <div className={styles.calculatingSpinner}></div>
-                    <span>Calculating...</span>
+              {isCalculating && (
+                <div className={styles.calculatingOverlay}>
+                  <div className={styles.calculatingSpinner}></div>
+                  <span>Calculating...</span>
+                </div>
+              )}
+
+              {/* SPECIAL LEAVE BANNER */}
+              {isSpecialLeave && (
+                <div className={styles.specialLeaveBanner}>
+                  <div className={styles.specialLeaveIcon}>🎉</div>
+                  <div className={styles.specialLeaveContent}>
+                    <strong>
+                      Special Leave ({formatLeaveTypeDisplay(leaveType)})
+                    </strong>
+                    <p>
+                      • All calendar days count as paid (including
+                      holidays/weekends)
+                      <br />
+                      • No leave credits required
+                      <br />• Full payment for all days
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* BALANCE WARNING BANNER - Only for regular leaves */}
+              {requiresCredits && usableBalance === 0 && (
+                <div className={styles.severeWarningCard}>
+                  <div className={styles.warningIcon}>🚫</div>
+                  <div className={styles.warningContent}>
+                    <strong>Cannot Approve as Paid Leave</strong>
+                    <p>
+                      Available balance ({availableBalance.toFixed(2)}) minus
+                      minimum preservation ({MINIMUM_BALANCE}) leaves 0 usable
+                      credits.
+                    </p>
+                    <p>
+                      <strong>Only "Without Pay" option is available.</strong>
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {requiresCredits &&
+                usableBalance > 0 &&
+                usableBalance < totalWorkingDays && (
+                  <div className={styles.warningCard}>
+                    <div className={styles.warningIcon}>⚠️</div>
+                    <div className={styles.warningContent}>
+                      <strong>Partial Payment Required</strong>
+                      <p>
+                        Only {usableBalance.toFixed(2)} credits are usable
+                        (preserving {MINIMUM_BALANCE} minimum balance).
+                        {totalWorkingDays - usableBalance} day(s) will be
+                        unpaid.
+                      </p>
+                    </div>
                   </div>
                 )}
 
-                <div className={styles.paymentOptions}>
-                  {/* With Pay Option */}
-                  <div
-                    className={`${styles.paymentOption} ${
-                      approveFor === "with_pay" ? styles.selected : ""
-                    }`}
-                  >
-                    <label className={styles.radioLabel}>
-                      <input
-                        type="radio"
-                        value="with_pay"
-                        checked={approveFor === "with_pay"}
-                        onChange={(e) => setApproveFor(e.target.value)}
-                        disabled={isCalculating}
-                      />
-                      <div className={styles.radioContent}>
-                        <div className={styles.optionHeader}>
-                          <span className={styles.optionTitle}>With Pay</span>
-                          <span className={styles.optionBadge}>
-                            Recommended
+              <div className={styles.paymentOptions}>
+                {/* With Pay Option */}
+                <div
+                  className={`${styles.paymentOption} ${
+                    approveFor === "with_pay" ? styles.selected : ""
+                  } ${
+                    disabledStatus.withPayDisabled ? styles.disabledOption : ""
+                  }`}
+                >
+                  <label className={styles.radioLabel}>
+                    <input
+                      type="radio"
+                      value="with_pay"
+                      checked={approveFor === "with_pay"}
+                      onChange={(e) => setApproveFor(e.target.value)}
+                      disabled={isCalculating || disabledStatus.withPayDisabled}
+                    />
+                    <div className={styles.radioContent}>
+                      <div className={styles.optionHeader}>
+                        <span className={styles.optionTitle}>With Pay</span>
+                        {isSpecialLeave ? (
+                          <span className={styles.optionBadgeSuccess}>
+                            Available
                           </span>
-                        </div>
-                        <div className={styles.optionDescription}>
-                          Employee receives full salary during leave
-                        </div>
-                        <div className={styles.optionDetails}>
-                          <span className={styles.detailItem}>
-                            ✅ {totalWorkingDays} working days paid
-                          </span>
-                          <span className={styles.detailItem}>
-                            ✅ Full monthly accrual
-                          </span>
-                          {holidayDays > 0 && (
-                            <span className={styles.detailItem}>
-                              📅 {holidayDays} holiday(s)/weekend(s) excluded
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </label>
-                  </div>
-
-                  {/* Without Pay Option */}
-                  <div
-                    className={`${styles.paymentOption} ${
-                      approveFor === "without_pay" ? styles.selected : ""
-                    }`}
-                  >
-                    <label className={styles.radioLabel}>
-                      <input
-                        type="radio"
-                        value="without_pay"
-                        checked={approveFor === "without_pay"}
-                        onChange={(e) => setApproveFor(e.target.value)}
-                        disabled={isCalculating}
-                      />
-                      <div className={styles.radioContent}>
-                        <div className={styles.optionHeader}>
-                          <span className={styles.optionTitle}>
-                            Without Pay
-                          </span>
+                        ) : usableBalance >= totalWorkingDays ? (
+                          <span className={styles.optionBadge}>Available</span>
+                        ) : usableBalance > 0 ? (
                           <span className={styles.optionBadgeWarning}>
-                            Limited
+                            Will Auto-Split
                           </span>
+                        ) : (
+                          <span className={styles.optionBadgeDanger}>
+                            Unavailable
+                          </span>
+                        )}
+                      </div>
+                      <div className={styles.optionDescription}>
+                        {isSpecialLeave
+                          ? "Employee receives full salary for all days"
+                          : usableBalance >= totalWorkingDays
+                          ? "Employee receives full salary during leave"
+                          : usableBalance > 0
+                          ? `Will auto-split: ${Math.min(
+                              usableBalance,
+                              totalWorkingDays
+                            ).toFixed(2)} paid, ${Math.max(
+                              0,
+                              totalWorkingDays - usableBalance
+                            ).toFixed(2)} unpaid`
+                          : "Not available - insufficient usable credits"}
+                      </div>
+                      {disabledStatus.withPayDisabled && requiresCredits && (
+                        <div className={styles.disabledReason}>
+                          {usableBalance === 0
+                            ? `❌ 0 usable credits (preserving ${MINIMUM_BALANCE} minimum balance)`
+                            : `❌ Insufficient credits (need ${totalWorkingDays}, have ${usableBalance.toFixed(
+                                2
+                              )} usable)`}
                         </div>
-                        <div className={styles.optionDescription}>
-                          Employee receives no salary during leave
-                        </div>
-                        <div className={styles.optionDetails}>
-                          <span className={styles.detailItem}>
-                            ❌ {totalWorkingDays} working days unpaid
-                          </span>
-                          <span className={styles.detailItem}>
-                            ❌ No monthly accrual
-                          </span>
-                          {holidayDays > 0 && (
+                      )}
+                    </div>
+                  </label>
+                </div>
+
+                {/* Without Pay Option */}
+                <div
+                  className={`${styles.paymentOption} ${
+                    approveFor === "without_pay" ? styles.selected : ""
+                  }`}
+                >
+                  <label className={styles.radioLabel}>
+                    <input
+                      type="radio"
+                      value="without_pay"
+                      checked={approveFor === "without_pay"}
+                      onChange={(e) => setApproveFor(e.target.value)}
+                      disabled={isCalculating}
+                    />
+                    <div className={styles.radioContent}>
+                      <div className={styles.optionHeader}>
+                        <span className={styles.optionTitle}>Without Pay</span>
+                        <span className={styles.optionBadge}>
+                          Always Available
+                        </span>
+                      </div>
+                      <div className={styles.optionDescription}>
+                        Employee receives no salary during leave
+                      </div>
+                      <div className={styles.optionDetails}>
+                        <span className={styles.detailItem}>
+                          ❌ {totalWorkingDays} days unpaid
+                        </span>
+                        {requiresCredits && (
+                          <>
                             <span className={styles.detailItem}>
-                              📅 {holidayDays} holiday(s)/weekend(s) excluded
+                              ✅ Preserves all leave credits
                             </span>
-                          )}
-                        </div>
+                            <span className={styles.detailItem}>
+                              ✅ Minimum balance of {MINIMUM_BALANCE} maintained
+                            </span>
+                          </>
+                        )}
                       </div>
-                    </label>
-                  </div>
+                    </div>
+                  </label>
+                </div>
 
-                  {/* Partial (Mixed) Option */}
-                  <div
-                    className={`${styles.paymentOption} ${
-                      approveFor === "both" ? styles.selected : ""
-                    }`}
-                  >
-                    <label className={styles.radioLabel}>
-                      <input
-                        type="radio"
-                        value="both"
-                        checked={approveFor === "both"}
-                        onChange={(e) => setApproveFor(e.target.value)}
-                        disabled={isCalculating}
-                      />
-                      <div className={styles.radioContent}>
-                        <div className={styles.optionHeader}>
-                          <span className={styles.optionTitle}>
-                            Partial (Mixed)
+                {/* Partial (Mixed) Option */}
+                <div
+                  className={`${styles.paymentOption} ${
+                    approveFor === "both" ? styles.selected : ""
+                  } ${
+                    disabledStatus.partialDisabled ? styles.disabledOption : ""
+                  }`}
+                >
+                  <label className={styles.radioLabel}>
+                    <input
+                      type="radio"
+                      value="both"
+                      checked={approveFor === "both"}
+                      onChange={(e) => setApproveFor(e.target.value)}
+                      disabled={isCalculating || disabledStatus.partialDisabled}
+                    />
+                    <div className={styles.radioContent}>
+                      <div className={styles.optionHeader}>
+                        <span className={styles.optionTitle}>
+                          Partial (Mixed)
+                        </span>
+                        {isSpecialLeave ? (
+                          <span className={styles.optionBadgeSuccess}>
+                            Available
                           </span>
+                        ) : usableBalance > 0 ? (
                           <span className={styles.optionBadgeInfo}>
-                            Flexible
+                            Available
                           </span>
-                        </div>
-                        <div className={styles.optionDescription}>
-                          Split working days between paid and unpaid
-                        </div>
-                        <div className={styles.optionDetails}>
-                          <span className={styles.detailItem}>
-                            ⚠️ Partial monthly accrual
+                        ) : (
+                          <span className={styles.optionBadgeDanger}>
+                            Unavailable
                           </span>
-                          <span className={styles.detailItem}>
-                            📅 Holidays/weekends excluded from split
-                          </span>
-                        </div>
+                        )}
                       </div>
-                    </label>
-                  </div>
+                      <div className={styles.optionDescription}>
+                        {isSpecialLeave
+                          ? `Split days (any ${totalWorkingDays} days can be paid)`
+                          : usableBalance > 0
+                          ? `Split working days (up to ${usableBalance.toFixed(
+                              2
+                            )} paid)`
+                          : "Not available - insufficient usable credits"}
+                      </div>
+                      {disabledStatus.partialDisabled && requiresCredits && (
+                        <div className={styles.disabledReason}>
+                          ❌ 0 usable credits (preserving {MINIMUM_BALANCE}{" "}
+                          minimum balance)
+                        </div>
+                      )}
+                    </div>
+                  </label>
                 </div>
-
-                {/* Partial Days Section - Only for "both" mode */}
-                {approveFor === "both" && (
-                  <div className={styles.partialSection}>
-                    <div className={styles.sliderHeader}>
-                      <h4>Working Days with Pay</h4>
-                      <div className={styles.sliderStats}>
-                        <span className={styles.totalWorkingDaysDisplay}>
-                          Total Working Days:{" "}
-                          <strong>{totalWorkingDays}</strong>
-                          {holidayDays > 0 &&
-                            ` (excludes ${holidayDays} holiday(s)/weekend(s))`}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className={styles.sliderContainer}>
-                      <input
-                        type="range"
-                        min="0"
-                        max={totalWorkingDays}
-                        value={withPayDays}
-                        onChange={(e) => handleSliderChange(e.target.value)}
-                        className={styles.rangeSlider}
-                        disabled={isCalculating}
-                      />
-                      <div className={styles.sliderLabels}>
-                        <span>0</span>
-                        <span>{Math.floor(totalWorkingDays / 2)}</span>
-                        <span>{totalWorkingDays}</span>
-                      </div>
-                    </div>
-
-                    <div className={styles.daysInputRow}>
-                      <div className={styles.inputGroup}>
-                        <label>Working days with pay:</label>
-                        <input
-                          type="number"
-                          min="0"
-                          max={totalWorkingDays}
-                          value={withPayDays}
-                          onChange={(e) =>
-                            handleWithPayDaysChange(e.target.value)
-                          }
-                          className={styles.daysInput}
-                          disabled={isCalculating}
-                        />
-                        <small className={styles.inputHelper}>
-                          Enter 0-{totalWorkingDays} working days
-                          (holidays/weekends not included)
-                        </small>
-                      </div>
-
-                      <div className={styles.daysPreview}>
-                        <div className={styles.daysBar}>
-                          <div
-                            className={styles.paidBar}
-                            style={{
-                              width:
-                                totalWorkingDays > 0
-                                  ? `${(withPayDays / totalWorkingDays) * 100}%`
-                                  : "0%",
-                            }}
-                          ></div>
-                          <div
-                            className={styles.unpaidBar}
-                            style={{
-                              width:
-                                totalWorkingDays > 0
-                                  ? `${
-                                      (daysWithoutPay / totalWorkingDays) * 100
-                                    }%`
-                                  : "0%",
-                            }}
-                          ></div>
-                        </div>
-                        <div className={styles.barLabels}>
-                          <span>Paid ({withPayDays})</span>
-                          <span>Unpaid ({daysWithoutPay})</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
               </div>
-            </div>
 
-            {/* RIGHT COLUMN - BREAKDOWN & ACTIONS */}
-            <div className={styles.rightColumn}>
-              {/* Leave Details Card */}
-              <div className={styles.sectionCard}>
-                <h3 className={styles.sectionTitle}>
-                  <span className={styles.sectionIcon}>📋</span>
-                  Leave Details
-                </h3>
-                <div className={styles.detailsGrid}>
-                  <div className={styles.detailItem}>
-                    <span className={styles.detailLabel}>Employee:</span>
-                    <span className={styles.detailValue}>
-                      {request.employeeName}
-                    </span>
-                  </div>
-                  <div className={styles.detailItem}>
-                    <span className={styles.detailLabel}>Leave Type:</span>
-                    <span className={styles.detailValue}>
-                      {request.leaveType}
-                    </span>
-                  </div>
-                  <div className={styles.detailItem}>
-                    <span className={styles.detailLabel}>Location:</span>
-                    <span className={styles.detailValue}>
-                      {request.location || "Not specified"}
-                    </span>
-                  </div>
-                  <div className={styles.detailItem}>
-                    <span className={styles.detailLabel}>Duration:</span>
-                    <span className={styles.detailValue}>
-                      {request.numDays || request.num_days || 0} calendar days
-                    </span>
-                  </div>
-                  <div className={styles.detailItem}>
-                    <span className={styles.detailLabel}>Working Days:</span>
-                    <span className={styles.detailValue}>
-                      {totalWorkingDays} days (excl. holidays/weekends)
-                    </span>
-                  </div>
-                  {holidayDays > 0 && (
-                    <div className={styles.detailItem}>
-                      <span className={styles.detailLabel}>
-                        Holidays/Weekends:
+              {/* Partial Days Section - Only for "both" mode and when selected */}
+              {approveFor === "both" && !disabledStatus.partialDisabled && (
+                <div className={styles.partialSection}>
+                  <div className={styles.sliderHeader}>
+                    <h4>Days with Pay</h4>
+                    <div className={styles.sliderStats}>
+                      <span className={styles.totalWorkingDaysDisplay}>
+                        Total Days: <strong>{totalWorkingDays}</strong>
+                        {!isSpecialLeave &&
+                          holidayDays > 0 &&
+                          ` (excludes ${holidayDays} holiday(s)/weekend(s))`}
                       </span>
-                      <span className={styles.detailValue}>
-                        {holidayDays} days
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Breakdown Card */}
-              {breakdown && (
-                <div className={styles.sectionCard}>
-                  <h3 className={styles.sectionTitle}>
-                    <span className={styles.sectionIcon}>🧮</span>
-                    Leave Breakdown
-                  </h3>
-                  <div className={styles.breakdownGrid}>
-                    <div className={styles.breakdownCard}>
-                      <div className={styles.breakdownIcon}>📅</div>
-                      <div className={styles.breakdownContent}>
-                        <span className={styles.breakdownLabel}>
-                          Calendar Days
-                        </span>
-                        <span className={styles.breakdownValue}>
-                          {request.numDays || request.num_days || 0}
-                        </span>
-                      </div>
-                    </div>
-                    <div className={styles.breakdownCard}>
-                      <div className={styles.breakdownIcon}>💼</div>
-                      <div className={styles.breakdownContent}>
-                        <span className={styles.breakdownLabel}>
-                          Working Days
-                        </span>
-                        <span className={styles.breakdownValue}>
-                          {totalWorkingDays}
-                        </span>
-                      </div>
-                    </div>
-                    <div className={styles.breakdownCard}>
-                      <div className={styles.breakdownIcon}>🎉</div>
-                      <div className={styles.breakdownContent}>
-                        <span className={styles.breakdownLabel}>
-                          Holidays/Weekends
-                        </span>
-                        <span className={styles.breakdownValue}>
-                          {holidayDays}
-                        </span>
-                      </div>
-                    </div>
-                    <div className={styles.breakdownCard}>
-                      <div className={styles.breakdownIcon}>✅</div>
-                      <div className={styles.breakdownContent}>
-                        <span className={styles.breakdownLabel}>With Pay</span>
-                        <span
-                          className={`${styles.breakdownValue} ${styles.valueGreen}`}
-                        >
-                          {breakdown.paidDays || 0}
-                        </span>
-                      </div>
-                    </div>
-                    <div className={styles.breakdownCard}>
-                      <div className={styles.breakdownIcon}>❌</div>
-                      <div className={styles.breakdownContent}>
-                        <span className={styles.breakdownLabel}>
-                          Without Pay
-                        </span>
-                        <span
-                          className={`${styles.breakdownValue} ${styles.valueRed}`}
-                        >
-                          {breakdown.unpaidDays || 0}
-                        </span>
-                      </div>
-                    </div>
-                    <div className={styles.breakdownCard}>
-                      <div className={styles.breakdownIcon}>📊</div>
-                      <div className={styles.breakdownContent}>
-                        <span className={styles.breakdownLabel}>
-                          Total Deduction
-                        </span>
-                        <span className={styles.breakdownValue}>
-                          {(breakdown.paidDays || 0) +
-                            (breakdown.unpaidDays || 0)}{" "}
-                          days
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Balance Information */}
-                  <div className={styles.balanceInfo}>
-                    <div className={styles.balanceItem}>
-                      <span>Available Balance:</span>
-                      <strong>{breakdown.availableBalance || 0} days</strong>
-                    </div>
-                    <div className={styles.balanceItem}>
-                      <span>Balance After Deduction:</span>
-                      <strong>{breakdown.balanceAfter || 0} days</strong>
-                    </div>
-                  </div>
-
-                  {/* Warning for special approval */}
-                  {breakdown.requiresApproval && (
-                    <div className={styles.warningCard}>
-                      <div className={styles.warningIcon}>⚠️</div>
-                      <div className={styles.warningContent}>
-                        <strong>Special Approval Required</strong>
-                        <p>
-                          This leave exceeds normal limits and may require
-                          additional approval.
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Accrual Impact */}
-              <div className={styles.sectionCard}>
-                <h3 className={styles.sectionTitle}>
-                  <span className={styles.sectionIcon}>📈</span>
-                  Monthly Accrual Impact
-                </h3>
-                <div className={styles.accrualImpact}>
-                  {approveFor === "with_pay" && (
-                    <div className={styles.accrualStatusSuccess}>
-                      <div className={styles.accrualIcon}>✅</div>
-                      <div className={styles.accrualText}>
-                        <strong>Full Accrual</strong>
-                        <p>
-                          Employee remains eligible for full monthly leave
-                          accrual
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                  {approveFor === "without_pay" && (
-                    <div className={styles.accrualStatusWarning}>
-                      <div className={styles.accrualIcon}>❌</div>
-                      <div className={styles.accrualText}>
-                        <strong>No Accrual</strong>
-                        <p>
-                          Employee will NOT receive monthly accrual for this
-                          period
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                  {approveFor === "both" &&
-                    breakdown &&
-                    breakdown.unpaidDays > 0 && (
-                      <div className={styles.accrualStatusPartial}>
-                        <div className={styles.accrualIcon}>⚠️</div>
-                        <div className={styles.accrualText}>
-                          <strong>Partial Accrual</strong>
-                          <p>
-                            Monthly accrual blocked for{" "}
-                            {breakdown.unpaidDays || 0} unpaid working day
-                            {(breakdown.unpaidDays || 0) !== 1 ? "s" : ""}
-                          </p>
-                        </div>
-                      </div>
-                    )}
-                  {approveFor === "both" &&
-                    breakdown &&
-                    breakdown.unpaidDays === 0 && (
-                      <div className={styles.accrualStatusSuccess}>
-                        <div className={styles.accrualIcon}>✅</div>
-                        <div className={styles.accrualText}>
-                          <strong>Full Accrual</strong>
-                          <p>
-                            All working days are paid - eligible for full
-                            monthly accrual
-                          </p>
-                        </div>
-                      </div>
-                    )}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* FOOTER - ACTION BUTTONS */}
-          <div className={styles.modalFooter}>
-            <div className={styles.footerSummary}>
-              <div className={styles.summaryItem}>
-                <span>Selected:</span>
-                <strong>
-                  {approveFor === "with_pay"
-                    ? "With Pay"
-                    : approveFor === "without_pay"
-                    ? "Without Pay"
-                    : `Partial (${withPayDays} paid, ${daysWithoutPay} unpaid)`}
-                </strong>
-              </div>
-              {breakdown && (
-                <div className={styles.summaryItem}>
-                  <span>To deduct:</span>
-                  <strong className={styles.deductionAmount}>
-                    {(breakdown.paidDays || 0) + (breakdown.unpaidDays || 0)}{" "}
-                    working days from leave credits
-                  </strong>
-                </div>
-              )}
-            </div>
-            <div className={styles.footerActions}>
-              <button
-                className={styles.cancelButton}
-                onClick={onClose}
-                disabled={isCalculating}
-              >
-                Cancel
-              </button>
-              <button
-                className={styles.approveButton}
-                onClick={handleApprove}
-                disabled={isCalculating || !breakdown}
-              >
-                {isCalculating ? (
-                  <div className={styles.loadingContent}>
-                    <span className={styles.spinnerSmall}></span>
-                    Calculating...
-                  </div>
-                ) : (
-                  <div className={styles.approveContent}>
-                    <span className={styles.approveIcon}>✓</span>
-                    <div className={styles.approveText}>
-                      <strong>Approve Leave</strong>
-                      {breakdown && (
-                        <span className={styles.approveSubtext}>
-                          {breakdown.paidDays || 0} paid •{" "}
-                          {breakdown.unpaidDays || 0} unpaid
+                      {requiresCredits && (
+                        <span className={styles.usableBalanceDisplay}>
+                          Usable Credits:{" "}
+                          <strong>{usableBalance.toFixed(2)}</strong>
+                          (preserving {MINIMUM_BALANCE} minimum)
                         </span>
                       )}
                     </div>
                   </div>
-                )}
-              </button>
+
+                  <div className={styles.sliderContainer}>
+                    <input
+                      type="range"
+                      min="0"
+                      max={
+                        requiresCredits
+                          ? Math.min(totalWorkingDays, usableBalance)
+                          : totalWorkingDays
+                      }
+                      value={withPayDays}
+                      onChange={(e) => handleSliderChange(e.target.value)}
+                      className={styles.rangeSlider}
+                      disabled={isCalculating || disabledStatus.sliderDisabled}
+                    />
+                    <div className={styles.sliderLabels}>
+                      <span>0</span>
+                      <span>
+                        {Math.floor(
+                          (requiresCredits
+                            ? Math.min(totalWorkingDays, usableBalance)
+                            : totalWorkingDays) / 2
+                        )}
+                      </span>
+                      <span>
+                        {requiresCredits
+                          ? Math.min(totalWorkingDays, usableBalance)
+                          : totalWorkingDays}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className={styles.daysInputRow}>
+                    <div className={styles.inputGroup}>
+                      <label>Days with pay:</label>
+                      <input
+                        type="number"
+                        min="0"
+                        max={
+                          requiresCredits
+                            ? Math.min(totalWorkingDays, usableBalance)
+                            : totalWorkingDays
+                        }
+                        value={withPayDays}
+                        onChange={(e) =>
+                          handleWithPayDaysChange(e.target.value)
+                        }
+                        className={styles.daysInput}
+                        disabled={
+                          isCalculating || disabledStatus.sliderDisabled
+                        }
+                      />
+                      <small className={styles.inputHelper}>
+                        Enter 0-
+                        {(requiresCredits
+                          ? Math.min(totalWorkingDays, usableBalance)
+                          : totalWorkingDays
+                        ).toFixed(2)}{" "}
+                        days
+                        {requiresCredits &&
+                          ` (max ${usableBalance.toFixed(2)} usable credits)`}
+                      </small>
+                    </div>
+
+                    <div className={styles.daysPreview}>
+                      <div className={styles.daysBar}>
+                        <div
+                          className={styles.paidBar}
+                          style={{
+                            width:
+                              totalWorkingDays > 0
+                                ? `${(withPayDays / totalWorkingDays) * 100}%`
+                                : "0%",
+                          }}
+                        ></div>
+                        <div
+                          className={styles.unpaidBar}
+                          style={{
+                            width:
+                              totalWorkingDays > 0
+                                ? `${
+                                    (daysWithoutPay / totalWorkingDays) * 100
+                                  }%`
+                                : "0%",
+                          }}
+                        ></div>
+                      </div>
+                      <div className={styles.barLabels}>
+                        <span>Paid ({withPayDays.toFixed(2)})</span>
+                        <span>Unpaid ({daysWithoutPay.toFixed(2)})</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Show message if no option selected yet */}
+              {!approveFor && (
+                <div className={styles.selectionPrompt}>
+                  <div className={styles.promptIcon}>👉</div>
+                  <div className={styles.promptText}>
+                    <strong>Please select a payment option</strong>
+                    <p>Choose how you want to approve this leave request</p>
+                  </div>
+                </div>
+              )}
             </div>
+          </div>
+
+          {/* RIGHT COLUMN - BREAKDOWN & ACTIONS */}
+          <div className={styles.rightColumn}>
+            {/* Leave Type Summary Card */}
+            <div className={styles.sectionCard}>
+              <h3 className={styles.sectionTitle}>
+                <span className={styles.sectionIcon}>📋</span>
+                Leave Type Summary
+              </h3>
+              <div className={styles.leaveTypeSummary}>
+                <div className={styles.summaryRow}>
+                  <span>Type:</span>
+                  <strong className={styles.leaveTypeValue}>
+                    {formatLeaveTypeDisplay(leaveType)} Leave
+                  </strong>
+                </div>
+                <div className={styles.summaryRow}>
+                  <span>Category:</span>
+                  <strong
+                    className={
+                      isSpecialLeave ? styles.specialValue : styles.regularValue
+                    }
+                  >
+                    {isSpecialLeave ? "Special Leave" : "Regular Leave"}
+                  </strong>
+                </div>
+                <div className={styles.summaryRow}>
+                  <span>Credits Required:</span>
+                  <strong
+                    className={
+                      requiresCredits
+                        ? styles.requiresCredits
+                        : styles.noCredits
+                    }
+                  >
+                    {requiresCredits ? "Yes" : "No"}
+                  </strong>
+                </div>
+                {isSpecialLeave && (
+                  <div className={styles.specialLeaveNotes}>
+                    <span className={styles.noteItem}>
+                      ✅ All calendar days count as paid
+                    </span>
+                    <span className={styles.noteItem}>
+                      ✅ Holidays/weekends included
+                    </span>
+                    <span className={styles.noteItem}>
+                      ✅ No leave credit deduction
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Balance Summary Card - Only show if credits are required */}
+            {requiresCredits && (
+              <div className={styles.sectionCard}>
+                <h3 className={styles.sectionTitle}>
+                  <span className={styles.sectionIcon}>🏦</span>
+                  Leave Credit Summary
+                </h3>
+                <div className={styles.balanceSummary}>
+                  <div className={styles.balanceRow}>
+                    <span>Available Balance:</span>
+                    <strong className={styles.balanceValue}>
+                      {availableBalance.toFixed(2)} days
+                    </strong>
+                  </div>
+                  <div className={styles.balanceRow}>
+                    <span>Minimum to Preserve:</span>
+                    <strong className={styles.balanceValue}>
+                      - {MINIMUM_BALANCE} days
+                    </strong>
+                  </div>
+                  <div className={styles.balanceDivider}></div>
+                  <div className={styles.balanceRow}>
+                    <span>Usable Credits:</span>
+                    <strong
+                      className={`${styles.balanceValue} ${styles.highlighted}`}
+                    >
+                      {usableBalance.toFixed(2)} days
+                    </strong>
+                  </div>
+                  <div className={styles.balanceNote}>
+                    {usableBalance === 0 ? (
+                      <span className={styles.warningText}>
+                        ⚠️ Only "Without Pay" option available
+                      </span>
+                    ) : usableBalance < totalWorkingDays ? (
+                      <span className={styles.warningText}>
+                        ⚠️ Partial payment required ({usableBalance.toFixed(2)}/
+                        {totalWorkingDays} days)
+                      </span>
+                    ) : (
+                      <span className={styles.successText}>
+                        ✅ Sufficient credits for full payment
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Leave Details Card */}
+            <div className={styles.sectionCard}>
+              <h3 className={styles.sectionTitle}>
+                <span className={styles.sectionIcon}>📅</span>
+                Leave Details
+              </h3>
+              <div className={styles.detailsGrid}>
+                <div className={styles.detailItem}>
+                  <span className={styles.detailLabel}>Employee:</span>
+                  <span className={styles.detailValue}>
+                    {request.employeeName}
+                  </span>
+                </div>
+                <div className={styles.detailItem}>
+                  <span className={styles.detailLabel}>Days:</span>
+                  <span className={styles.detailValue}>
+                    {totalWorkingDays} {isSpecialLeave ? "calendar" : "working"}{" "}
+                    days
+                  </span>
+                </div>
+                {!isSpecialLeave && holidayDays > 0 && (
+                  <div className={styles.detailItem}>
+                    <span className={styles.detailLabel}>
+                      Holidays/Weekends:
+                    </span>
+                    <span className={styles.detailValue}>
+                      {holidayDays} days (excluded)
+                    </span>
+                  </div>
+                )}
+                {isSpecialLeave && (
+                  <div className={styles.detailItem}>
+                    <span className={styles.detailLabel}>Calculation:</span>
+                    <span className={styles.detailValue}>
+                      All {totalWorkingDays} days count as paid
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Breakdown Card - Only show when an option is selected */}
+            {breakdown && approveFor && (
+              <div className={styles.sectionCard}>
+                <h3 className={styles.sectionTitle}>
+                  <span className={styles.sectionIcon}>🧮</span>
+                  Payment Breakdown
+                </h3>
+                <div className={styles.breakdownGrid}>
+                  <div className={styles.breakdownCard}>
+                    <div className={styles.breakdownIcon}>📅</div>
+                    <div className={styles.breakdownContent}>
+                      <span className={styles.breakdownLabel}>Total Days</span>
+                      <span className={styles.breakdownValue}>
+                        {totalWorkingDays}
+                      </span>
+                    </div>
+                  </div>
+                  <div className={styles.breakdownCard}>
+                    <div className={styles.breakdownIcon}>✅</div>
+                    <div className={styles.breakdownContent}>
+                      <span className={styles.breakdownLabel}>With Pay</span>
+                      <span
+                        className={`${styles.breakdownValue} ${styles.valueGreen}`}
+                      >
+                        {breakdown.paidDays?.toFixed(2) || 0}
+                      </span>
+                    </div>
+                  </div>
+                  <div className={styles.breakdownCard}>
+                    <div className={styles.breakdownIcon}>❌</div>
+                    <div className={styles.breakdownContent}>
+                      <span className={styles.breakdownLabel}>Without Pay</span>
+                      <span
+                        className={`${styles.breakdownValue} ${styles.valueRed}`}
+                      >
+                        {breakdown.unpaidDays?.toFixed(2) || 0}
+                      </span>
+                    </div>
+                  </div>
+                  {requiresCredits && (
+                    <div className={styles.breakdownCard}>
+                      <div className={styles.breakdownIcon}>📊</div>
+                      <div className={styles.breakdownContent}>
+                        <span className={styles.breakdownLabel}>To Deduct</span>
+                        <span className={styles.breakdownValue}>
+                          {breakdown.totalDeducted?.toFixed(2) || 0} days
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Balance Information - Only for regular leaves */}
+                {requiresCredits && (
+                  <div className={styles.balanceInfo}>
+                    <div className={styles.balanceItem}>
+                      <span>Balance Before:</span>
+                      <strong>
+                        {breakdown.availableBalance?.toFixed(2) || 0} days
+                      </strong>
+                    </div>
+                    <div className={styles.balanceItem}>
+                      <span>Balance After:</span>
+                      <strong className={styles.finalBalance}>
+                        {breakdown.balanceAfter?.toFixed(2) || 0} days
+                      </strong>
+                    </div>
+                    <div className={styles.minimumBalanceNote}>
+                      ✅ Minimum balance of {MINIMUM_BALANCE} preserved
+                    </div>
+                  </div>
+                )}
+
+                {/* Special Leave Notes */}
+                {isSpecialLeave && (
+                  <div className={styles.specialLeaveBreakdown}>
+                    <div className={styles.specialNote}>
+                      <span className={styles.noteIcon}>🎉</span>
+                      <div className={styles.noteContent}>
+                        <strong>Special Leave Benefits</strong>
+                        <p>
+                          No leave credits required • All days paid • No balance
+                          deduction
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* FOOTER - ACTION BUTTONS */}
+        <div className={styles.modalFooter}>
+          <div className={styles.footerSummary}>
+            <div className={styles.summaryItem}>
+              <span>Selected:</span>
+              <strong>
+                {!approveFor
+                  ? "None selected"
+                  : approveFor === "with_pay"
+                  ? "With Pay"
+                  : approveFor === "without_pay"
+                  ? "Without Pay"
+                  : `Partial (${withPayDays.toFixed(
+                      2
+                    )} paid, ${daysWithoutPay.toFixed(2)} unpaid)`}
+              </strong>
+            </div>
+            {breakdown && requiresCredits && (
+              <div className={styles.summaryItem}>
+                <span>To deduct:</span>
+                <strong className={styles.deductionAmount}>
+                  {breakdown.totalDeducted?.toFixed(2) || 0} days from leave
+                  credits
+                </strong>
+              </div>
+            )}
+            {breakdown && !requiresCredits && (
+              <div className={styles.summaryItem}>
+                <span>Deduction:</span>
+                <strong className={styles.noDeduction}>
+                  No leave credits required (Special Leave)
+                </strong>
+              </div>
+            )}
+          </div>
+          <div className={styles.footerActions}>
+            <button
+              className={styles.cancelButton}
+              onClick={onClose}
+              disabled={isCalculating}
+            >
+              Cancel
+            </button>
+            <button
+              className={styles.approveButton}
+              onClick={handleApprove}
+              disabled={isCalculating || !breakdown || !approveFor}
+              title={!approveFor ? "Please select a payment option first" : ""}
+            >
+              {isCalculating ? (
+                <div className={styles.loadingContent}>
+                  <span className={styles.spinnerSmall}></span>
+                  Calculating...
+                </div>
+              ) : !approveFor ? (
+                <div className={styles.selectFirstContent}>
+                  <span className={styles.selectIcon}>⚠️</span>
+                  <div className={styles.selectText}>
+                    <strong>Select Option First</strong>
+                    <span className={styles.selectSubtext}>
+                      Choose payment type above
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <div className={styles.approveContent}>
+                  <span className={styles.approveIcon}>✓</span>
+                  <div className={styles.approveText}>
+                    <strong>Approve Leave</strong>
+                    {breakdown && (
+                      <span className={styles.approveSubtext}>
+                        {breakdown.paidDays?.toFixed(2) || 0} paid •{" "}
+                        {breakdown.unpaidDays?.toFixed(2) || 0} unpaid
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+            </button>
           </div>
         </div>
       </div>
-    );
-  };
+    </div>
+  );
+};
   const handleRejectClick = (id, employeeName) => {
     setSelectedRequest({ id, employeeName });
     setRejectionReason("");

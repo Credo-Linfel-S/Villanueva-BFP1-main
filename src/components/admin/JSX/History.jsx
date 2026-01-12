@@ -8,23 +8,43 @@ import { supabase } from "../../../lib/supabaseClient.js";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import BFPPreloader from "../../BFPPreloader.jsx";
-import { reactivatePersonnel } from "./Utility/personnelStatusUtils.js"; // Import the utility function
+import { reactivatePersonnel } from "./Utility/personnelStatusUtils.js";
 import FloatingNotificationBell from "../../FloatingNotificationBell.jsx";
 import { useUserId } from "../../hooks/useUserId.js";
+
 const History = () => {
   const { isSidebarCollapsed } = useSidebar();
   const [historyRecords, setHistoryRecords] = useState([]);
   const [clearanceHistory, setClearanceHistory] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("personnel"); // 'personnel' or 'clearance'
+  const [activeTab, setActiveTab] = useState("personnel");
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
-  const rowsPerPage = 10;
-const { userId, isAuthenticated, userRole } = useUserId();
+  const rowsPerPage = 15; // Increased for landscape
+  const { userId, isAuthenticated, userRole } = useUserId();
   const [showPreloader, setShowPreloader] = useState(true);
   const [loadingProgress, setLoadingProgress] = useState(0);
+
+  // DELETE MODAL STATES
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteId, setDeleteId] = useState(null);
+  const [deleteName, setDeleteName] = useState("");
+  const [personnelToDelete, setPersonnelToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // REACTIVATE MODAL STATES
+  const [showReactivateConfirm, setShowReactivateConfirm] = useState(false);
+  const [reactivateId, setReactivateId] = useState(null);
+  const [reactivateName, setReactivateName] = useState("");
+  const [personnelToReactivate, setPersonnelToReactivate] = useState(null);
+  const [isReactivating, setIsReactivating] = useState(false);
+  const [isTransferredPersonnel, setIsTransferredPersonnel] = useState(false);
+
+  // Compact view state
+  const [compactView, setCompactView] = useState(false);
+
   // Rank options for rank images
   const rankOptions = [
     {
@@ -77,6 +97,7 @@ const { userId, isAuthenticated, userRole } = useUserId();
       }/storage/v1/object/public/rank_images/SFO4.png`,
     },
   ];
+
   // Helper function to get rank image
   const getRankImage = (rank) => {
     const rankOption = rankOptions.find((option) => option.rank === rank);
@@ -88,6 +109,7 @@ const { userId, isAuthenticated, userRole } = useUserId();
     const rankOption = rankOptions.find((option) => option.rank === rank);
     return rankOption ? rankOption.name : rank || "N/A";
   };
+
   const updateLoadingProgress = (progress) => {
     setLoadingProgress(progress);
   };
@@ -98,17 +120,16 @@ const { userId, isAuthenticated, userRole } = useUserId();
     loadHistoryData();
   };
 
-  // Update the loadHistoryData function in History.jsx
   const loadHistoryData = async () => {
     try {
       setLoading(true);
       updateLoadingProgress(10);
 
-      // Load ONLY retired and resigned personnel
+      // Load retired, resigned, and transferred personnel
       const { data: personnelData, error: personnelError } = await supabase
         .from("personnel")
         .select("*")
-        .or("status.eq.Retired,status.eq.Resigned") // ONLY Retirement and Resignation
+        .or("status.eq.Retired,status.eq.Resigned,status.eq.Transferred")
         .order("updated_at", { ascending: false });
 
       if (personnelError) {
@@ -118,7 +139,7 @@ const { userId, isAuthenticated, userRole } = useUserId();
 
       updateLoadingProgress(30);
 
-      // Load completed clearance requests - ONLY Retirement and Resignation
+      // Load completed clearance requests
       const { data: clearanceData, error: clearanceError } = await supabase
         .from("clearance_requests")
         .select(
@@ -128,7 +149,7 @@ const { userId, isAuthenticated, userRole } = useUserId();
       `
         )
         .eq("status", "Completed")
-        .in("type", ["Resignation", "Retirement"]) // ONLY these two types
+        .in("type", ["Resignation", "Retirement", "Transfer"])
         .order("completed_at", { ascending: false });
 
       if (clearanceError) {
@@ -138,7 +159,7 @@ const { userId, isAuthenticated, userRole } = useUserId();
 
       updateLoadingProgress(60);
 
-      // Transform personnel data - ONLY Retirement and Resignation
+      // Transform personnel data
       const transformedPersonnelData = (personnelData || []).map((person) => {
         const fullName = `${person.first_name || ""} ${
           person.middle_name || ""
@@ -146,9 +167,16 @@ const { userId, isAuthenticated, userRole } = useUserId();
           .replace(/\s+/g, " ")
           .trim();
 
-        // Get separation date
-        const separationDate =
-          person.separation_date || person.retirement_date || person.updated_at;
+        let separationDate;
+        if (person.status === "Retired") {
+          separationDate = person.retirement_date || person.updated_at;
+        } else if (person.status === "Resigned") {
+          separationDate = person.separation_date || person.updated_at;
+        } else if (person.status === "Transferred") {
+          separationDate = person.transfer_date || person.updated_at;
+        } else {
+          separationDate = person.updated_at;
+        }
 
         return {
           id: person.id,
@@ -162,12 +190,14 @@ const { userId, isAuthenticated, userRole } = useUserId();
           rank: person.rank,
           designation: person.designation,
           station: person.station,
+          new_station: person.new_station,
           date_hired: person.date_hired,
           separation_date: separationDate,
           photo_url: person.photo_url,
           status: person.status,
           separation_type: person.separation_type,
           separation_reason: person.separation_reason,
+          transfer_reason: person.transfer_reason,
           years_of_service: calculateYearsOfService(
             person.date_hired,
             separationDate
@@ -177,7 +207,7 @@ const { userId, isAuthenticated, userRole } = useUserId();
         };
       });
 
-      // Transform clearance data - ONLY Retirement and Resignation
+      // Transform clearance data
       const transformedClearanceData = (clearanceData || []).map(
         (clearance) => {
           const personnel = clearance.personnel || {};
@@ -197,6 +227,7 @@ const { userId, isAuthenticated, userRole } = useUserId();
             badge_number: personnel.badge_number,
             rank: personnel.rank,
             station: personnel.station,
+            new_station: clearance.new_station,
             reason: clearance.reason,
             remarks: clearance.remarks,
             effective_date: clearance.effective_date,
@@ -276,7 +307,6 @@ const { userId, isAuthenticated, userRole } = useUserId();
   useEffect(() => {
     loadHistoryData();
 
-    // Set up real-time subscription for clearance updates
     const clearanceSubscription = supabase
       .channel("clearance-changes")
       .on(
@@ -288,13 +318,12 @@ const { userId, isAuthenticated, userRole } = useUserId();
         },
         (payload) => {
           if (payload.new.status === "Completed") {
-            loadHistoryData(); // Reload when clearance is completed
+            loadHistoryData();
           }
         }
       )
       .subscribe();
 
-    // Set up real-time subscription for personnel updates
     const personnelSubscription = supabase
       .channel("personnel-changes")
       .on(
@@ -305,7 +334,7 @@ const { userId, isAuthenticated, userRole } = useUserId();
           table: "personnel",
         },
         () => {
-          loadHistoryData(); // Reload when personnel status changes
+          loadHistoryData();
         }
       )
       .subscribe();
@@ -331,10 +360,7 @@ const { userId, isAuthenticated, userRole } = useUserId();
           return false;
         if (filterTypeLower === "resignation" && !recordType.includes("resign"))
           return false;
-        if (
-          filterTypeLower === "equipment completion" &&
-          !recordType.includes("equipment")
-        )
+        if (filterTypeLower === "transfer" && !recordType.includes("transfer"))
           return false;
       }
 
@@ -346,10 +372,7 @@ const { userId, isAuthenticated, userRole } = useUserId();
           return false;
         if (filterTypeLower === "resignation" && !recordType.includes("resign"))
           return false;
-        if (
-          filterTypeLower === "equipment completion" &&
-          !recordType.includes("equipment")
-        )
+        if (filterTypeLower === "transfer" && !recordType.includes("transfer"))
           return false;
       }
 
@@ -387,22 +410,38 @@ const { userId, isAuthenticated, userRole } = useUserId();
     setCurrentPage(page);
   };
 
-  // FIXED: Use the utility function for consistency
-  const handleReactivate = async (personnelId, personName) => {
-    if (
-      !window.confirm(
-        `Are you sure you want to reactivate ${personName}? This will change their status to Active.`
-      )
-    ) {
+  // ========== REACTIVATE FUNCTIONALITY ==========
+  const handleReactivateClick = (record) => {
+    if (!record || !record.id) {
+      toast.error("Invalid record — cannot reactivate.");
       return;
     }
 
+    const personnelRecord = historyRecords.find((r) => r.id === record.id);
+    const isTransferred = personnelRecord?.status === "Transferred";
+
+    setReactivateId(record.id);
+    setReactivateName(record.full_name);
+    setPersonnelToReactivate(record);
+    setIsTransferredPersonnel(isTransferred);
+    setShowReactivateConfirm(true);
+  };
+
+  const confirmReactivateRecord = async () => {
     try {
-      const result = await reactivatePersonnel(personnelId);
+      setIsReactivating(true);
+      if (!reactivateId) {
+        toast.error("No record selected for reactivation.");
+        setIsReactivating(false);
+        return;
+      }
+
+      const result = await reactivatePersonnel(reactivateId);
 
       if (result.success) {
-        toast.success(`${personName} has been reactivated and is now Active`);
-        // Wait a moment then reload to see the change
+        toast.success(
+          `${reactivateName} has been reactivated and is now Active`
+        );
         setTimeout(() => {
           loadHistoryData();
         }, 500);
@@ -412,13 +451,552 @@ const { userId, isAuthenticated, userRole } = useUserId();
     } catch (error) {
       console.error("Error reactivating personnel:", error);
       toast.error("Failed to reactivate personnel");
+    } finally {
+      setIsReactivating(false);
+      setShowReactivateConfirm(false);
+      setReactivateId(null);
+      setReactivateName("");
+      setPersonnelToReactivate(null);
+      setIsTransferredPersonnel(false);
     }
   };
 
-  const handleViewClearanceDetails = (clearanceId) => {
-    // Navigate to clearance details or show modal
-    toast.info(`Viewing clearance details for ID: ${clearanceId}`);
-    // Implement navigation to clearance details page
+  const cancelReactivate = () => {
+    setShowReactivateConfirm(false);
+    setReactivateId(null);
+    setReactivateName("");
+    setPersonnelToReactivate(null);
+    setIsTransferredPersonnel(false);
+    setIsReactivating(false);
+  };
+
+  // ========== DELETE FUNCTIONALITY ==========
+  const handleDeleteClick = (record) => {
+    if (!record || !record.id) {
+      toast.error("Invalid record — cannot delete.");
+      return;
+    }
+
+    setDeleteId(record.id);
+    setDeleteName(record.full_name);
+    setPersonnelToDelete(record);
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDeleteRecord = async () => {
+    try {
+      setIsDeleting(true);
+      if (!deleteId) {
+        toast.error("No record selected for deletion.");
+        setIsDeleting(false);
+        return;
+      }
+
+      const recordToDelete = filteredRecords.find((r) => r.id === deleteId);
+      if (!recordToDelete) {
+        toast.error("Record not found.");
+        setIsDeleting(false);
+        return;
+      }
+
+      if (activeTab === "personnel") {
+        const { error } = await supabase
+          .from("personnel")
+          .delete()
+          .eq("id", deleteId);
+
+        if (error) {
+          console.error("Supabase delete error:", error);
+          if (error.code === "42501") {
+            toast.error(
+              "Permission denied. Please check Row Level Security policies."
+            );
+          } else {
+            toast.error("Failed to delete personnel.");
+          }
+          throw error;
+        }
+      } else {
+        const { error } = await supabase
+          .from("clearance_requests")
+          .delete()
+          .eq("id", deleteId);
+
+        if (error) {
+          console.error("Supabase delete error:", error);
+          if (error.code === "42501") {
+            toast.error(
+              "Permission denied. Please check Row Level Security policies."
+            );
+          } else {
+            toast.error("Failed to delete clearance record.");
+          }
+          throw error;
+        }
+      }
+
+      toast.warn(
+        `${
+          activeTab === "personnel" ? "Personnel" : "Clearance"
+        } deleted successfully!`
+      );
+
+      await loadHistoryData();
+
+      setShowDeleteConfirm(false);
+      setDeleteId(null);
+      setDeleteName("");
+      setPersonnelToDelete(null);
+    } catch (error) {
+      console.error("Error deleting record:", error);
+      if (!error.message?.includes("Permission denied")) {
+        toast.error(
+          `Failed to delete ${
+            activeTab === "personnel" ? "personnel" : "clearance record"
+          }.`
+        );
+      }
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const cancelDelete = () => {
+    setShowDeleteConfirm(false);
+    setDeleteId(null);
+    setDeleteName("");
+    setPersonnelToDelete(null);
+    setIsDeleting(false);
+  };
+
+  // REACTIVATE MODAL COMPONENT (Updated for Landscape)
+  const ReactivateModal = () => {
+    if (!showReactivateConfirm || !personnelToReactivate) return null;
+
+    const reactivateMessage = isTransferredPersonnel
+      ? `Reactivate ${reactivateName}? This will change their status to Active and keep them at their current station.`
+      : `Reactivate ${reactivateName}? This will change their status to Active.`;
+
+    return (
+      <div
+        className={`${styles.modalOverlay} ${
+          isSidebarCollapsed ? styles.sidebarCollapsed : ""
+        }`}
+        style={{
+          left: isSidebarCollapsed ? "80px" : "285px",
+          width: isSidebarCollapsed
+            ? "calc(100vw - 80px)"
+            : "calc(100vw - 150px)",
+        }}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) cancelReactivate();
+        }}
+      >
+        <div className={styles.modalCompact}>
+          <div className={styles.modalHeaderCompact}>
+            <div className={styles.modalTitleIcon}>↻</div>
+            <h3 className={styles.modalTitleCompact}>Confirm Reactivation</h3>
+            <button
+              className={styles.modalCloseCompact}
+              onClick={cancelReactivate}
+              disabled={isReactivating}
+            >
+              ×
+            </button>
+          </div>
+
+          <div className={styles.modalBodyCompact}>
+            {/* Personnel Info in Compact Layout */}
+            <div className={styles.personnelInfoCompact}>
+              {/* Photo and Rank */}
+              <div className={styles.personnelImageSection}>
+                {personnelToReactivate.photo_url ? (
+                  <img
+                    src={personnelToReactivate.photo_url}
+                    alt={personnelToReactivate.full_name}
+                    className={styles.personnelPhotoCompact}
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.src = "https://via.placeholder.com/60";
+                    }}
+                  />
+                ) : (
+                  <div className={styles.personnelPhotoPlaceholderCompact}>
+                    {personnelToReactivate.first_name?.[0]}
+                    {personnelToReactivate.last_name?.[0]}
+                  </div>
+                )}
+
+                {personnelToReactivate.rank && (
+                  <div className={styles.personnelRankBadgeCompact}>
+                    {getRankImage(personnelToReactivate.rank) ? (
+                      <img
+                        src={getRankImage(personnelToReactivate.rank)}
+                        alt={personnelToReactivate.rank}
+                        className={styles.rankIconCompact}
+                      />
+                    ) : (
+                      <span>{personnelToReactivate.rank}</span>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Name and Details */}
+              <div className={styles.personnelDetailsCompact}>
+                <h4 className={styles.personnelNameCompact}>
+                  {reactivateName}
+                </h4>
+
+                <div className={styles.personnelMetaCompact}>
+                  {personnelToReactivate.badge_number && (
+                    <div className={styles.metaItem}>
+                      <span className={styles.metaLabel}>Badge:</span>
+                      <span className={styles.metaValue}>
+                        {personnelToReactivate.badge_number}
+                      </span>
+                    </div>
+                  )}
+
+                  <div className={styles.metaItem}>
+                    <span className={styles.metaLabel}>Status:</span>
+                    <span
+                      className={`${styles.statusBadgeCompact} ${
+                        personnelToReactivate.status === "Retired"
+                          ? styles.retired
+                          : personnelToReactivate.status === "Resigned"
+                          ? styles.resigned
+                          : personnelToReactivate.status === "Transferred"
+                          ? styles.transferred
+                          : ""
+                      }`}
+                    >
+                      {personnelToReactivate.status || "Unknown"}
+                    </span>
+                  </div>
+
+                  {isTransferredPersonnel &&
+                    personnelToReactivate.new_station && (
+                      <div className={styles.metaItem}>
+                        <span className={styles.metaLabel}>Transfer:</span>
+                        <span className={styles.metaValue}>
+                          {personnelToReactivate.station} →{" "}
+                          {personnelToReactivate.new_station}
+                        </span>
+                      </div>
+                    )}
+                </div>
+              </div>
+            </div>
+
+            {/* Confirmation Message */}
+            <div className={styles.confirmationMessageCompact}>
+              <div className={styles.warningIconCompact}>⚠️</div>
+              <p className={styles.messageTextCompact}>{reactivateMessage}</p>
+              <p className={styles.warningTextCompact}>
+                This action will restore the personnel to active status.
+              </p>
+            </div>
+
+            {/* Quick Info Grid */}
+            <div className={styles.quickInfoGrid}>
+              {personnelToReactivate.date_hired && (
+                <div className={styles.quickInfoItem}>
+                  <span className={styles.quickInfoLabel}>Hired:</span>
+                  <span className={styles.quickInfoValue}>
+                    {formatDate(personnelToReactivate.date_hired)}
+                  </span>
+                </div>
+              )}
+
+              {personnelToReactivate.separation_date && (
+                <div className={styles.quickInfoItem}>
+                  <span className={styles.quickInfoLabel}>
+                    {personnelToReactivate.status === "Transferred"
+                      ? "Transferred:"
+                      : "Separated:"}
+                  </span>
+                  <span className={styles.quickInfoValue}>
+                    {formatDate(personnelToReactivate.separation_date)}
+                  </span>
+                </div>
+              )}
+
+              {personnelToReactivate.years_of_service && (
+                <div className={styles.quickInfoItem}>
+                  <span className={styles.quickInfoLabel}>Service:</span>
+                  <span className={styles.quickInfoValue}>
+                    {personnelToReactivate.years_of_service.toFixed(1)} years
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className={styles.modalFooterCompact}>
+            <button
+              className={styles.cancelBtnCompact}
+              onClick={cancelReactivate}
+              disabled={isReactivating}
+            >
+              Cancel
+            </button>
+            <button
+              className={`${styles.confirmBtnCompact} ${
+                styles.reactivateBtnCompact
+              } ${isReactivating ? styles.loading : ""}`}
+              onClick={confirmReactivateRecord}
+              disabled={isReactivating}
+            >
+              {isReactivating ? (
+                <>
+                  <span className={styles.spinnerCompact}></span>
+                  Reactivating...
+                </>
+              ) : (
+                <>
+                  <span className={styles.btnIcon}>↻</span>
+                  Confirm Reactivation
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // DELETE MODAL COMPONENT (Updated for Landscape)
+  const DeleteModal = () => {
+    if (!showDeleteConfirm || !personnelToDelete) return null;
+
+    return (
+      <div
+        className={`${styles.modalOverlay} ${
+          isSidebarCollapsed ? styles.sidebarCollapsed : ""
+        }`}
+        style={{
+          left: isSidebarCollapsed ? "80px" : "285px",
+          width: isSidebarCollapsed
+            ? "calc(100vw - 80px)"
+            : "calc(100vw - 150px)",
+        }}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) cancelDelete();
+        }}
+      >
+        <div className={styles.modalCompact}>
+          <div
+            className={`${styles.modalHeaderCompact} ${styles.deleteHeader}`}
+          >
+            <div className={styles.modalTitleIcon}>🗑️</div>
+            <h3 className={styles.modalTitleCompact}>Confirm Deletion</h3>
+            <button
+              className={styles.modalCloseCompact}
+              onClick={cancelDelete}
+              disabled={isDeleting}
+            >
+              ×
+            </button>
+          </div>
+
+          <div className={styles.modalBodyCompact}>
+            {/* Personnel Info in Compact Layout */}
+            <div className={styles.personnelInfoCompact}>
+              {/* Photo and Rank */}
+              <div className={styles.personnelImageSection}>
+                {personnelToDelete.photo_url ? (
+                  <img
+                    src={personnelToDelete.photo_url}
+                    alt={personnelToDelete.full_name}
+                    className={styles.personnelPhotoCompact}
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.src = "https://via.placeholder.com/60";
+                    }}
+                  />
+                ) : (
+                  <div className={styles.personnelPhotoPlaceholderCompact}>
+                    {personnelToDelete.first_name?.[0]}
+                    {personnelToDelete.last_name?.[0]}
+                  </div>
+                )}
+
+                {personnelToDelete.rank && (
+                  <div className={styles.personnelRankBadgeCompact}>
+                    {getRankImage(personnelToDelete.rank) ? (
+                      <img
+                        src={getRankImage(personnelToDelete.rank)}
+                        alt={personnelToDelete.rank}
+                        className={styles.rankIconCompact}
+                      />
+                    ) : (
+                      <span>{personnelToDelete.rank}</span>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Name and Details */}
+              <div className={styles.personnelDetailsCompact}>
+                <h4 className={styles.personnelNameCompact}>{deleteName}</h4>
+
+                <div className={styles.personnelMetaCompact}>
+                  {activeTab === "personnel" ? (
+                    <>
+                      {personnelToDelete.badge_number && (
+                        <div className={styles.metaItem}>
+                          <span className={styles.metaLabel}>Badge:</span>
+                          <span className={styles.metaValue}>
+                            {personnelToDelete.badge_number}
+                          </span>
+                        </div>
+                      )}
+
+                      <div className={styles.metaItem}>
+                        <span className={styles.metaLabel}>Type:</span>
+                        <span
+                          className={`${styles.recordTypeBadge} ${
+                            personnelToDelete.status === "Retired"
+                              ? styles.retired
+                              : personnelToDelete.status === "Resigned"
+                              ? styles.resigned
+                              : personnelToDelete.status === "Transferred"
+                              ? styles.transferred
+                              : ""
+                          }`}
+                        >
+                          {personnelToDelete.status || "Unknown"}
+                        </span>
+                      </div>
+
+                      {personnelToDelete.station && (
+                        <div className={styles.metaItem}>
+                          <span className={styles.metaLabel}>Station:</span>
+                          <span className={styles.metaValue}>
+                            {personnelToDelete.station}
+                          </span>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <div className={styles.metaItem}>
+                        <span className={styles.metaLabel}>Type:</span>
+                        <span
+                          className={`${styles.recordTypeBadge} ${
+                            personnelToDelete.clearance_type === "Retirement"
+                              ? styles.retired
+                              : personnelToDelete.clearance_type ===
+                                "Resignation"
+                              ? styles.resigned
+                              : personnelToDelete.clearance_type === "Transfer"
+                              ? styles.transferred
+                              : ""
+                          }`}
+                        >
+                          {personnelToDelete.clearance_type || "Unknown"}
+                        </span>
+                      </div>
+
+                      <div className={styles.metaItem}>
+                        <span className={styles.metaLabel}>Completed:</span>
+                        <span className={styles.metaValue}>
+                          {formatDateTime(personnelToDelete.completed_at)}
+                        </span>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Danger Warning */}
+            <div className={styles.dangerWarningCompact}>
+              <div className={styles.dangerIconCompact}>⚠️</div>
+              <div className={styles.warningContent}>
+                <p className={styles.dangerTitleCompact}>
+                  {activeTab === "personnel"
+                    ? "Delete Personnel Record?"
+                    : "Delete Clearance Record?"}
+                </p>
+                <p className={styles.dangerTextCompact}>
+                  This action <strong>cannot be undone</strong>. All associated
+                  data will be permanently removed from the system.
+                </p>
+              </div>
+            </div>
+
+            {/* Additional Warning for Personnel */}
+            {activeTab === "personnel" && (
+              <div className={styles.additionalWarning}>
+                <div className={styles.warningItem}>
+                  <span className={styles.warningIcon}>📋</span>
+                  <span>All clearance records will be deleted</span>
+                </div>
+                <div className={styles.warningItem}>
+                  <span className={styles.warningIcon}>📊</span>
+                  <span>Leave and attendance history will be lost</span>
+                </div>
+                <div className={styles.warningItem}>
+                  <span className={styles.warningIcon}>🔄</span>
+                  <span>Cannot be recovered or reactivated</span>
+                </div>
+              </div>
+            )}
+
+            {/* Additional Warning for Clearance */}
+            {activeTab === "clearance" && (
+              <div className={styles.additionalWarning}>
+                <div className={styles.warningItem}>
+                  <span className={styles.warningIcon}>📄</span>
+                  <span>Clearance documentation will be deleted</span>
+                </div>
+                <div className={styles.warningItem}>
+                  <span className={styles.warningIcon}>📋</span>
+                  <span>Approval records will be removed</span>
+                </div>
+                <div className={styles.warningItem}>
+                  <span className={styles.warningIcon}>🔄</span>
+                  <span>Cannot be restored once deleted</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className={styles.modalFooterCompact}>
+            <button
+              className={styles.cancelBtnCompact}
+              onClick={cancelDelete}
+              disabled={isDeleting}
+            >
+              Cancel
+            </button>
+            <button
+              className={`${styles.confirmBtnCompact} ${
+                styles.deleteBtnCompact
+              } ${isDeleting ? styles.loading : ""}`}
+              onClick={confirmDeleteRecord}
+              disabled={isDeleting}
+            >
+              {isDeleting ? (
+                <>
+                  <span className={styles.spinnerCompact}></span>
+                  Deleting...
+                </>
+              ) : (
+                <>
+                  <span className={styles.btnIcon}>🗑️</span>
+                  {activeTab === "personnel"
+                    ? "Delete Personnel"
+                    : "Delete Clearance"}
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   if (showPreloader) {
@@ -432,173 +1010,682 @@ const { userId, isAuthenticated, userRole } = useUserId();
     );
   }
 
+  // Compact table headers for personnel
+  const PersonnelTableHeaders = () => {
+    if (compactView) {
+      return (
+        <>
+          <th>Photo</th>
+          <th>Name & Badge</th>
+          <th>Rank & Station</th>
+          <th>Years</th>
+          <th>Separation</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </>
+      );
+    }
+
+    return (
+      <>
+        <th>Photo</th>
+        <th>Name</th>
+        <th>Badge</th>
+        <th>Rank</th>
+        <th>Station</th>
+        <th>New Station</th>
+        <th>Years of Service</th>
+        <th>Date Hired</th>
+        <th>
+          {filterType === "transfer" ? "Transfer Date" : "Separation Date"}
+        </th>
+        <th>Status</th>
+        <th>Actions</th>
+      </>
+    );
+  };
+
+  // Compact table headers for clearance
+  const ClearanceTableHeaders = () => {
+    if (compactView) {
+      return (
+        <>
+          <th>Personnel</th>
+          <th>Type & Reason</th>
+          <th>Dates</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </>
+      );
+    }
+
+    return (
+      <>
+        <th>Personnel</th>
+        <th>Clearance Type</th>
+        <th>Reason</th>
+        <th>New Station</th>
+        <th>Effective Date</th>
+        <th>Completed Date</th>
+        <th>Approved By</th>
+        <th>Status</th>
+        <th>Actions</th>
+      </>
+    );
+  };
+
+  // Compact personnel row
+  const CompactPersonnelRow = ({ record }) => (
+    <tr key={`${record.id}-${record.type}`} className={styles.tableRow}>
+      <td>
+        {record.photo_url ? (
+          <img
+            src={record.photo_url}
+            alt={record.full_name}
+            className={styles.photoCompact}
+            onError={(e) => {
+              e.target.onerror = null;
+              e.target.src = "https://via.placeholder.com/40";
+            }}
+          />
+        ) : (
+          <div className={styles.photoPlaceholderCompact}>
+            {record.first_name?.[0]}
+            {record.last_name?.[0]}
+          </div>
+        )}
+      </td>
+      <td>
+        <div className={styles.nameCellCompact}>
+          <strong className={styles.compactName}>{record.full_name}</strong>
+          <div className={styles.compactBadge}>
+            {record.badge_number || "N/A"}
+          </div>
+          {record.designation && (
+            <div className={styles.compactDesignation}>
+              {record.designation}
+            </div>
+          )}
+        </div>
+      </td>
+      <td>
+        <div className={styles.compactRankStation}>
+          <div className={styles.compactRank}>
+            <div className={styles.rankImageContainerCompact}>
+              {record.rank && getRankImage(record.rank) ? (
+                <img
+                  src={getRankImage(record.rank)}
+                  alt={record.rank || "Rank"}
+                  className={styles.rankImageCompact}
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.style.display = "none";
+                    const parent = e.target.parentElement;
+                    if (parent) {
+                      const placeholder = parent.querySelector(
+                        `.${styles.rankPlaceholderCompact}`
+                      );
+                      if (placeholder) {
+                        placeholder.style.display = "flex";
+                      }
+                    }
+                  }}
+                />
+              ) : null}
+              <div
+                className={styles.rankPlaceholderCompact}
+                style={{
+                  display:
+                    record.rank && getRankImage(record.rank) ? "none" : "flex",
+                }}
+              >
+                {record.rank ? record.rank.charAt(0) : "R"}
+              </div>
+            </div>
+            <span className={styles.compactRankText}>
+              {record.rank || "N/A"}
+            </span>
+          </div>
+          <div className={styles.compactStation}>
+            {record.station || "N/A"}
+            {record.status === "Transferred" && record.new_station && (
+              <div className={styles.compactTransfer}>
+                → {record.new_station}
+              </div>
+            )}
+          </div>
+        </div>
+      </td>
+      <td>
+        <span className={styles.yearsBadgeCompact}>
+          {record.years_of_service.toFixed(1)}y
+        </span>
+      </td>
+      <td>
+        <div className={styles.compactDates}>
+          <div>Hired: {formatDate(record.date_hired)}</div>
+          <div>Sep: {formatDate(record.separation_date)}</div>
+        </div>
+      </td>
+      <td>
+        <span
+          className={`${styles.statusBadgeCompact} ${
+            record.status && record.status.toLowerCase().includes("retired")
+              ? styles.retired
+              : record.status &&
+                record.status.toLowerCase().includes("resigned")
+              ? styles.resigned
+              : record.status &&
+                record.status.toLowerCase().includes("transferred")
+              ? styles.transferred
+              : styles.other
+          }`}
+        >
+          {record.status || "Inactive"}
+        </span>
+      </td>
+      <td>
+        <div className={styles.actionButtonsCompact}>
+          <button
+            className={styles.reactivateBtnCompact}
+            onClick={() => handleReactivateClick(record)}
+            title="Reactivate"
+          >
+            ↻
+          </button>
+          <button
+            className={styles.deleteBtnCompact}
+            onClick={() => handleDeleteClick(record)}
+            title="Delete"
+          >
+            ×
+          </button>
+        </div>
+      </td>
+    </tr>
+  );
+
+  // Compact clearance row
+  const CompactClearanceRow = ({ record }) => (
+    <tr key={`${record.id}-${record.type}`} className={styles.tableRow}>
+      <td>
+        <div className={styles.compactPersonnelInfo}>
+          <strong>{record.full_name}</strong>
+          <div className={styles.compactPersonnelMeta}>
+            <span>Badge: {record.badge_number || "N/A"}</span>
+            <span>Rank: {record.rank || "N/A"}</span>
+            <span>Station: {record.station || "N/A"}</span>
+          </div>
+        </div>
+      </td>
+      <td>
+        <div className={styles.compactClearanceInfo}>
+          <span
+            className={`${styles.clearanceTypeCompact} ${
+              record.clearance_type === "Retirement"
+                ? styles.retired
+                : record.clearance_type === "Resignation"
+                ? styles.resigned
+                : record.clearance_type === "Transfer"
+                ? styles.transferred
+                : styles.equipment
+            }`}
+          >
+            {record.clearance_type}
+          </span>
+          <div className={styles.compactReason}>
+            {record.reason || "No reason provided"}
+          </div>
+          {record.clearance_type === "Transfer" && record.new_station && (
+            <div className={styles.compactTransfer}>→ {record.new_station}</div>
+          )}
+        </div>
+      </td>
+      <td>
+        <div className={styles.compactDates}>
+          <div>Effective: {formatDate(record.effective_date)}</div>
+          <div>Completed: {formatDateTime(record.completed_at)}</div>
+          <div>Approved: {record.approved_by || "N/A"}</div>
+        </div>
+      </td>
+      <td>
+        <span className={`${styles.statusBadgeCompact} ${styles.completed}`}>
+          {record.status}
+        </span>
+      </td>
+      <td>
+        <div className={styles.actionButtonsCompact}>
+          <button
+            className={styles.deleteBtnCompact}
+            onClick={() => handleDeleteClick(record)}
+            title="Delete"
+          >
+            ×
+          </button>
+        </div>
+      </td>
+    </tr>
+  );
+
+  // Regular personnel row
+  const RegularPersonnelRow = ({ record }) => (
+    <tr key={`${record.id}-${record.type}`} className={styles.tableRow}>
+      <td>
+        {record.photo_url ? (
+          <img
+            src={record.photo_url}
+            alt={record.full_name}
+            className={styles.photo}
+            onError={(e) => {
+              e.target.onerror = null;
+              e.target.src = "https://via.placeholder.com/50";
+            }}
+          />
+        ) : (
+          <div className={styles.photoPlaceholder}>
+            {record.first_name?.[0]}
+            {record.last_name?.[0]}
+          </div>
+        )}
+      </td>
+      <td>
+        <div className={styles.nameCell}>
+          <strong>{record.full_name}</strong>
+          {record.designation && (
+            <span className={styles.designation}>{record.designation}</span>
+          )}
+        </div>
+      </td>
+      <td>{record.badge_number || "N/A"}</td>
+      <td>
+        <div className={styles.rankDisplay}>
+          <div
+            className={`${styles.rankImageContainer} ${
+              record.rank ? styles[`rank${record.rank}`] : ""
+            }`}
+          >
+            {record.rank && getRankImage(record.rank) ? (
+              <img
+                src={getRankImage(record.rank)}
+                alt={record.rank || "Rank"}
+                className={styles.rankImage}
+                onError={(e) => {
+                  const target = e.target;
+                  if (!target) return;
+
+                  target.onerror = null;
+                  target.style.display = "none";
+
+                  const parent = target.parentElement;
+                  if (parent) {
+                    const placeholder = parent.querySelector(
+                      `.${styles.rankPlaceholder}`
+                    );
+                    if (placeholder) {
+                      placeholder.style.display = "flex";
+                    }
+                  }
+                }}
+              />
+            ) : null}
+            <div
+              className={styles.rankPlaceholder}
+              style={{
+                display:
+                  record.rank && getRankImage(record.rank) ? "none" : "flex",
+              }}
+            >
+              {record.rank ? record.rank.charAt(0) : "R"}
+            </div>
+          </div>
+          <div className={styles.rankInfo}>
+            <div className={styles.rankAbbreviation}>
+              {record.rank || "N/A"}
+            </div>
+            <div className={styles.rankFullName}>
+              {getRankName(record.rank)}
+            </div>
+          </div>
+        </div>
+      </td>
+      <td>{record.station || "N/A"}</td>
+      <td>
+        {record.status === "Transferred" && record.new_station ? (
+          <div className={styles.transferStation}>
+            <span className={styles.transferArrow}>→</span>
+            <span className={styles.newStation}>{record.new_station}</span>
+          </div>
+        ) : (
+          "N/A"
+        )}
+      </td>
+      <td>
+        <span className={styles.yearsBadge}>
+          {record.years_of_service.toFixed(1)} years
+        </span>
+      </td>
+      <td>{formatDate(record.date_hired)}</td>
+      <td>{formatDate(record.separation_date)}</td>
+      <td>
+        <span
+          className={`${styles.statusBadge} ${
+            record.status && record.status.toLowerCase().includes("retired")
+              ? styles.retired
+              : record.status &&
+                record.status.toLowerCase().includes("resigned")
+              ? styles.resigned
+              : record.status &&
+                record.status.toLowerCase().includes("transferred")
+              ? styles.transferred
+              : styles.other
+          }`}
+        >
+          {record.status || "Inactive"}
+        </span>
+      </td>
+      <td>
+        <div className={styles.actionButtons}>
+          <button
+            className={styles.reactivateBtn}
+            onClick={() => handleReactivateClick(record)}
+            title="Reactivate this personnel"
+          >
+            Reactivate
+          </button>
+          <button
+            className={styles.deleteBtn}
+            onClick={() => handleDeleteClick(record)}
+            title="Delete this record"
+          >
+            Delete
+          </button>
+        </div>
+      </td>
+    </tr>
+  );
+
+  // Regular clearance row
+  const RegularClearanceRow = ({ record }) => (
+    <tr key={`${record.id}-${record.type}`} className={styles.tableRow}>
+      <td>
+        <div className={styles.nameCell}>
+          <strong>{record.full_name}</strong>
+          <div className={styles.clearanceMeta}>
+            <span>Badge: {record.badge_number || "N/A"}</span>
+            <span>Rank: {record.rank || "N/A"}</span>
+          </div>
+        </div>
+      </td>
+      <td>
+        <span
+          className={`${styles.clearanceType} ${
+            record.clearance_type === "Retirement"
+              ? styles.retired
+              : record.clearance_type === "Resignation"
+              ? styles.resigned
+              : record.clearance_type === "Transfer"
+              ? styles.transferred
+              : styles.equipment
+          }`}
+        >
+          {record.clearance_type}
+        </span>
+      </td>
+      <td>
+        <div className={styles.reasonCell}>
+          {record.reason || "No reason provided"}
+        </div>
+      </td>
+      <td>
+        {record.clearance_type === "Transfer" && record.new_station ? (
+          <div className={styles.transferStation}>
+            <span className={styles.transferArrow}>→</span>
+            <span className={styles.newStation}>{record.new_station}</span>
+          </div>
+        ) : (
+          "N/A"
+        )}
+      </td>
+      <td>{formatDate(record.effective_date)}</td>
+      <td>{formatDateTime(record.completed_at)}</td>
+      <td>{record.approved_by || "N/A"}</td>
+      <td>
+        <span className={`${styles.statusBadge} ${styles.completed}`}>
+          {record.status}
+        </span>
+      </td>
+      <td>
+        <div className={styles.actionButtons}>
+          <button
+            className={styles.deleteBtn}
+            onClick={() => handleDeleteClick(record)}
+            title="Delete this clearance record"
+          >
+            Delete
+          </button>
+        </div>
+      </td>
+    </tr>
+  );
+
   return (
-    <div className={styles.container}>
+    <div className={`${styles.container} ${styles.landscapeMode}`}>
       <Title>History | BFP Villanueva</Title>
       <Meta name="robots" content="noindex, nofollow" />
 
       <Hamburger />
       <ToastContainer position="top-right" autoClose={3000} />
       <Sidebar />
+      <ReactivateModal />
+      <DeleteModal />
 
       <div className={`main-content ${isSidebarCollapsed ? "collapsed" : ""}`}>
         <div className={styles.header}>
           <h1>Separation & Clearance History</h1>
           <p className={styles.subtitle}>
-            View retired, resigned personnel and completed clearance requests
+            View retired, resigned, transferred personnel and completed
+            clearance requests
           </p>
         </div>
 
-        {/* Tabs */}
-        <div className={styles.tabs}>
-          <button
-            className={`${styles.tab} ${
-              activeTab === "personnel" ? styles.activeTab : ""
-            }`}
-            onClick={() => {
-              setActiveTab("personnel");
-              setCurrentPage(1);
-            }}
-          >
-            👥 Personnel History ({historyRecords.length})
-          </button>
-          <button
-            className={`${styles.tab} ${
-              activeTab === "clearance" ? styles.activeTab : ""
-            }`}
-            onClick={() => {
-              setActiveTab("clearance");
-              setCurrentPage(1);
-            }}
-          >
-            📋 Clearance History ({clearanceHistory.length})
-          </button>
-        </div>
-
-        {/* Debug Info - Add this for troubleshooting */}
-        <div className={styles.debugInfo} style={{ display: "none" }}>
-          <p>Total Records: {historyRecords.length}</p>
-          <p>
-            Sample record:{" "}
-            {historyRecords[0] && JSON.stringify(historyRecords[0])}
-          </p>
-        </div>
-
-        {/* Controls */}
-        <div className={styles.controls}>
-          <div className={styles.searchContainer}>
-            <input
-              type="text"
-              className={styles.searchInput}
-              placeholder={`Search ${
-                activeTab === "personnel" ? "personnel" : "clearance"
-              } records...`}
-              value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                setCurrentPage(1);
-              }}
-            />
-          </div>
-
-          <div className={styles.filterContainer}>
-            <select
-              className={styles.filterSelect}
-              value={filterType}
-              onChange={(e) => {
-                setFilterType(e.target.value);
+        {/* Controls Row */}
+        <div className={styles.controlsRow}>
+          {/* Tabs */}
+          <div className={styles.tabs}>
+            <button
+              className={`${styles.tab} ${
+                activeTab === "personnel" ? styles.activeTab : ""
+              }`}
+              onClick={() => {
+                setActiveTab("personnel");
                 setCurrentPage(1);
               }}
             >
-              <option value="all">All Types</option>
-              <option value="retirement">Retirement</option>
-              <option value="resignation">Resignation</option>
-              {/* REMOVE Equipment Completion from History filters */}
-            </select>
+              👥 Personnel ({historyRecords.length})
+            </button>
+            <button
+              className={`${styles.tab} ${
+                activeTab === "clearance" ? styles.activeTab : ""
+              }`}
+              onClick={() => {
+                setActiveTab("clearance");
+                setCurrentPage(1);
+              }}
+            >
+              📋 Clearance ({clearanceHistory.length})
+            </button>
+          </div>
+
+          {/* Search and Filters */}
+          <div className={styles.searchFilters}>
+            <div className={styles.searchContainer}>
+              <input
+                type="text"
+                className={styles.searchInput}
+                placeholder={`Search ${
+                  activeTab === "personnel" ? "personnel" : "clearance"
+                }...`}
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setCurrentPage(1);
+                }}
+              />
+            </div>
+
+            <div className={styles.filterContainer}>
+              <select
+                className={styles.filterSelect}
+                value={filterType}
+                onChange={(e) => {
+                  setFilterType(e.target.value);
+                  setCurrentPage(1);
+                }}
+              >
+                <option value="all">All Types</option>
+                <option value="retirement">Retirement</option>
+                <option value="resignation">Resignation</option>
+                <option value="transfer">Transfer</option>
+              </select>
+            </div>
+
+            {/* View Toggle Button */}
+            <button
+              className={`${styles.viewToggleBtn} ${
+                compactView ? styles.compactActive : ""
+              }`}
+              onClick={() => setCompactView(!compactView)}
+              title={
+                compactView
+                  ? "Switch to detailed view"
+                  : "Switch to compact view"
+              }
+            >
+              {compactView ? "📱" : "🖥️"}
+            </button>
           </div>
         </div>
 
-        {/* Stats */}
-        <div className={styles.stats}>
-          <div className={styles.statCard}>
-            <div className={styles.statIcon}>📜</div>
-            <div className={styles.statContent}>
-              <h3>Total Records</h3>
-              <p className={styles.statNumber}>
+        {/* Stats Cards - Compact Layout */}
+        <div className={styles.statsCompact}>
+          <div className={styles.statCardCompact}>
+            <div className={styles.statIconCompact}>📜</div>
+            <div className={styles.statContentCompact}>
+              <div className={styles.statNumberCompact}>
                 {activeTab === "personnel"
                   ? historyRecords.length
                   : clearanceHistory.length}
-              </p>
+              </div>
+              <div className={styles.statLabelCompact}>Total Records</div>
             </div>
           </div>
 
           {activeTab === "personnel" ? (
             <>
-              <div className={`${styles.statCard} ${styles.retiredCard}`}>
-                <div className={styles.statIcon}>👴</div>
-                <div className={styles.statContent}>
-                  <h3>Retired</h3>
-                  <p className={styles.statNumber}>
+              <div
+                className={`${styles.statCardCompact} ${styles.retiredCard}`}
+              >
+                <div className={styles.statIconCompact}>👴</div>
+                <div className={styles.statContentCompact}>
+                  <div className={styles.statNumberCompact}>
                     {
                       historyRecords.filter((r) => r.status === "Retired")
                         .length
                     }
-                  </p>
+                  </div>
+                  <div className={styles.statLabelCompact}>Retired</div>
                 </div>
               </div>
 
-              <div className={`${styles.statCard} ${styles.resignedCard}`}>
-                <div className={styles.statIcon}>👋</div>
-                <div className={styles.statContent}>
-                  <h3>Resigned</h3>
-                  <p className={styles.statNumber}>
+              <div
+                className={`${styles.statCardCompact} ${styles.resignedCard}`}
+              >
+                <div className={styles.statIconCompact}>👋</div>
+                <div className={styles.statContentCompact}>
+                  <div className={styles.statNumberCompact}>
                     {
                       historyRecords.filter((r) => r.status === "Resigned")
                         .length
                     }
-                  </p>
+                  </div>
+                  <div className={styles.statLabelCompact}>Resigned</div>
                 </div>
               </div>
 
-              {/* REMOVE Equipment Completion stat card */}
+              <div
+                className={`${styles.statCardCompact} ${styles.transferredCard}`}
+              >
+                <div className={styles.statIconCompact}>🚚</div>
+                <div className={styles.statContentCompact}>
+                  <div className={styles.statNumberCompact}>
+                    {
+                      historyRecords.filter((r) => r.status === "Transferred")
+                        .length
+                    }
+                  </div>
+                  <div className={styles.statLabelCompact}>Transferred</div>
+                </div>
+              </div>
             </>
           ) : (
             <>
-              <div className={`${styles.statCard} ${styles.retiredCard}`}>
-                <div className={styles.statIcon}>👴</div>
-                <div className={styles.statContent}>
-                  <h3>Retirement Clearances</h3>
-                  <p className={styles.statNumber}>
+              <div
+                className={`${styles.statCardCompact} ${styles.retiredCard}`}
+              >
+                <div className={styles.statIconCompact}>👴</div>
+                <div className={styles.statContentCompact}>
+                  <div className={styles.statNumberCompact}>
                     {
                       clearanceHistory.filter(
                         (r) => r.clearance_type === "Retirement"
                       ).length
                     }
-                  </p>
+                  </div>
+                  <div className={styles.statLabelCompact}>Retirement</div>
                 </div>
               </div>
 
-              <div className={`${styles.statCard} ${styles.resignedCard}`}>
-                <div className={styles.statIcon}>👋</div>
-                <div className={styles.statContent}>
-                  <h3>Resignation Clearances</h3>
-                  <p className={styles.statNumber}>
+              <div
+                className={`${styles.statCardCompact} ${styles.resignedCard}`}
+              >
+                <div className={styles.statIconCompact}>👋</div>
+                <div className={styles.statContentCompact}>
+                  <div className={styles.statNumberCompact}>
                     {
                       clearanceHistory.filter(
                         (r) => r.clearance_type === "Resignation"
                       ).length
                     }
-                  </p>
+                  </div>
+                  <div className={styles.statLabelCompact}>Resignation</div>
                 </div>
               </div>
 
-              {/* REMOVE Equipment Completion stat card */}
+              <div
+                className={`${styles.statCardCompact} ${styles.transferredCard}`}
+              >
+                <div className={styles.statIconCompact}>🚚</div>
+                <div className={styles.statContentCompact}>
+                  <div className={styles.statNumberCompact}>
+                    {
+                      clearanceHistory.filter(
+                        (r) => r.clearance_type === "Transfer"
+                      ).length
+                    }
+                  </div>
+                  <div className={styles.statLabelCompact}>Transfer</div>
+                </div>
+              </div>
             </>
           )}
         </div>
 
-        {/* Table */}
-        <div className={styles.tableContainer}>
+        {/* Table Container with Horizontal Scroll */}
+        <div
+          className={`${styles.tableContainer} ${
+            compactView ? styles.compactTable : ""
+          }`}
+        >
           {filteredRecords.length === 0 ? (
             <div className={styles.noRecords}>
               <div className={styles.noRecordsIcon}>
@@ -609,289 +1696,118 @@ const { userId, isAuthenticated, userRole } = useUserId();
                 {search || filterType !== "all"
                   ? "No records match your search criteria."
                   : activeTab === "personnel"
-                  ? "No retired or resigned personnel found. Approve a clearance request first."
+                  ? "No retired, resigned, or transferred personnel found."
                   : "No completed clearance requests found."}
               </p>
             </div>
           ) : (
             <>
-              <table className={styles.table}>
-                <thead>
-                  <tr>
-                    {activeTab === "personnel" ? (
-                      <>
-                        <th>Photo</th>
-                        <th>Name</th>
-                        <th>Badge</th>
-                        <th>Rank</th>
-                        <th>Station</th>
-                        <th>Years of Service</th>
-                        <th>Date Hired</th>
-                        <th>Separation Date</th>
-                        <th>Status</th>
-                        <th>Actions</th>
-                      </>
-                    ) : (
-                      <>
-                        <th>Personnel</th>
-                        <th>Clearance Type</th>
-                        <th>Reason</th>
-                        <th>Effective Date</th>
-                        <th>Completed Date</th>
-                        <th>Approved By</th>
-                        <th>Status</th>
-                        <th>Actions</th>
-                      </>
-                    )}
-                  </tr>
-                </thead>
-                <tbody>
-                  {paginatedRecords.map((record) => (
-                    <tr
-                      key={`${record.id}-${record.type}`}
-                      className={styles.tableRow}
-                    >
+              <div className={styles.tableWrapper}>
+                <table
+                  className={`${styles.table} ${
+                    compactView ? styles.compact : ""
+                  }`}
+                >
+                  <thead>
+                    <tr>
                       {activeTab === "personnel" ? (
-                        <>
-                          <td>
-                            {record.photo_url ? (
-                              <img
-                                src={record.photo_url}
-                                alt={record.full_name}
-                                className={styles.photo}
-                                onError={(e) => {
-                                  e.target.onerror = null;
-                                  e.target.src =
-                                    "https://via.placeholder.com/50";
-                                }}
-                              />
-                            ) : (
-                              <div className={styles.photoPlaceholder}>
-                                {record.first_name?.[0]}
-                                {record.last_name?.[0]}
-                              </div>
-                            )}
-                          </td>
-                          <td>
-                            <div className={styles.nameCell}>
-                              <strong>{record.full_name}</strong>
-                              {record.designation && (
-                                <span className={styles.designation}>
-                                  {record.designation}
-                                </span>
-                              )}
-                            </div>
-                          </td>
-                          <td>{record.badge_number || "N/A"}</td>
-                          <td>
-                            <div className={styles.rankDisplay}>
-                              <div
-                                className={`${styles.rankImageContainer} ${
-                                  record.rank
-                                    ? styles[`rank${record.rank}`]
-                                    : ""
-                                }`}
-                              >
-                                {record.rank && getRankImage(record.rank) ? (
-                                  <img
-                                    src={getRankImage(record.rank)}
-                                    alt={record.rank || "Rank"}
-                                    className={styles.rankImage}
-                                    onError={(e) => {
-                                      const target = e.target;
-                                      if (!target) return;
-
-                                      target.onerror = null;
-                                      target.style.display = "none";
-
-                                      // Get parent and find placeholder
-                                      const parent = target.parentElement;
-                                      if (parent) {
-                                        const placeholder =
-                                          parent.querySelector(
-                                            `.${styles.rankPlaceholder}`
-                                          );
-                                        if (placeholder) {
-                                          placeholder.style.display = "flex";
-                                        }
-                                      }
-                                    }}
-                                  />
-                                ) : null}
-                                <div
-                                  className={styles.rankPlaceholder}
-                                  style={{
-                                    display:
-                                      record.rank && getRankImage(record.rank)
-                                        ? "none"
-                                        : "flex",
-                                  }}
-                                >
-                                  {record.rank ? record.rank.charAt(0) : "R"}
-                                </div>
-                              </div>
-                              <div className={styles.rankInfo}>
-                                <div className={styles.rankAbbreviation}>
-                                  {record.rank || "N/A"}
-                                </div>
-                                <div className={styles.rankFullName}>
-                                  {getRankName(record.rank)}
-                                </div>
-                              </div>
-                            </div>
-                          </td>
-                          <td>{record.station || "N/A"}</td>
-                          <td>
-                            <span className={styles.yearsBadge}>
-                              {record.years_of_service.toFixed(1)} years
-                            </span>
-                          </td>
-                          <td>{formatDate(record.date_hired)}</td>
-                          <td>{formatDate(record.separation_date)}</td>
-                          <td>
-                            <span
-                              className={`${styles.statusBadge} ${
-                                record.status &&
-                                record.status.toLowerCase().includes("retired")
-                                  ? styles.retired
-                                  : record.status &&
-                                    record.status
-                                      .toLowerCase()
-                                      .includes("resigned")
-                                  ? styles.resigned
-                                  : record.status === "Equipment Completed"
-                                  ? styles.equipment
-                                  : styles.other
-                              }`}
-                            >
-                              {record.status || "Inactive"}
-                            </span>
-                          </td>
-                          <td>
-                            <button
-                              className={styles.reactivateBtn}
-                              onClick={() =>
-                                handleReactivate(record.id, record.full_name)
-                              }
-                              title="Reactivate this personnel"
-                            >
-                              Reactivate
-                            </button>
-                          </td>
-                        </>
+                        <PersonnelTableHeaders />
                       ) : (
-                        <>
-                          <td>
-                            <div className={styles.nameCell}>
-                              <strong>{record.full_name}</strong>
-                              <div className={styles.clearanceMeta}>
-                                <span>
-                                  Badge: {record.badge_number || "N/A"}
-                                </span>
-                                <span>Rank: {record.rank || "N/A"}</span>
-                              </div>
-                            </div>
-                          </td>
-                          <td>
-                            <span
-                              className={`${styles.clearanceType} ${
-                                record.clearance_type === "Retirement"
-                                  ? styles.retired
-                                  : record.clearance_type === "Resignation"
-                                  ? styles.resigned
-                                  : styles.equipment
-                              }`}
-                            >
-                              {record.clearance_type}
-                            </span>
-                          </td>
-                          <td>
-                            <div className={styles.reasonCell}>
-                              {record.reason || "No reason provided"}
-                            </div>
-                          </td>
-                          <td>{formatDate(record.effective_date)}</td>
-                          <td>{formatDateTime(record.completed_at)}</td>
-                          <td>{record.approved_by || "N/A"}</td>
-                          <td>
-                            <span
-                              className={`${styles.statusBadge} ${styles.completed}`}
-                            >
-                              {record.status}
-                            </span>
-                          </td>
-                          <td>
-                            <button
-                              className={styles.viewBtn}
-                              onClick={() =>
-                                handleViewClearanceDetails(record.id)
-                              }
-                              title="View clearance details"
-                            >
-                              View Details
-                            </button>
-                          </td>
-                        </>
+                        <ClearanceTableHeaders />
                       )}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {paginatedRecords.map((record) =>
+                      activeTab === "personnel" ? (
+                        compactView ? (
+                          <CompactPersonnelRow
+                            key={`${record.id}-${record.type}`}
+                            record={record}
+                          />
+                        ) : (
+                          <RegularPersonnelRow
+                            key={`${record.id}-${record.type}`}
+                            record={record}
+                          />
+                        )
+                      ) : compactView ? (
+                        <CompactClearanceRow
+                          key={`${record.id}-${record.type}`}
+                          record={record}
+                        />
+                      ) : (
+                        <RegularClearanceRow
+                          key={`${record.id}-${record.type}`}
+                          record={record}
+                        />
+                      )
+                    )}
+                  </tbody>
+                </table>
+              </div>
 
               {/* Pagination */}
               {filteredRecords.length > rowsPerPage && (
                 <div className={styles.pagination}>
-                  <button
-                    className={`${styles.paginationBtn} ${
-                      currentPage === 1 ? styles.disabled : ""
-                    }`}
-                    onClick={() => handlePageChange(currentPage - 1)}
-                    disabled={currentPage === 1}
-                  >
-                    Previous
-                  </button>
-                  <span className={styles.pageInfo}>
-                    Page {currentPage} of {totalPages}
-                  </span>
-                  <button
-                    className={`${styles.paginationBtn} ${
-                      currentPage === totalPages ? styles.disabled : ""
-                    }`}
-                    onClick={() => handlePageChange(currentPage + 1)}
-                    disabled={currentPage === totalPages}
-                  >
-                    Next
-                  </button>
+                  <div className={styles.paginationInfo}>
+                    Showing {startIndex + 1}-
+                    {Math.min(startIndex + rowsPerPage, filteredRecords.length)}{" "}
+                    of {filteredRecords.length} records
+                  </div>
+                  <div className={styles.paginationControls}>
+                    <button
+                      className={`${styles.paginationBtn} ${
+                        currentPage === 1 ? styles.disabled : ""
+                      }`}
+                      onClick={() => handlePageChange(currentPage - 1)}
+                      disabled={currentPage === 1}
+                    >
+                      ← Previous
+                    </button>
+                    <span className={styles.pageInfo}>
+                      Page {currentPage} of {totalPages}
+                    </span>
+                    <button
+                      className={`${styles.paginationBtn} ${
+                        currentPage === totalPages ? styles.disabled : ""
+                      }`}
+                      onClick={() => handlePageChange(currentPage + 1)}
+                      disabled={currentPage === totalPages}
+                    >
+                      Next →
+                    </button>
+                  </div>
                 </div>
               )}
             </>
           )}
         </div>
 
-        {/* Instructions */}
-        <div className={styles.instructions}>
-          <h3>How This System Works:</h3>
-          <ol>
-            <li>
-              <strong>Clearance Request:</strong> Initiate clearance in
-              Clearance System
-            </li>
-            <li>
-              <strong>Approval:</strong> When clearance is approved (status
-              becomes "Completed")
-            </li>
-            <li>
-              <strong>Auto-Update:</strong> Personnel status automatically
-              changes (Retired/Resigned)
-            </li>
-            <li>
-              <strong>Appearance:</strong> Personnel appears here automatically
-            </li>
-            <li>
-              <strong>Reactivate:</strong> Use "Reactivate" button to make
-              personnel Active again
-            </li>
-          </ol>
+        {/* Quick Instructions */}
+        <div className={styles.quickInstructions}>
+          <h3>💡 Quick Actions:</h3>
+          <div className={styles.instructionItems}>
+            <div className={styles.instructionItem}>
+              <span className={styles.instructionIcon}>↻</span>
+              <span>
+                <strong>Reactivate:</strong> Click ↻ to restore personnel to
+                Active status
+              </span>
+            </div>
+            <div className={styles.instructionItem}>
+              <span className={styles.instructionIcon}>×</span>
+              <span>
+                <strong>Delete:</strong> Click × to permanently remove records
+              </span>
+            </div>
+            <div className={styles.instructionItem}>
+              <span className={styles.instructionIcon}>📱</span>
+              <span>
+                <strong>View:</strong> Toggle between compact and detailed views
+              </span>
+            </div>
+          </div>
         </div>
       </div>
     </div>

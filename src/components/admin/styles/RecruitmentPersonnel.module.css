@@ -520,7 +520,8 @@ h1 {
 }
 
 .tableBorder {
-  width: 101%;
+  width: 100%;
+  max-width: auto;
   overflow-x: auto; /* Enable horizontal scrolling */
   overflow-y: hidden;
   -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
@@ -1157,37 +1158,46 @@ h1 {
   display: flex;
   justify-content: space-between;
   align-items: center;
- 
+  margin: 20px 0 10px 0;
   font-size: 17px;
-  border-left: 4px solid #085CB1;
+  border-left: 4px solid #085cb1;
   color: black;
+  padding-left: 10px;
 
  
 }
 
 .tableBorder {
   width: 101%;
-  right: 5px;
+  max-width: auto;
+  overflow-x: auto; /* Enable horizontal scrolling */
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+  border-radius: 12px;
+  box-shadow: 0 5px 4px rgba(16, 95, 175, 0.597);
+  background: #fff;
+  position: relative;
 }
 
 .table {
-  width: 1200px; /* Change from fixed width to auto */
-
+  width: 100%!important; /* Change from 98.5% to auto */
+max-width: auto;
   padding: 20px;
   border-collapse: separate;
   border-spacing: 0;
   font-size: 14px;
-  margin-left: 0px; /* Remove negative margin */
+  margin-left: 0; /* Remove negative margin */
   background: #fff;
   border-radius: 12px;
   text-align: center;
-  min-width: 1250px; /* Increase to accommodate all columns */
+  min-width: 1980px; /* Increase to accommodate extra column */
   box-shadow: none; /* Remove shadow since container has it */
 }
 
 .table thead {
   position: sticky;
   top: 0;
+    max-width: auto;
   z-index: 1;
 }
 
@@ -1277,14 +1287,14 @@ h1 {
 .table tr:nth-child(5) {
   min-width: 290px;
   max-width: 290px;
-  width: 100%;
+  width: auto;
 
 }
 
 .table th:nth-child(6), /* Application Date */
 .table td:nth-child(6) {
-  min-width: 120px;
-  max-width: 150px;
+  min-width: 220px;
+  max-width: 250px;
 }
 
 .table th:nth-child(7), /* Stage */

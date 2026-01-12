@@ -1,25 +1,136 @@
-// components/LeaveMeter.jsx - CORRECTED VERSION
-import React, { useState, useEffect } from "react";
+// components/LeaveMeter.jsx - PHILIPPINE TIME VERSION
+import React, { useState, useEffect, useRef } from "react";
 import { supabase } from "../../../lib/supabaseClient.js";
 import { useAuth } from "../../AuthContext.jsx";
 import styles from "../styles/LeaveMeter.module.css";
+
+// Helper function to get current time in Philippine Time (UTC+8)
+const getPHTime = () => {
+  const now = new Date();
+  // Convert to Philippine Time (UTC+8)
+  const phTime = new Date(now.getTime() + 8 * 60 * 60 * 1000);
+  return phTime;
+};
+
+// Helper function to get current year in PH Time
+const getPHYear = () => {
+  return getPHTime().getUTCFullYear();
+};
 
 const LeaveMeter = () => {
   const { user } = useAuth();
   const [leaveData, setLeaveData] = useState({
     vacation: { current: 15, initial: 15, used: 0 },
     sick: { current: 15, initial: 15, used: 0 },
-    emergency: { current: 5, initial: 5, used: 0 },
   });
   const [loading, setLoading] = useState(true);
-  const [currentYear] = useState(new Date().getFullYear());
+  const [currentYear, setCurrentYear] = useState(getPHYear());
   const [employeeId, setEmployeeId] = useState(null);
+  const [lastResetYear, setLastResetYear] = useState(getPHYear());
+  const yearCheckRef = useRef(null);
+
+  // Function to check if we need to create a new year's record
+  const checkAndCreateNewYearRecord = async (employeeId) => {
+    try {
+      // Check if record for current year exists
+      const { data: existingRecord, error: checkError } = await supabase
+        .from("leave_balances")
+        .select("*")
+        .eq("personnel_id", employeeId)
+        .eq("year", currentYear)
+        .single();
+
+      // If no record exists for current year, check for previous year
+      if (checkError && checkError.code === "PGRST116") {
+        // Get previous year's data to carry over any unused leave (if policy allows)
+        const { data: prevYearRecord } = await supabase
+          .from("leave_balances")
+          .select("*")
+          .eq("personnel_id", employeeId)
+          .eq("year", currentYear - 1)
+          .single();
+
+        // Default values
+        let vacationBalance = 15;
+        let sickBalance = 15;
+
+        // Your business logic for carry-over:
+        // Option 1: Reset to defaults (comment out the carry-over section below)
+        // Option 2: Carry over unused leave up to a limit (example: max 5 days)
+        if (prevYearRecord) {
+          // Example: Carry over up to 5 days of unused vacation
+          const carryOverVacation = Math.min(
+            parseFloat(prevYearRecord.vacation_balance) || 0,
+            5
+          );
+          vacationBalance = 15 + carryOverVacation;
+
+          // Example: Carry over up to 5 days of unused sick leave
+          const carryOverSick = Math.min(
+            parseFloat(prevYearRecord.sick_balance) || 0,
+            5
+          );
+          sickBalance = 15 + carryOverSick;
+        }
+
+        // Create new record for current year
+        const { error: createError } = await supabase
+          .from("leave_balances")
+          .insert({
+            personnel_id: employeeId,
+            year: currentYear,
+            vacation_balance: vacationBalance,
+            initial_vacation_credits: vacationBalance,
+            vacation_used: 0,
+            sick_balance: sickBalance,
+            initial_sick_credits: sickBalance,
+            sick_used: 0,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          });
+
+        if (createError) throw createError;
+
+        console.log(
+          `Created new leave balance record for year ${currentYear} (PH Time)`
+        );
+        setLastResetYear(currentYear);
+      }
+
+      return true;
+    } catch (error) {
+      console.error("Error creating new year record:", error);
+      return false;
+    }
+  };
+
+  // Function to check if year has changed in PH Time
+  const checkYearChange = () => {
+    const newYear = getPHYear();
+
+    if (newYear !== currentYear) {
+      console.log(`Year changed from ${currentYear} to ${newYear} (PH Time)`);
+      setCurrentYear(newYear);
+      if (employeeId) {
+        // Trigger reload with new year
+        loadLeaveData();
+      }
+    }
+  };
+
+  // Function to get current PH Time as formatted string
+  const getPHTimeString = () => {
+    const phTime = getPHTime();
+    return phTime.toUTCString().replace("GMT", "PH Time");
+  };
 
   useEffect(() => {
     if (user?.username) {
       loadLeaveData();
 
-      // Subscribe to real-time changes for this employee
+      // Set up interval to check for year change (check more frequently around midnight)
+      yearCheckRef.current = setInterval(checkYearChange, 60000); // Check every minute for year change
+
       if (employeeId) {
         const subscription = supabase
           .channel(`leave-balances-${employeeId}`)
@@ -32,7 +143,6 @@ const LeaveMeter = () => {
               filter: `personnel_id=eq.${employeeId}`,
             },
             () => {
-              console.log("Balance updated, refreshing...");
               loadLeaveData();
             }
           )
@@ -40,58 +150,50 @@ const LeaveMeter = () => {
 
         return () => {
           supabase.removeChannel(subscription);
+          if (yearCheckRef.current) {
+            clearInterval(yearCheckRef.current);
+          }
         };
       }
     }
+
+    return () => {
+      if (yearCheckRef.current) {
+        clearInterval(yearCheckRef.current);
+      }
+    };
   }, [user, employeeId]);
 
   const loadLeaveData = async () => {
     try {
       setLoading(true);
-      console.log("🔄 Loading leave data for user:", user.username);
 
-      // 1. Get employee ID
       const { data: employeeData, error: employeeError } = await supabase
         .from("personnel")
-        .select("id, first_name, last_name, rank, date_hired")
+        .select("id")
         .eq("username", user.username)
         .single();
 
-      if (employeeError) {
-        console.error("Employee error:", employeeError);
-        throw employeeError;
-      }
+      if (employeeError) throw employeeError;
 
-      setEmployeeId(employeeData.id);
-      console.log("Employee ID:", employeeData.id);
+      const employeeId = employeeData.id;
+      setEmployeeId(employeeId);
 
-      // 2. Get current year leave balance
+      // Check and create new year record if needed
+      await checkAndCreateNewYearRecord(employeeId);
+
       const { data: balanceRecord, error: balanceError } = await supabase
         .from("leave_balances")
         .select("*")
-        .eq("personnel_id", employeeData.id)
+        .eq("personnel_id", employeeId)
         .eq("year", currentYear)
         .single();
 
-      console.log("Balance record:", balanceRecord);
-
       if (balanceError && balanceError.code !== "PGRST116") {
-        console.error("Balance error:", balanceError);
-        // If no balance record exists, create one with defaults
-        if (balanceError.code === "PGRST116") {
-          console.log("No balance record found, using defaults");
-          setLeaveData({
-            vacation: { current: 15, initial: 15, used: 0 },
-            sick: { current: 15, initial: 15, used: 0 },
-            emergency: { current: 5, initial: 5, used: 0 },
-          });
-          setLoading(false);
-          return;
-        }
+        throw balanceError;
       }
 
       if (balanceRecord) {
-        // Use actual database balances
         const vacationCurrent = parseFloat(balanceRecord.vacation_balance) || 0;
         const vacationInitial =
           parseFloat(balanceRecord.initial_vacation_credits) || 15;
@@ -101,26 +203,6 @@ const LeaveMeter = () => {
         const sickInitial =
           parseFloat(balanceRecord.initial_sick_credits) || 15;
         const sickUsed = parseFloat(balanceRecord.sick_used) || 0;
-
-        const emergencyCurrent =
-          parseFloat(balanceRecord.emergency_balance) || 0;
-        const emergencyInitial =
-          parseFloat(balanceRecord.initial_emergency_credits) || 5;
-        const emergencyUsed = parseFloat(balanceRecord.emergency_used) || 0;
-
-        console.log("Parsed balances:", {
-          vacation: {
-            current: vacationCurrent,
-            initial: vacationInitial,
-            used: vacationUsed,
-          },
-          sick: { current: sickCurrent, initial: sickInitial, used: sickUsed },
-          emergency: {
-            current: emergencyCurrent,
-            initial: emergencyInitial,
-            used: emergencyUsed,
-          },
-        });
 
         setLeaveData({
           vacation: {
@@ -133,44 +215,35 @@ const LeaveMeter = () => {
             initial: sickInitial,
             used: sickUsed,
           },
-          emergency: {
-            current: emergencyCurrent,
-            initial: emergencyInitial,
-            used: emergencyUsed,
-          },
         });
       } else {
-        // Use defaults if no balance record
-        console.log("Using default balances");
+        // Default values if no record exists
         setLeaveData({
           vacation: { current: 15, initial: 15, used: 0 },
           sick: { current: 15, initial: 15, used: 0 },
-          emergency: { current: 5, initial: 5, used: 0 },
         });
       }
     } catch (error) {
-      console.error("💥 Error loading leave data:", error);
-      // Set defaults on error
+      console.error("Error loading leave data:", error);
       setLeaveData({
         vacation: { current: 15, initial: 15, used: 0 },
         sick: { current: 15, initial: 15, used: 0 },
-        emergency: { current: 5, initial: 5, used: 0 },
       });
     } finally {
       setLoading(false);
     }
   };
 
-  const calculatePercentage = (current, max) => {
-    if (max <= 0) return 0;
-    return Math.min(100, (current / max) * 100);
+  const calculatePercentage = (used, initial) => {
+    if (initial <= 0) return 0;
+    return Math.min(100, (used / initial) * 100);
   };
 
-  const getMeterColor = (percentage) => {
-    if (percentage >= 75) return "#10b981"; // Green
-    if (percentage >= 50) return "#f59e0b"; // Yellow
-    if (percentage >= 25) return "#f97316"; // Orange
-    return "#ef4444"; // Red
+  const getMeterColor = (percentageUsed) => {
+    if (percentageUsed <= 25) return "#10b981";
+    if (percentageUsed <= 50) return "#f59e0b";
+    if (percentageUsed <= 75) return "#f97316";
+    return "#ef4444";
   };
 
   const formatNumber = (num) => {
@@ -181,22 +254,18 @@ const LeaveMeter = () => {
     return (
       <div className={styles.meterLoading}>
         <div className={styles.loadingSpinner}></div>
-        <p>Loading leave data...</p>
+        <p>Loading leave data for {currentYear} (PH Time)...</p>
       </div>
     );
   }
 
   const vacationPercent = calculatePercentage(
-    leaveData.vacation.current,
+    leaveData.vacation.used,
     leaveData.vacation.initial
   );
   const sickPercent = calculatePercentage(
-    leaveData.sick.current,
+    leaveData.sick.used,
     leaveData.sick.initial
-  );
-  const emergencyPercent = calculatePercentage(
-    leaveData.emergency.current,
-    leaveData.emergency.initial
   );
 
   return (
@@ -204,27 +273,27 @@ const LeaveMeter = () => {
       <div className={styles.meterHeader}>
         <h2>
           <i className="fas fa-calendar-alt"></i> Leave Credits {currentYear}
+          {currentYear !== lastResetYear && (
+            <span className={styles.newYearBadge}>New Year! 🎉</span>
+          )}
         </h2>
-        <button
-          onClick={loadLeaveData}
-          className={styles.refreshButton}
-          disabled={loading}
-        >
-          {loading ? "🔄 Loading..." : "🔄 Refresh"}
-        </button>
+        <div className={styles.yearInfo}>
+          <small>
+            Data for calendar year {currentYear} • Philippine Time (UTC+8)
+          </small>
+          <br />
+          <small className={styles.timeInfo}>
+            Current PH Time: {getPHTimeString()}
+          </small>
+        </div>
       </div>
 
-      {/* Info Banner */}
       <div className={styles.infoBanner}>
-        <span
-          style={{ color: "#0369a1", fontSize: "1.2rem", marginRight: "10px" }}
-        >
-          ℹ️
-        </span>
+        <span style={{ fontSize: "1.2rem", marginRight: "10px" }}>ℹ️</span>
         <div>
-          <strong>How it works:</strong> The meter shows your current available
-          leave balance. Balances update automatically when monthly accrual runs
-          or when leave requests are approved.
+          <strong>Meter Reading:</strong> Shows percentage of leave USED. Lower
+          percentage = more leave available. Reset annually on January 1st
+          (Philippine Time).
         </div>
       </div>
 
@@ -235,24 +304,31 @@ const LeaveMeter = () => {
             <div className={styles.meterIcon}>
               <span className={styles.emojiIcon}>🏖️</span>
             </div>
-            <h3>🏖️ Vacation Leave</h3>
+            <h3>Vacation Leave</h3>
           </div>
 
           <div className={styles.meterWrapper}>
             <div className={styles.meterLabels}>
-              <span className={styles.meterLabel}>
-                <span className={styles.emojiSmall}>🎯</span> Available
-              </span>
-              <span className={styles.meterValue}>
-                {formatNumber(leaveData.vacation.current)} days
-              </span>
-              <span className={styles.meterLabel}>
-                <span className={styles.emojiSmall}>📊</span> Total
-              </span>
-              <span className={styles.meterValue}>
-                {formatNumber(leaveData.vacation.initial)} days
-              </span>
+              <div className={styles.meterLabelGroup}>
+                <span className={styles.meterLabel}>Total</span>
+                <span className={styles.meterValue}>
+                  {formatNumber(leaveData.vacation.initial)} days
+                </span>
+              </div>
+              <div className={styles.meterLabelGroup}>
+                <span className={styles.meterLabel}>Used</span>
+                <span className={styles.meterValue}>
+                  {formatNumber(leaveData.vacation.used)} days
+                </span>
+              </div>
+              <div className={styles.meterLabelGroup}>
+                <span className={styles.meterLabel}>Available</span>
+                <span className={styles.meterValue}>
+                  {formatNumber(leaveData.vacation.current)} days
+                </span>
+              </div>
             </div>
+
             <div className={styles.meterContainer}>
               <div className={styles.meterTrack}>
                 <div
@@ -261,29 +337,35 @@ const LeaveMeter = () => {
                     width: `${vacationPercent}%`,
                     backgroundColor: getMeterColor(vacationPercent),
                   }}
-                ></div>
+                >
+                  <span className={styles.meterFillText}>
+                    {vacationPercent.toFixed(1)}%
+                  </span>
+                </div>
               </div>
-              <div className={styles.meterPercentage}>
-                {vacationPercent.toFixed(1)}%
-              </div>
+              <div className={styles.meterEndMarker}>100%</div>
+            </div>
+
+            <div className={styles.meterLegend}>
+              <span>0%</span>
+              <span>25%</span>
+              <span>50%</span>
+              <span>75%</span>
+              <span>100%</span>
             </div>
           </div>
 
           <div className={styles.meterStats}>
             <div className={styles.statItem}>
-              <span className={styles.statLabel}>
-                <span className={styles.emojiSmall}>📝</span> Used:
-              </span>
+              <span className={styles.statLabel}>Available:</span>
               <span className={styles.statValue}>
-                {formatNumber(leaveData.vacation.used)} days
+                {formatNumber(leaveData.vacation.current)} days
               </span>
             </div>
             <div className={styles.statItem}>
-              <span className={styles.statLabel}>
-                <span className={styles.emojiSmall}>📈</span> Remaining:
-              </span>
+              <span className={styles.statLabel}>Used:</span>
               <span className={styles.statValue}>
-                {formatNumber(leaveData.vacation.current)} days
+                {formatNumber(leaveData.vacation.used)} days
               </span>
             </div>
           </div>
@@ -295,24 +377,31 @@ const LeaveMeter = () => {
             <div className={styles.meterIcon}>
               <span className={styles.emojiIcon}>🤒</span>
             </div>
-            <h3>🤒 Sick Leave</h3>
+            <h3>Sick Leave</h3>
           </div>
 
           <div className={styles.meterWrapper}>
             <div className={styles.meterLabels}>
-              <span className={styles.meterLabel}>
-                <span className={styles.emojiSmall}>🎯</span> Available
-              </span>
-              <span className={styles.meterValue}>
-                {formatNumber(leaveData.sick.current)} days
-              </span>
-              <span className={styles.meterLabel}>
-                <span className={styles.emojiSmall}>📊</span> Total
-              </span>
-              <span className={styles.meterValue}>
-                {formatNumber(leaveData.sick.initial)} days
-              </span>
+              <div className={styles.meterLabelGroup}>
+                <span className={styles.meterLabel}>Total</span>
+                <span className={styles.meterValue}>
+                  {formatNumber(leaveData.sick.initial)} days
+                </span>
+              </div>
+              <div className={styles.meterLabelGroup}>
+                <span className={styles.meterLabel}>Used</span>
+                <span className={styles.meterValue}>
+                  {formatNumber(leaveData.sick.used)} days
+                </span>
+              </div>
+              <div className={styles.meterLabelGroup}>
+                <span className={styles.meterLabel}>Available</span>
+                <span className={styles.meterValue}>
+                  {formatNumber(leaveData.sick.current)} days
+                </span>
+              </div>
             </div>
+
             <div className={styles.meterContainer}>
               <div className={styles.meterTrack}>
                 <div
@@ -321,125 +410,37 @@ const LeaveMeter = () => {
                     width: `${sickPercent}%`,
                     backgroundColor: getMeterColor(sickPercent),
                   }}
-                ></div>
+                >
+                  <span className={styles.meterFillText}>
+                    {sickPercent.toFixed(1)}%
+                  </span>
+                </div>
               </div>
-              <div className={styles.meterPercentage}>
-                {sickPercent.toFixed(1)}%
-              </div>
+              <div className={styles.meterEndMarker}>100%</div>
+            </div>
+
+            <div className={styles.meterLegend}>
+              <span>0%</span>
+              <span>25%</span>
+              <span>50%</span>
+              <span>75%</span>
+              <span>100%</span>
             </div>
           </div>
 
           <div className={styles.meterStats}>
             <div className={styles.statItem}>
-              <span className={styles.statLabel}>
-                <span className={styles.emojiSmall}>📝</span> Used:
-              </span>
-              <span className={styles.statValue}>
-                {formatNumber(leaveData.sick.used)} days
-              </span>
-            </div>
-            <div className={styles.statItem}>
-              <span className={styles.statLabel}>
-                <span className={styles.emojiSmall}>📈</span> Remaining:
-              </span>
+              <span className={styles.statLabel}>Available:</span>
               <span className={styles.statValue}>
                 {formatNumber(leaveData.sick.current)} days
               </span>
             </div>
-          </div>
-        </div>
-
-        {/* Emergency Leave Meter */}
-        <div className={styles.meterCard}>
-          <div className={styles.meterCardHeader}>
-            <div className={styles.meterIcon}>
-              <span className={styles.emojiIcon}>🚨</span>
-            </div>
-            <h3>🚨 Emergency Leave</h3>
-          </div>
-
-          <div className={styles.meterWrapper}>
-            <div className={styles.meterLabels}>
-              <span className={styles.meterLabel}>
-                <span className={styles.emojiSmall}>🎯</span> Available
-              </span>
-              <span className={styles.meterValue}>
-                {formatNumber(leaveData.emergency.current)} days
-              </span>
-              <span className={styles.meterLabel}>
-                <span className={styles.emojiSmall}>📊</span> Total
-              </span>
-              <span className={styles.meterValue}>
-                {formatNumber(leaveData.emergency.initial)} days
-              </span>
-            </div>
-            <div className={styles.meterContainer}>
-              <div className={styles.meterTrack}>
-                <div
-                  className={styles.meterFill}
-                  style={{
-                    width: `${emergencyPercent}%`,
-                    backgroundColor: getMeterColor(emergencyPercent),
-                  }}
-                ></div>
-              </div>
-              <div className={styles.meterPercentage}>
-                {emergencyPercent.toFixed(1)}%
-              </div>
-            </div>
-          </div>
-
-          <div className={styles.meterStats}>
             <div className={styles.statItem}>
-              <span className={styles.statLabel}>
-                <span className={styles.emojiSmall}>📝</span> Used:
-              </span>
+              <span className={styles.statLabel}>Used:</span>
               <span className={styles.statValue}>
-                {formatNumber(leaveData.emergency.used)} days
+                {formatNumber(leaveData.sick.used)} days
               </span>
             </div>
-            <div className={styles.statItem}>
-              <span className={styles.statLabel}>
-                <span className={styles.emojiSmall}>📈</span> Remaining:
-              </span>
-              <span className={styles.statValue}>
-                {formatNumber(leaveData.emergency.current)} days
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Summary Footer */}
-      <div className={styles.meterFooter}>
-        <div className={styles.summaryCard}>
-          <div className={styles.emojiLarge}>📊</div>
-          <div>
-            <h4>Total Available</h4>
-            <p className={styles.totalDays}>
-              {formatNumber(
-                leaveData.vacation.current +
-                  leaveData.sick.current +
-                  leaveData.emergency.current
-              )}{" "}
-              days
-            </p>
-            <small>All leave types combined</small>
-          </div>
-        </div>
-        <div className={styles.summaryCard}>
-          <div className={styles.emojiLarge}>📝</div>
-          <div>
-            <h4>Total Used</h4>
-            <p className={styles.usedDays}>
-              {formatNumber(
-                leaveData.vacation.used +
-                  leaveData.sick.used +
-                  leaveData.emergency.used
-              )}{" "}
-              days
-            </p>
-            <small>Approved leaves this year</small>
           </div>
         </div>
       </div>

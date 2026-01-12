@@ -3186,3 +3186,107 @@ label[for="leaveStatusFilter"] {
     grid-template-columns: 1fr;
   }
 }
+
+/* Add to LeaveManagement.module.css */
+
+.disabledOption {
+  opacity: 0.5;
+  pointer-events: none;
+  cursor: not-allowed;
+}
+
+.disabledReason {
+  background: #ffeaea;
+  border-left: 4px solid #ff6b6b;
+  padding: 8px 12px;
+  margin-top: 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #d32f2f;
+}
+
+.severeWarningCard {
+  background: #fff3e0;
+  border: 2px solid #ff9800;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.balanceSummary {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.balanceRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.balanceDivider {
+  height: 1px;
+  background: #dee2e6;
+  margin: 12px 0;
+}
+
+.balanceValue {
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.highlighted {
+  color: #27ae60;
+  font-size: 1.1em;
+}
+
+.warningText {
+  color: #e74c3c;
+  font-weight: 500;
+}
+
+.successText {
+  color: #27ae60;
+  font-weight: 500;
+}
+
+.optionBadgeDanger {
+  background: #ff6b6b;
+  color: white;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  margin-left: 8px;
+}
+
+.minimumBalanceNote {
+  background: #e8f5e9;
+  border: 1px solid #a5d6a7;
+  border-radius: 4px;
+  padding: 8px;
+  margin-top: 12px;
+  text-align: center;
+  color: #2e7d32;
+  font-weight: 500;
+}
+
+.finalBalance {
+  color: #27ae60;
+  font-size: 1.1em;
+}
+
+.usableBalanceDisplay {
+  font-size: 12px;
+  color: #666;
+  background: #f0f7ff;
+  padding: 4px 8px;
+  border-radius: 4px;
+}

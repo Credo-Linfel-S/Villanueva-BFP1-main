@@ -113,13 +113,14 @@ const Sidebar = () => {
       icon: "🧑‍🤝‍🧑",
       items: [
         { href: "/promotion", icon: "📈", text: "Qualified for Promotion" },
+        { href: "/placement", icon: "📍", text: "Personnel Designation" },
+        { href: "/trainings", icon: "🎓", text: "Personnel Trainings" },
         {
           href: "/recruitmentPersonnel",
           icon: "👥",
           text: "Recruited Applicants",
         },
-        { href: "/trainings", icon: "🎓", text: "Personnel Trainings" },
-        { href: "/placement", icon: "📍", text: "Personnel Designation" },
+
         { href: "/history", icon: "⏳", text: "Archived Personnel Accounts" },
       ],
     },
@@ -222,11 +223,12 @@ const Sidebar = () => {
             src={logo}
             alt="Logo"
             style={{
-              height: "30px",
-              width: "30px",
+              height: "40px",
+              width: "40px",
               objectFit: "cover",
               borderRadius: "50%",
               marginRight: "10px",
+              
             }}
           />
           <span style={{ fontWeight: "800" }}>Villanueva Fire Station</span>

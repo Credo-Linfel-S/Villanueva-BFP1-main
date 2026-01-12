@@ -102,39 +102,177 @@
 
 .meterContainer {
   position: relative;
-  height: 24px;
+  height: 32px;
+  margin: 12px 0;
+}
+.meterTrack {
+  width: 100%;
+  height: 100%;
+  background: #e2e8f0;
+  border-radius: 16px;
+  overflow: hidden;
+  position: relative;
+}
+
+
+.meterFill {
+  height: 100%;
+  border-radius: 16px;
+  transition: width 0.5s ease;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 10px;
+  box-sizing: border-box;
+  min-width: 50px; /* Ensures text is visible even at 0% */
+}
+.meterFillText {
+  color: white;
+  font-weight: bold;
+  font-size: 0.85rem;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
+  white-space: nowrap;
+}.meterFill.lowPercentage {
+  justify-content: flex-start;
+  padding-left: 10px;
+  padding-right: 0;
+}
+
+.meterEndMarker {
+  position: absolute;
+  right: 0;
+  top: -20px;
+  font-size: 0.75rem;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.meterLegend {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+  font-size: 0.7rem;
+  color: #64748b;
+}
+
+.meterLegend span {
+  position: relative;
+}
+
+.meterLegend span:nth-child(2)::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: -8px;
+  width: 1px;
+  height: 4px;
+  background: #cbd5e1;
+}
+
+.meterLegend span:nth-child(3)::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: -8px;
+  width: 1px;
+  height: 4px;
+  background: #cbd5e1;
+}
+
+.meterLegend span:nth-child(4)::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: -8px;
+  width: 1px;
+  height: 4px;
+  background: #cbd5e1;
+}
+
+/* Meter Labels Layout */
+.meterLabels {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
   margin-bottom: 8px;
 }
 
-.meterTrack {
-  position: absolute;
-  top: 50%;
-  left: 0;
-  right: 0;
-  height: 8px;
-  background: #e5e7eb;
-  border-radius: 4px;
-  transform: translateY(-50%);
-  overflow: hidden;
+.meterLabelGroup {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: #f8fafc;
+  padding: 6px;
+  border-radius: 6px;
 }
 
-.meterFill {
-  position: absolute;
-  top: 0;
-  left: 0;
-  height: 100%;
-  border-radius: 4px;
-  transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+.meterLabel {
+  font-size: 0.75rem;
+  color: #64748b;
+  margin-bottom: 2px;
 }
 
+.meterValue {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+/* Meter Stats */
+.meterStats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.statItem {
+  background: #f8fafc;
+  padding: 8px;
+  border-radius: 6px;
+  text-align: center;
+}
+
+.statLabel {
+  display: block;
+  font-size: 0.8rem;
+  color: #64748b;
+  margin-bottom: 4px;
+}
+
+.statValue {
+  display: block;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .meterLabels {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+  
+  .meterLabelGroup {
+    flex-direction: row;
+    justify-content: space-between;
+  }
+  
+  .meterFillText {
+    font-size: 0.75rem;
+  }
+}
 .meterPercentage {
   position: absolute;
   right: 0;
   top: 50%;
   transform: translateY(-50%);
-  background: white;
-  padding: 4px 12px;
-  border-radius: 20px;
+  background: rgb(83, 166, 243);
+  padding: 1px 10px;
+  border-radius: 50px;
+  width: 70px;
   font-weight: 700;
   font-size: 0.9rem;
   color: #1f2937;
@@ -695,4 +833,106 @@
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
+}
+
+/* Add these styles */
+
+/* Info Banner Update */
+.infoBanner {
+  display: flex;
+  align-items: flex-start;
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 20px;
+  font-size: 0.9rem;
+}
+
+/* Meter Labels Layout */
+.meterLabels {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+.meterLabel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+.meterValue {
+  font-weight: 600;
+  color: #1e293b;
+  font-size: 0.9rem;
+}
+
+/* Meter Percentage Text */
+.meterPercentage {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  font-weight: bold;
+  font-size: 0.9rem;
+  color: white;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
+  z-index: 2;
+}
+
+/* Available days color */
+.availableDays {
+  color: #10b981 !important;
+  font-size: 1.4rem;
+  font-weight: bold;
+  margin: 0;
+}
+
+/* Summary Card Layout */
+.meterFooter {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.summaryCard {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  background: white;
+  border-radius: 10px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+
+.newYearBadge {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-size: 0.7rem;
+  margin-left: 10px;
+  vertical-align: middle;
+  font-weight: bold;
+  animation: pulse 2s infinite;
+}
+
+.yearInfo {
+  margin-top: 5px;
+  color: #666;
+  font-size: 0.9rem;
+}
+
+@keyframes pulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.7; }
+  100% { opacity: 1; }
 }

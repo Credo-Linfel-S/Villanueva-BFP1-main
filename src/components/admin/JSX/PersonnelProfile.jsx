@@ -502,7 +502,7 @@ const PersonnelProfile = () => {
     }));
   };
 
-  // Get field value for filtering
+  // Get field value for filtering - UPDATED
   const getFieldValue = (personnel, field) => {
     switch (field) {
       case "firstName":
@@ -515,8 +515,8 @@ const PersonnelProfile = () => {
         return personnel.designation || "";
       case "dateHired":
         return personnel.date_hired || "";
-      case "Retirement":
-        return personnel.retirement_date || "";
+      case "status": // Changed from "Retirement"
+        return personnel.status || "Active"; // Changed from retirement_date to status
       default:
         return "";
     }
@@ -546,7 +546,7 @@ const PersonnelProfile = () => {
     setCurrentPage(1);
   };
 
-  // Highlight search text
+  // Highlight search text - UPDATED
   const highlightText = (text, fieldType) => {
     if (!searchQuery.trim() || !text) return text;
 
@@ -562,8 +562,8 @@ const PersonnelProfile = () => {
           return fieldType === "designation";
         case "dateHired":
           return fieldType === "date_hired";
-        case "Retirement":
-          return fieldType === "retirement_date";
+        case "status": // Changed from "Retirement"
+          return fieldType === "status"; // Changed from "retirement_date"
         default:
           return false;
       }
@@ -756,7 +756,8 @@ const PersonnelProfile = () => {
             <option value="rank">Rank</option>
             <option value="designation">Designation</option>
             <option value="dateHired">Date Hired</option>
-            <option value="Retirement">Retirement</option>
+            <option value="status">Status</option>{" "}
+            {/* Changed from Retirement to Status */}
           </select>
           <input
             type="text"
@@ -1198,7 +1199,6 @@ const PreviewSidebar = ({ document, onClose, formatTimestamp }) => {
   );
 };
 
-
 const PersonnelCard = ({
   personnel,
   index,
@@ -1231,7 +1231,7 @@ const PersonnelCard = ({
     setSelectedCategory(e.target.value);
   };
 
-  // Calculate if name needs carousel - THIS SHOULD BE INSIDE PersonnelCard
+  // Calculate if name needs carousel
   const fullName = `${personnel.first_name || ""} ${
     personnel.last_name || ""
   }`.trim();
@@ -1253,11 +1253,32 @@ const PersonnelCard = ({
     formatDate(personnel.date_hired),
     "date_hired"
   );
-  const retirementDate = highlightText(
-    formatDate(personnel.retirement_date),
-    "retirement_date"
-  );
+  // Changed from retirementDate to status
+  const status = highlightText(personnel.status || "Active", "status");
   const birthDate = formatDate(personnel.birth_date);
+
+  // Function to get status style class
+  // Function to get status style class
+  const getStatusStyle = (status) => {
+    const statusLower = (status || "Active").toLowerCase();
+    switch (statusLower) {
+      case "active":
+        return styles.statusActive;
+      case "inactive":
+        return styles.statusInactive;
+      case "retired":
+        return styles.statusRetired;
+      case "transferred": // Changed from "awol"
+        return styles.statusTransferred; // Changed from styles.statusAWOL
+      case "resigned":
+        return styles.statusResigned;
+      default:
+        return styles.statusActive;
+    }
+  };
+
+  // Get the raw status text (without highlighting) for class determination
+  const rawStatus = personnel.status || "Active";
 
   const pendingFiles = pendingUploads[index];
   const hasPendingFiles = pendingFiles && pendingFiles.length > 0;
@@ -1394,8 +1415,11 @@ const PersonnelCard = ({
           <span dangerouslySetInnerHTML={{ __html: dateHired }} />
         </div>
         <div>
-          <strong>Retirement:</strong>{" "}
-          <span dangerouslySetInnerHTML={{ __html: retirementDate }} />
+          <strong>Status:</strong> {/* Added status badge with styling */}
+          <span
+            className={`${styles.statusBadge} ${getStatusStyle(rawStatus)}`}
+            dangerouslySetInnerHTML={{ __html: status }}
+          />
         </div>
       </div>
 

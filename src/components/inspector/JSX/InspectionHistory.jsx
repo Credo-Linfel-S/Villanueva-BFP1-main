@@ -24,6 +24,9 @@ import {
   Trash2,
   Eye,
   AlertTriangle,
+  DollarSign,
+  ShieldAlert,
+  ShieldCheck,
 } from "lucide-react";
 
 // Import the BFPPreloader component
@@ -45,6 +48,7 @@ const InspectionHistory = () => {
   const [selectedYear, setSelectedYear] = useState("");
   const [selectedPersonnel, setSelectedPersonnel] = useState("");
   const [showUnassignedOnly, setShowUnassignedOnly] = useState(false);
+  const [showAccountabilityOnly, setShowAccountabilityOnly] = useState(false);
 
   const [dateRange, setDateRange] = useState({ start: "", end: "" });
   const [exportLoading, setExportLoading] = useState(false);
@@ -56,8 +60,239 @@ const InspectionHistory = () => {
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [inspectionToDelete, setInspectionToDelete] = useState(null);
+  const [accountabilityStatuses, setAccountabilityStatuses] = useState({});
 
-  const itemsPerPage = 20;
+  const itemsPerPage = 10;
+
+  // Function to check and add accountability for existing clearance personnel
+  const addAccountabilityForClearancePersonnel = async (inspectionData) => {
+    try {
+      if (!inspectionData.assigned_personnel_id) {
+        return;
+      }
+
+      // Check if personnel already has accountability with clearance
+      const { data: existingAccountability, error: checkError } = await supabase
+        .from("personnel_equipment_accountability_table")
+        .select("*")
+        .eq("personnel_id", inspectionData.assigned_personnel_id)
+        .not("clearance_request_id", "is", null)
+        .eq("accountability_status", "ACCOUNTABLE")
+        .maybeSingle();
+
+      if (checkError) {
+        console.error("Error checking existing accountability:", checkError);
+        return;
+      }
+
+      // If personnel has existing accountability with clearance
+      if (existingAccountability) {
+        // Create accountability record for this inspection
+        const accountabilityRecord = {
+          personnel_id: inspectionData.assigned_personnel_id,
+          inventory_id: inspectionData.equipment_id,
+          inspection_id: inspectionData.id,
+          record_type: inspectionData.status?.toUpperCase().includes("DAMAGED")
+            ? "DAMAGED"
+            : inspectionData.status?.toUpperCase().includes("LOST")
+            ? "LOST"
+            : "RETURNED",
+          record_date: new Date().toISOString().split("T")[0],
+          amount_due: 0, // You might want to calculate this based on equipment value
+          source_type: "clearance",
+          clearance_request_id: existingAccountability.clearance_request_id,
+          remarks: `Auto-generated from inspection. ${
+            inspectionData.findings || ""
+          }`,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+
+        // Insert accountability record
+        const { data: createdRecord, error: createError } = await supabase
+          .from("accountability_records")
+          .insert([accountabilityRecord])
+          .select();
+
+        if (createError) {
+          console.error("Error creating accountability record:", createError);
+        } else {
+          console.log("Accountability record created:", createdRecord);
+
+          // Update accountability summary table
+          await updateAccountabilitySummary(
+            inspectionData.assigned_personnel_id
+          );
+
+          // Send notification
+          showAccountabilityNotification(
+            inspectionData,
+            existingAccountability
+          );
+        }
+      }
+    } catch (error) {
+      console.error("Error in addAccountabilityForClearancePersonnel:", error);
+    }
+  };
+
+  // Function to update accountability summary
+  const updateAccountabilitySummary = async (personnelId) => {
+    try {
+      // Recalculate accountability summary for personnel
+      const { data: accountabilityData, error } = await supabase.rpc(
+        "calculate_personnel_accountability",
+        { personnel_id_param: personnelId }
+      );
+
+      if (error) {
+        console.error("Error calculating accountability:", error);
+        // Fallback to manual calculation if function doesn't exist
+        await manualUpdateAccountabilitySummary(personnelId);
+      }
+    } catch (error) {
+      console.error("Error updating accountability summary:", error);
+    }
+  };
+
+  // Manual update if RPC function doesn't exist
+  const manualUpdateAccountabilitySummary = async (personnelId) => {
+    try {
+      // Get all accountability records for personnel
+      const { data: records, error } = await supabase
+        .from("accountability_records")
+        .select("*")
+        .eq("personnel_id", personnelId)
+        .eq("is_settled", false);
+
+      if (error) throw error;
+
+      // Calculate totals
+      const totalRecords = records.length;
+      const lostRecords = records.filter(
+        (r) => r.record_type === "LOST"
+      ).length;
+      const damagedRecords = records.filter(
+        (r) => r.record_type === "DAMAGED"
+      ).length;
+      const totalAmount = records.reduce(
+        (sum, r) => sum + (r.amount_due || 0),
+        0
+      );
+      const lostAmount = records
+        .filter((r) => r.record_type === "LOST")
+        .reduce((sum, r) => sum + (r.amount_due || 0), 0);
+      const damagedAmount = records
+        .filter((r) => r.record_type === "DAMAGED")
+        .reduce((sum, r) => sum + (r.amount_due || 0), 0);
+
+      // Update summary table
+      const { error: updateError } = await supabase
+        .from("personnel_equipment_accountability_table")
+        .upsert(
+          {
+            personnel_id: personnelId,
+            total_equipment_count: totalRecords,
+            lost_equipment_count: lostRecords,
+            damaged_equipment_count: damagedRecords,
+            total_equipment_value: totalAmount,
+            lost_equipment_value: lostAmount,
+            damaged_equipment_value: damagedAmount,
+            total_outstanding_amount: totalAmount,
+            updated_at: new Date().toISOString(),
+          },
+          {
+            onConflict: "personnel_id",
+          }
+        );
+
+      if (updateError) throw updateError;
+    } catch (error) {
+      console.error("Error in manualUpdateAccountabilitySummary:", error);
+    }
+  };
+
+  // Notification function
+  const showAccountabilityNotification = (
+    inspectionData,
+    accountabilityData
+  ) => {
+    const notification = {
+      title: "Accountability Added",
+      message: `Accountability record created for ${
+        inspectionData.personnel_name || "personnel"
+      } with existing clearance`,
+      type: "info",
+      data: {
+        personnel_id: inspectionData.assigned_personnel_id,
+        inspection_id: inspectionData.id,
+        clearance_request_id: accountabilityData.clearance_request_id,
+        timestamp: new Date().toISOString(),
+      },
+    };
+
+    console.log("Notification:", notification);
+
+    // Show success message
+    setSuccessMessage(
+      `Accountability added for ${
+        inspectionData.personnel_name || "personnel"
+      } with clearance.`
+    );
+
+    // Show browser notification if available
+    if ("Notification" in window && Notification.permission === "granted") {
+      new Notification("Accountability Added", {
+        body: `Added accountability for ${
+          inspectionData.personnel_name || "personnel"
+        }`,
+        icon: "/favicon.ico",
+      });
+    }
+  };
+
+  // Function to fetch accountability status for personnel
+  const fetchAccountabilityStatus = async (personnelId) => {
+    if (!personnelId) return null;
+
+    try {
+      const { data, error } = await supabase
+        .from("personnel_equipment_accountability_table")
+        .select(
+          "accountability_status, total_outstanding_amount, clearance_request_id"
+        )
+        .eq("personnel_id", personnelId)
+        .maybeSingle();
+
+      if (!error && data) {
+        return data;
+      }
+      return null;
+    } catch (error) {
+      console.error("Error fetching accountability status:", error);
+      return null;
+    }
+  };
+
+  // Load accountability statuses for all personnel
+  const loadAccountabilityStatuses = async (inspectionsData) => {
+    const personnelIds = [
+      ...new Set(
+        inspectionsData.map((i) => i.assigned_personnel_id).filter(Boolean)
+      ),
+    ];
+
+    const statuses = {};
+
+    for (const personnelId of personnelIds) {
+      const status = await fetchAccountabilityStatus(personnelId);
+      if (status) {
+        statuses[personnelId] = status;
+      }
+    }
+
+    setAccountabilityStatuses(statuses);
+  };
 
   // Initialize months and years
   useEffect(() => {
@@ -79,6 +314,12 @@ const InspectionHistory = () => {
     loadData();
     fetchPersonnel();
   }, []);
+
+  useEffect(() => {
+    if (inspections.length > 0) {
+      loadAccountabilityStatuses(inspections);
+    }
+  }, [inspections]);
 
   const fetchPersonnel = async () => {
     try {
@@ -380,6 +621,12 @@ const InspectionHistory = () => {
             record_type: "INSPECTION",
             source: "inspections",
             created_at: inspection.created_at,
+            // Add accountability trigger flags
+            requires_accountability:
+              inspection.findings?.toLowerCase().includes("damaged") ||
+              inspection.findings?.toLowerCase().includes("lost") ||
+              inspection.status?.toLowerCase().includes("damaged") ||
+              inspection.status?.toLowerCase().includes("lost"),
           };
         }
       );
@@ -443,6 +690,12 @@ const InspectionHistory = () => {
           record_type: "CLEARANCE",
           source: "clearance_inventory",
           created_at: ci.created_at,
+          // Add accountability trigger flags
+          requires_accountability:
+            ci.findings?.toLowerCase().includes("damaged") ||
+            ci.findings?.toLowerCase().includes("lost") ||
+            ci.status?.toLowerCase().includes("damaged") ||
+            ci.status?.toLowerCase().includes("lost"),
         };
       });
 
@@ -460,6 +713,7 @@ const InspectionHistory = () => {
       setError(`Error fetching inspections: ${error.message}`);
     }
   };
+
   // Handle row selection
   const toggleRowSelection = (id) => {
     const newSelected = new Set(selectedRows);
@@ -615,6 +869,90 @@ const InspectionHistory = () => {
     }
   };
 
+  // Function to handle adding accountability for inspection
+  const handleAddAccountability = async (inspection) => {
+    if (!inspection.assigned_personnel_id) {
+      setError("Cannot add accountability: No personnel assigned");
+      return;
+    }
+
+    try {
+      await addAccountabilityForClearancePersonnel(inspection);
+      // Refresh data after adding accountability
+      await loadData();
+    } catch (error) {
+      console.error("Error adding accountability:", error);
+      setError(`Failed to add accountability: ${error.message}`);
+    }
+  };
+
+  // Component for displaying accountability status badge
+  const AccountabilityStatusBadge = ({ personnelId }) => {
+    const status = accountabilityStatuses[personnelId];
+
+    if (!status) {
+      return <span className={styles.naText}>No Data</span>;
+    }
+
+    const getBadgeClass = (statusText) => {
+      switch (statusText?.toUpperCase()) {
+        case "ACCOUNTABLE":
+          return styles.accountabilityAccountable;
+        case "SETTLED":
+          return styles.accountabilitySettled;
+        case "PENDING":
+          return styles.accountabilityPending;
+        case "OVERDUE":
+          return styles.accountabilityOverdue;
+        default:
+          return styles.accountabilityUnknown;
+      }
+    };
+
+    const getBadgeIcon = (statusText) => {
+      switch (statusText?.toUpperCase()) {
+        case "ACCOUNTABLE":
+          return <ShieldAlert size={14} />;
+        case "SETTLED":
+          return <ShieldCheck size={14} />;
+        case "PENDING":
+          return <Clock size={14} />;
+        case "OVERDUE":
+          return <AlertCircle size={14} />;
+        default:
+          return <DollarSign size={14} />;
+      }
+    };
+
+    const badgeText = status.accountability_status || "Unknown";
+    const hasOutstanding = status.total_outstanding_amount > 0;
+    const hasClearance = !!status.clearance_request_id;
+
+    return (
+      <div className={styles.accountabilityContainer}>
+        <span
+          className={`${styles.accountabilityBadge} ${getBadgeClass(
+            badgeText
+          )}`}
+        >
+          {getBadgeIcon(badgeText)}
+          {badgeText}
+        </span>
+        {hasOutstanding && (
+          <div className={styles.outstandingAmount}>
+            <DollarSign size={12} />
+            {status.total_outstanding_amount.toFixed(2)}
+          </div>
+        )}
+        {hasClearance && (
+          <div className={styles.clearanceIndicator} title="Has clearance">
+            📋
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const filteredInspections = useMemo(() => {
     return inspections.filter((inspection) => {
       const searchLower = searchTerm.toLowerCase();
@@ -700,6 +1038,14 @@ const InspectionHistory = () => {
       // Apply unassigned filter
       const matchesUnassigned = !showUnassignedOnly || inspection.is_unassigned;
 
+      // Apply accountability filter
+      const accountabilityStatus =
+        accountabilityStatuses[inspection.assigned_personnel_id];
+      const matchesAccountability =
+        !showAccountabilityOnly ||
+        (accountabilityStatus &&
+          accountabilityStatus.accountability_status === "ACCOUNTABLE");
+
       return (
         matchesSearch &&
         matchesStatus &&
@@ -707,7 +1053,8 @@ const InspectionHistory = () => {
         matchesClearanceType &&
         matchesDate &&
         matchesPersonnel &&
-        matchesUnassigned
+        matchesUnassigned &&
+        matchesAccountability
       );
     });
   }, [
@@ -721,6 +1068,8 @@ const InspectionHistory = () => {
     dateRange,
     selectedPersonnel,
     showUnassignedOnly,
+    showAccountabilityOnly,
+    accountabilityStatuses,
   ]);
 
   // Paginated data
@@ -815,12 +1164,17 @@ const InspectionHistory = () => {
         "Findings",
         "Equipment Status",
         "Is Unassigned",
+        "Accountability Status",
+        "Outstanding Amount",
+        "Requires Accountability",
       ];
 
       let csvContent = "data:text/csv;charset=utf-8,\uFEFF";
       csvContent += headers.join(",") + "\n";
 
       data.forEach((item) => {
+        const accountabilityStatus =
+          accountabilityStatuses[item.assigned_personnel_id];
         const row = [
           formatDate(item.inspection_date).replace(/"/g, '""'),
           item.item_code?.replace(/"/g, '""') || "",
@@ -837,6 +1191,10 @@ const InspectionHistory = () => {
           item.findings?.replace(/"/g, '""') || "",
           item.equipment_status?.replace(/"/g, '""') || "",
           item.is_unassigned ? "Yes" : "No",
+          accountabilityStatus?.accountability_status?.replace(/"/g, '""') ||
+            "N/A",
+          accountabilityStatus?.total_outstanding_amount?.toString() || "0",
+          item.requires_accountability ? "Yes" : "No",
         ]
           .map((field) => `"${field}"`)
           .join(",");
@@ -873,6 +1231,7 @@ const InspectionHistory = () => {
     setSelectedYear("");
     setSelectedPersonnel("");
     setShowUnassignedOnly(false);
+    setShowAccountabilityOnly(false);
     setDateRange({ start: "", end: "" });
     setCurrentPage(1);
     setSelectedRows(new Set());
@@ -901,8 +1260,33 @@ const InspectionHistory = () => {
           i.status.toUpperCase().includes("CLEARED"))
     ).length;
 
-    return { total, routine, clearance, unassigned, completed };
-  }, [inspections]);
+    // Accountability stats
+    const accountablePersonnel = Object.values(accountabilityStatuses).filter(
+      (status) => status.accountability_status === "ACCOUNTABLE"
+    ).length;
+    const withOutstanding = Object.values(accountabilityStatuses).filter(
+      (status) => status.total_outstanding_amount > 0
+    ).length;
+
+    return {
+      total,
+      routine,
+      clearance,
+      unassigned,
+      completed,
+      accountablePersonnel,
+      withOutstanding,
+    };
+  }, [inspections, accountabilityStatuses]);
+
+  // Add to your CSS classes or create new ones
+  const accountabilityBadgeClasses = {
+    accountable: styles.accountabilityAccountable,
+    settled: styles.accountabilitySettled,
+    pending: styles.accountabilityPending,
+    overdue: styles.accountabilityOverdue,
+    unknown: styles.accountabilityUnknown,
+  };
 
   // Render BFPPreloader at the top of the component
   return (
@@ -1005,17 +1389,21 @@ const InspectionHistory = () => {
               </div>
               <div className={styles.statCard}>
                 <div className={styles.statIcon}>
-                  <Package size={24} />
+                  <ShieldAlert size={24} />
                 </div>
-                <span className={styles.statNumber}>{stats.routine}</span>
-                <span className={styles.statLabel}>Routine Inspections</span>
+                <span className={styles.statNumber}>
+                  {stats.accountablePersonnel}
+                </span>
+                <span className={styles.statLabel}>Accountable Personnel</span>
               </div>
               <div className={styles.statCard}>
                 <div className={styles.statIcon}>
-                  <User size={24} />
+                  <DollarSign size={24} />
                 </div>
-                <span className={styles.statNumber}>{stats.clearance}</span>
-                <span className={styles.statLabel}>Clearance Inspections</span>
+                <span className={styles.statNumber}>
+                  {stats.withOutstanding}
+                </span>
+                <span className={styles.statLabel}>With Outstanding</span>
               </div>
               <div className={styles.statCard}>
                 <div className={styles.statIcon}>
@@ -1205,6 +1593,25 @@ const InspectionHistory = () => {
                 </label>
               </div>
 
+              {/* Accountability Toggle */}
+              <div className={styles.filterToggle}>
+                <label className={styles.toggleLabel}>
+                  <input
+                    type="checkbox"
+                    checked={showAccountabilityOnly}
+                    onChange={(e) => {
+                      setShowAccountabilityOnly(e.target.checked);
+                      setCurrentPage(1);
+                    }}
+                    className={styles.toggleInput}
+                  />
+                  <span className={styles.toggleSlider}></span>
+                  <span className={styles.toggleText}>
+                    Show Accountable Only
+                  </span>
+                </label>
+              </div>
+
               {/* Clear Filters Button */}
               <button
                 className={`${styles.IHBtn} ${styles.IHClear}`}
@@ -1256,6 +1663,7 @@ const InspectionHistory = () => {
                         <th>Date</th>
                         <th>Item Details</th>
                         <th>Personnel</th>
+                        <th>Accountability</th>
                         <th>Inspector</th>
                         <th>Type</th>
                         <th>Status</th>
@@ -1330,6 +1738,15 @@ const InspectionHistory = () => {
                             )}
                           </td>
                           <td>
+                            {inspection.assigned_personnel_id ? (
+                              <AccountabilityStatusBadge
+                                personnelId={inspection.assigned_personnel_id}
+                              />
+                            ) : (
+                              <span className={styles.naText}>N/A</span>
+                            )}
+                          </td>
+                          <td>
                             <div className={styles.inspectorCell}>
                               <User size={14} className={styles.cellIcon} />
                               {inspection.inspector_name || "Unknown"}
@@ -1370,6 +1787,12 @@ const InspectionHistory = () => {
                           </td>
                           <td className={styles.findingsCell}>
                             {inspection.findings || "No findings"}
+                            {inspection.requires_accountability && (
+                              <div className={styles.accountabilityFlag}>
+                                <AlertTriangle size={12} />
+                                <span>Requires accountability</span>
+                              </div>
+                            )}
                           </td>
                           <td>
                             <div className={styles.actionButtons}>
@@ -1393,6 +1816,7 @@ Notes: ${inspection.notes || "None"}
 ────────────────────
 Record Type: ${inspection.record_type}
 Source: ${inspection.source}
+Accountability Required: ${inspection.requires_accountability ? "Yes" : "No"}
                                   `.trim();
                                   alert(details);
                                 }}
@@ -1400,6 +1824,18 @@ Source: ${inspection.source}
                               >
                                 <Eye size={14} />
                               </button>
+                              {inspection.requires_accountability &&
+                                inspection.assigned_personnel_id && (
+                                  <button
+                                    className={`${styles.IHBtn} ${styles.IHAccountability}`}
+                                    onClick={() =>
+                                      handleAddAccountability(inspection)
+                                    }
+                                    title="Add Accountability"
+                                  >
+                                    <ShieldAlert size={14} />
+                                  </button>
+                                )}
                               <button
                                 className={`${styles.IHBtn} ${styles.IHDeleteSingle}`}
                                 onClick={() =>

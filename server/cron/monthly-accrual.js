@@ -1,4 +1,4 @@
-// server/cron/monthly-accrual.js - SIMPLIFIED WITH hired_time
+// server/cron/monthly-accrual.js - SIMPLIFIED VERSION (NO WITHOUT-PAY RESTRICTION)
 const { supabase } = require("../lib/supabaseClient");
 
 console.log("=== BFP LEAVE ACCRUAL SYSTEM ===");
@@ -83,66 +83,6 @@ function calculateBFPProRatedLeave(employee, targetMonth, targetYear) {
   );
 
   return result;
-}
-
-// ======================
-// CHECK IF PERSONNEL CAN RECEIVE ACCRUAL THIS MONTH
-// ======================
-
-// In the canReceiveAccrualThisMonth function - UPDATE:
-async function canReceiveAccrualThisMonth(personnelId, targetMonth, targetYear) {
-  try {
-    // Check if personnel had any leave without pay this month
-    const { data: withoutPayLeaves, error } = await supabase
-      .from("leave_requests")
-      .select("approve_for, start_date, end_date, status, paid_days, unpaid_days")
-      .eq("personnel_id", personnelId)
-      .eq("status", "Approved")
-      .or("approve_for.eq.without_pay,approve_for.eq.both")
-      .lte("start_date", `${targetYear}-${String(targetMonth + 1).padStart(2, "0")}-31`)
-      .gte("end_date", `${targetYear}-${String(targetMonth + 1).padStart(2, "0")}-01`);
-
-    if (error) {
-      console.error(`  ❌ Error checking without-pay leaves:`, error.message);
-      return true;
-    }
-
-    if (!withoutPayLeaves || withoutPayLeaves.length === 0) {
-      return true; // No without-pay leaves, can receive accrual
-    }
-
-    // Check each without-pay leave
-    const monthStart = new Date(targetYear, targetMonth, 1);
-    const monthEnd = new Date(targetYear, targetMonth + 1, 0);
-
-    for (const leave of withoutPayLeaves) {
-      const leaveStart = new Date(leave.start_date);
-      const leaveEnd = new Date(leave.end_date);
-
-      // Check if leave covers any part of the month
-      const leaveCoversMonth = leaveStart <= monthEnd && leaveEnd >= monthStart;
-
-      if (leaveCoversMonth) {
-        if (leave.approve_for === "without_pay") {
-          console.log(`  ⏭️  No accrual: Has FULL without-pay leave`);
-          return false;
-        } else if (leave.approve_for === "both") {
-          const unpaidDays = parseFloat(leave.unpaid_days) || 0;
-          const paidDays = parseFloat(leave.paid_days) || 0;
-          
-          if (unpaidDays > 0) {
-            console.log(`  ⏭️  No accrual: Has ${unpaidDays} unpaid days in mixed leave`);
-            return false;
-          }
-        }
-      }
-    }
-
-    return true;
-  } catch (error) {
-    console.error(`  ❌ Error:`, error.message);
-    return true;
-  }
 }
 
 // ======================
@@ -265,7 +205,7 @@ async function updateBalance(personnelId, amount, year, isFirstMonth = false) {
 }
 
 // ======================
-// PROCESS EMPLOYEE ACCRUAL
+// PROCESS EMPLOYEE ACCRUAL (SIMPLIFIED)
 // ======================
 
 async function processEmployeeAccrual(employee, currentDate) {
@@ -286,19 +226,9 @@ async function processEmployeeAccrual(employee, currentDate) {
     console.log(`   Time: ${employee.hired_time}`);
   }
 
-  // STEP 1: Check if personnel can receive accrual this month
-  const canReceiveAccrual = await canReceiveAccrualThisMonth(
-    employee.id,
-    currentMonth,
-    currentYear
-  );
+  // REMOVED: without-pay leave check
 
-  if (!canReceiveAccrual) {
-    console.log(`   ⏭️  Skipped: Has without-pay leave this month`);
-    return 0;
-  }
-
-  // STEP 2: Check if this is the first accrual for the year
+  // Check if this is the first accrual for the year
   const isFirstAccrualThisYear = !(await hasReceivedAccrualThisYear(
     employee.id,
     currentYear
@@ -393,7 +323,7 @@ async function addMonthlyAccruals() {
     console.log(`📊 Found ${employees?.length || 0} active employees\n`);
 
     let processed = 0;
-    let skippedDueToLeave = 0;
+    let skipped = 0;
     let errors = 0;
 
     for (const emp of employees || []) {
@@ -402,7 +332,7 @@ async function addMonthlyAccruals() {
         if (result > 0) {
           processed++;
         } else {
-          skippedDueToLeave++;
+          skipped++; // Only skips if not hired yet (future hire date)
         }
       } catch (empError) {
         console.error(
@@ -415,9 +345,7 @@ async function addMonthlyAccruals() {
 
     console.log(`\n✅ ACCRUAL SUMMARY:`);
     console.log(`   Processed: ${processed} employees (received accrual)`);
-    console.log(
-      `   Skipped: ${skippedDueToLeave} employees (due to without-pay leave)`
-    );
+    console.log(`   Skipped: ${skipped} employees (not hired yet)`);
     console.log(`   Errors: ${errors} employees`);
 
     console.log(`\n💡 Time Formula:`);
@@ -429,7 +357,7 @@ async function addMonthlyAccruals() {
     return {
       success: true,
       processed,
-      skippedDueToLeave,
+      skipped,
       errors,
       total: employees?.length || 0,
     };
@@ -503,7 +431,6 @@ function testExamples() {
 module.exports = {
   addMonthlyAccruals,
   calculateBFPProRatedLeave,
-  canReceiveAccrualThisMonth,
   testExamples,
 };
 

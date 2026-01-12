@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import styles from "../styles/InventoryControl.module.css";
 import { Html5QrcodeScanner } from "html5-qrcode";
+import { Scanner } from "@yudiel/react-qr-scanner";
 import Sidebar from "../../Sidebar.jsx";
 import Hamburger from "../../Hamburger.jsx";
 import { useSidebar } from "../../SidebarContext.jsx";
@@ -26,7 +27,7 @@ export default function InventoryControl() {
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [showContent, setShowContent] = useState(false);
   const { userId, isAuthenticated, userRole } = useUserId();
-
+  const editModalQrReaderRef = useRef(null);
   // ========== NEW: Scan Result Modal State ==========
   const [showScanResultModal, setShowScanResultModal] = useState(false);
   const [scanResult, setScanResult] = useState({
@@ -262,113 +263,117 @@ export default function InventoryControl() {
     });
   };
 
-const applyScannedData = (equipmentData, barcode, applyAllFields = false) => {
-  // For edit mode: if scanning a different equipment, only allow barcode update
-  const isDifferentEquipment =
-    isEditOpen && equipmentData && equipmentData.id !== editId;
+  const applyScannedData = (equipmentData, barcode, applyAllFields = false) => {
+    // For edit mode: if scanning a different equipment, only allow barcode update
+    const isDifferentEquipment =
+      isEditOpen && equipmentData && equipmentData.id !== editId;
 
-  if (isDifferentEquipment && applyAllFields) {
-    toast.error(
-      <div style={{ padding: "10px" }}>
-        <div
-          style={{ display: "flex", alignItems: "center", marginBottom: "8px" }}
-        >
-          <span style={{ fontSize: "20px", marginRight: "10px" }}>🚫</span>
-          <strong style={{ fontSize: "16px" }}>Restricted Operation</strong>
-        </div>
-        <div style={{ fontSize: "14px", lineHeight: "1.4" }}>
-          Cannot copy data from a different equipment while editing.
-          <br />
-          You can only update the barcode field.
-        </div>
-      </div>,
-      { autoClose: 5000, closeButton: true }
-    );
-    return;
-  }
+    if (isDifferentEquipment && applyAllFields) {
+      toast.error(
+        <div style={{ padding: "10px" }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              marginBottom: "8px",
+            }}
+          >
+            <span style={{ fontSize: "20px", marginRight: "10px" }}>🚫</span>
+            <strong style={{ fontSize: "16px" }}>Restricted Operation</strong>
+          </div>
+          <div style={{ fontSize: "14px", lineHeight: "1.4" }}>
+            Cannot copy data from a different equipment while editing.
+            <br />
+            You can only update the barcode field.
+          </div>
+        </div>,
+        { autoClose: 5000, closeButton: true }
+      );
+      return;
+    }
 
-  if (equipmentData) {
-    if (isAddSidebarOpen) {
-      // Add mode - apply all data
-      setNewItem({
-        itemName: equipmentData.item_name || "",
-        itemCode: equipmentData.item_code || "",
-        category: equipmentData.category || "",
-        status: equipmentData.status || "",
-        assignedTo: equipmentData.assigned_personnel_id || "unassigned",
-        purchaseDate: equipmentData.purchase_date || "",
-        lastChecked: equipmentData.last_checked || "",
-        price: equipmentData.price || "",
-        assignedDate: equipmentData.assigned_date || "",
-        lastAssigned: equipmentData.last_assigned || "",
-        unassignedDate: equipmentData.unassigned_date || "",
-      });
+    if (equipmentData) {
+      if (isAddSidebarOpen) {
+        // Add mode - apply all data
+        setNewItem({
+          itemName: equipmentData.item_name || "",
+          itemCode: equipmentData.item_code || "",
+          category: equipmentData.category || "",
+          status: equipmentData.status || "",
+          assignedTo: equipmentData.assigned_personnel_id || "unassigned",
+          purchaseDate: equipmentData.purchase_date || "",
+          lastChecked: equipmentData.last_checked || "",
+          price: equipmentData.price || "",
+          assignedDate: equipmentData.assigned_date || "",
+          lastAssigned: equipmentData.last_assigned || "",
+          unassignedDate: equipmentData.unassigned_date || "",
+        });
 
-      setFloatingLabels({
-        category: !!equipmentData.category,
-        status: !!equipmentData.status,
-        assignedTo: !!equipmentData.assigned_personnel_id,
-        assignedDate: !!equipmentData.assigned_date,
-      });
+        setFloatingLabels({
+          category: !!equipmentData.category,
+          status: !!equipmentData.status,
+          assignedTo: !!equipmentData.assigned_personnel_id,
+          assignedDate: !!equipmentData.assigned_date,
+        });
 
-      toast.success("Equipment data loaded from scan!");
-    } else if (isEditOpen) {
-      if (isDifferentEquipment) {
-        // Different equipment in edit mode - only update barcode
-        setEditItem((prev) => ({
-          ...prev,
-          itemCode: barcode,
-        }));
-        toast.info(`Barcode updated to: ${barcode}`);
-      } else if (equipmentData.id === editId) {
-        // Same equipment in edit mode - user can choose what to update
-        if (applyAllFields) {
-          // Update all fields (for same equipment)
-          setEditItem({
-            itemName: equipmentData.item_name || "",
-            itemCode: equipmentData.item_code || "",
-            category: equipmentData.category || "",
-            status: equipmentData.status || "",
-            assignedTo: equipmentData.assigned_personnel_id || "unassigned",
-            purchaseDate: equipmentData.purchase_date || "",
-            lastChecked: equipmentData.last_checked || "",
-            price: equipmentData.price || "",
-            assignedDate: equipmentData.assigned_date || "",
-            lastAssigned: equipmentData.last_assigned || "",
-            unassignedDate: equipmentData.unassigned_date || "",
-          });
-
-          setEditFloatingLabels({
-            category: !!equipmentData.category,
-            status: !!equipmentData.status,
-            assignedTo: !!equipmentData.assigned_personnel_id,
-            assignedDate: !!equipmentData.assigned_date,
-          });
-
-          toast.success("All fields updated from scan!");
-        } else {
-          // Only update barcode (default)
+        toast.success("Equipment data loaded from scan!");
+      } else if (isEditOpen) {
+        if (isDifferentEquipment) {
+          // Different equipment in edit mode - only update barcode
           setEditItem((prev) => ({
             ...prev,
-            itemCode: equipmentData.item_code || prev.itemCode,
+            itemCode: barcode,
           }));
-          toast.success("Barcode updated!");
+          toast.info(`Barcode updated to: ${barcode}`);
+        } else if (equipmentData.id === editId) {
+          // Same equipment in edit mode - user can choose what to update
+          if (applyAllFields) {
+            // Update all fields (for same equipment)
+            setEditItem({
+              itemName: equipmentData.item_name || "",
+              itemCode: equipmentData.item_code || "",
+              category: equipmentData.category || "",
+              status: equipmentData.status || "",
+              assignedTo: equipmentData.assigned_personnel_id || "unassigned",
+              purchaseDate: equipmentData.purchase_date || "",
+              lastChecked: equipmentData.last_checked || "",
+              price: equipmentData.price || "",
+              assignedDate: equipmentData.assigned_date || "",
+              lastAssigned: equipmentData.last_assigned || "",
+              unassignedDate: equipmentData.unassigned_date || "",
+            });
+
+            setEditFloatingLabels({
+              category: !!equipmentData.category,
+              status: !!equipmentData.status,
+              assignedTo: !!equipmentData.assigned_personnel_id,
+              assignedDate: !!equipmentData.assigned_date,
+            });
+
+            toast.success("All fields updated from scan!");
+          } else {
+            // Only update barcode (default)
+            setEditItem((prev) => ({
+              ...prev,
+              itemCode: equipmentData.item_code || prev.itemCode,
+            }));
+            toast.success("Barcode updated!");
+          }
         }
       }
+    } else {
+      // No equipment found - just update barcode
+      if (isAddSidebarOpen) {
+        setNewItem((prev) => ({ ...prev, itemCode: barcode }));
+        toast.info(`New barcode set: ${barcode}`);
+      } else if (isEditOpen) {
+        setEditItem((prev) => ({ ...prev, itemCode: barcode }));
+        toast.info(`Barcode updated to: ${barcode}`);
+      }
     }
-  } else {
-    // No equipment found - just update barcode
-    if (isAddSidebarOpen) {
-      setNewItem((prev) => ({ ...prev, itemCode: barcode }));
-      toast.info(`New barcode set: ${barcode}`);
-    } else if (isEditOpen) {
-      setEditItem((prev) => ({ ...prev, itemCode: barcode }));
-      toast.info(`Barcode updated to: ${barcode}`);
-    }
-  }
 
-  closeScanResultModal();
-};
+    closeScanResultModal();
+  };
 
   // ========== INSPECTION CHECK FUNCTIONS ==========
 
@@ -785,43 +790,47 @@ const applyScannedData = (equipmentData, barcode, applyAllFields = false) => {
   };
 
   // Generate barcode image - FIXED VERSION
-const generateBarcodeImage = (itemCode, itemName, equipmentDetails = null) => {
-  return new Promise((resolve, reject) => {
-    try {
-      // Create responsive container
-      const container = document.createElement("div");
-      container.style.width = "100%";
-      container.style.maxWidth = "400px";
-      container.style.padding = "15px";
-      container.style.backgroundColor = "white";
-      container.style.boxSizing = "border-box";
-      container.style.fontFamily = "Arial, sans-serif";
-      container.style.wordWrap = "break-word";
+  const generateBarcodeImage = (
+    itemCode,
+    itemName,
+    equipmentDetails = null
+  ) => {
+    return new Promise((resolve, reject) => {
+      try {
+        // Create responsive container
+        const container = document.createElement("div");
+        container.style.width = "100%";
+        container.style.maxWidth = "400px";
+        container.style.padding = "15px";
+        container.style.backgroundColor = "white";
+        container.style.boxSizing = "border-box";
+        container.style.fontFamily = "Arial, sans-serif";
+        container.style.wordWrap = "break-word";
 
-      // Title
-      const title = document.createElement("h3");
-      title.textContent = "BFP Villanueva - Equipment Barcode";
-      title.style.margin = "0 0 10px 0";
-      title.style.fontSize = "14px";
-      title.style.fontWeight = "bold";
-      title.style.color = "#2b2b2b";
-      title.style.textAlign = "center";
-      title.style.wordBreak = "break-word";
-      container.appendChild(title);
+        // Title
+        const title = document.createElement("h3");
+        title.textContent = "BFP Villanueva - Equipment Barcode";
+        title.style.margin = "0 0 10px 0";
+        title.style.fontSize = "14px";
+        title.style.fontWeight = "bold";
+        title.style.color = "#2b2b2b";
+        title.style.textAlign = "center";
+        title.style.wordBreak = "break-word";
+        container.appendChild(title);
 
-      // Equipment details
-      const detailsDiv = document.createElement("div");
-      detailsDiv.style.marginBottom = "10px";
-      detailsDiv.style.fontSize = "11px";
-      detailsDiv.style.lineHeight = "1.4";
+        // Equipment details
+        const detailsDiv = document.createElement("div");
+        detailsDiv.style.marginBottom = "10px";
+        detailsDiv.style.fontSize = "11px";
+        detailsDiv.style.lineHeight = "1.4";
 
-      let detailsHTML = `
+        let detailsHTML = `
         <div><strong>Equipment:</strong> ${itemName || "N/A"}</div>
         <div><strong>Barcode:</strong> <span class="barcode-text">${itemCode}</span></div>
       `;
 
-      if (equipmentDetails) {
-        detailsHTML += `
+        if (equipmentDetails) {
+          detailsHTML += `
           <div><strong>Category:</strong> ${
             equipmentDetails.category || "N/A"
           }</div>
@@ -840,204 +849,204 @@ const generateBarcodeImage = (itemCode, itemName, equipmentDetails = null) => {
               : "₱0.00"
           }</div>
         `;
-      }
+        }
 
-      detailsDiv.innerHTML = detailsHTML;
-      container.appendChild(detailsDiv);
+        detailsDiv.innerHTML = detailsHTML;
+        container.appendChild(detailsDiv);
 
-      // Create canvas for barcode
-      const canvas = document.createElement("canvas");
+        // Create canvas for barcode
+        const canvas = document.createElement("canvas");
 
-      // Adjust canvas size based on barcode length
-      const barcodeLength = itemCode.length;
-      let canvasWidth = 350;
-      let canvasHeight = 80;
+        // Adjust canvas size based on barcode length
+        const barcodeLength = itemCode.length;
+        let canvasWidth = 350;
+        let canvasHeight = 80;
 
-      if (barcodeLength > 20) {
-        canvasWidth = 400;
-        canvasHeight = 100;
-      } else if (barcodeLength > 30) {
-        canvasWidth = 450;
-        canvasHeight = 120;
-      }
+        if (barcodeLength > 20) {
+          canvasWidth = 400;
+          canvasHeight = 100;
+        } else if (barcodeLength > 30) {
+          canvasWidth = 450;
+          canvasHeight = 120;
+        }
 
-      canvas.width = canvasWidth;
-      canvas.height = canvasHeight;
-      canvas.style.display = "block";
-      canvas.style.margin = "10px auto";
-      canvas.style.maxWidth = "100%";
-      canvas.style.height = "auto";
+        canvas.width = canvasWidth;
+        canvas.height = canvasHeight;
+        canvas.style.display = "block";
+        canvas.style.margin = "10px auto";
+        canvas.style.maxWidth = "100%";
+        canvas.style.height = "auto";
 
-      try {
-        // Configure barcode based on length
-        const barcodeConfig = {
-          format: "CODE128",
-          displayValue: true,
-          fontSize: barcodeLength > 25 ? 12 : 14,
-          textMargin: 5,
-          margin: barcodeLength > 20 ? 10 : 5,
-          width: barcodeLength > 20 ? 1.5 : 2,
-          height: barcodeLength > 20 ? 60 : 50,
-          background: "#ffffff",
-        };
-
-        jsbarcode(canvas, itemCode, barcodeConfig);
-
-        container.appendChild(canvas);
-
-        // Footer
-        const footer = document.createElement("div");
-        footer.textContent = `Generated: ${new Date().toLocaleDateString()}`;
-        footer.style.fontSize = "10px";
-        footer.style.color = "#666";
-        footer.style.textAlign = "center";
-        footer.style.marginTop = "5px";
-        container.appendChild(footer);
-
-        // Convert to image
-        const tempImg = new Image();
-        tempImg.onload = () => {
-          const finalCanvas = document.createElement("canvas");
-          finalCanvas.width = 400;
-          finalCanvas.height = 300; // Increased height for long content
-          const ctx = finalCanvas.getContext("2d");
-
-          ctx.fillStyle = "#ffffff";
-          ctx.fillRect(0, 0, 400, 300);
-
-          // Draw title
-          ctx.fillStyle = "#000000";
-          ctx.font = "bold 14px Arial";
-          ctx.fillText("BFP Villanueva - Equipment Barcode", 20, 30);
-
-          // Draw equipment info with word wrap
-          ctx.font = "11px Arial";
-
-          // Function to wrap text
-          const wrapText = (context, text, x, y, maxWidth, lineHeight) => {
-            const words = text.split(" ");
-            let line = "";
-            let testLine = "";
-            let lineCount = 0;
-            const maxLines = 5;
-
-            for (let n = 0; n < words.length; n++) {
-              testLine = line + words[n] + " ";
-              const metrics = context.measureText(testLine);
-              const testWidth = metrics.width;
-
-              if (testWidth > maxWidth && n > 0 && lineCount < maxLines - 1) {
-                context.fillText(line, x, y);
-                line = words[n] + " ";
-                y += lineHeight;
-                lineCount++;
-              } else {
-                line = testLine;
-              }
-            }
-            context.fillText(line, x, y);
-            return y + lineHeight;
+        try {
+          // Configure barcode based on length
+          const barcodeConfig = {
+            format: "CODE128",
+            displayValue: true,
+            fontSize: barcodeLength > 25 ? 12 : 14,
+            textMargin: 5,
+            margin: barcodeLength > 20 ? 10 : 5,
+            width: barcodeLength > 20 ? 1.5 : 2,
+            height: barcodeLength > 20 ? 60 : 50,
+            background: "#ffffff",
           };
 
-          let yPosition = 60;
-          yPosition = wrapText(
-            ctx,
-            `Equipment: ${itemName}`,
-            20,
-            yPosition,
-            360,
-            14
-          );
-          yPosition = wrapText(
-            ctx,
-            `Barcode: ${itemCode}`,
-            20,
-            yPosition,
-            360,
-            14
-          );
+          jsbarcode(canvas, itemCode, barcodeConfig);
 
-          if (equipmentDetails) {
-            yPosition += 5;
-            yPosition = wrapText(
-              ctx,
-              `Category: ${equipmentDetails.category || "N/A"}`,
-              20,
-              yPosition,
-              360,
-              14
-            );
-            yPosition = wrapText(
-              ctx,
-              `Status: ${equipmentDetails.status || "N/A"}`,
-              20,
-              yPosition,
-              360,
-              14
-            );
-            yPosition = wrapText(
-              ctx,
-              `Assigned To: ${equipmentDetails.assigned_to || "Unassigned"}`,
-              20,
-              yPosition,
-              360,
-              14
-            );
-          }
-
-          // Draw barcode
-          const barcodeCanvas = document.createElement("canvas");
-          barcodeCanvas.width = canvasWidth;
-          barcodeCanvas.height = canvasHeight;
-
-          jsbarcode(barcodeCanvas, itemCode, barcodeConfig);
-
-          ctx.drawImage(barcodeCanvas, 20, yPosition + 10);
+          container.appendChild(canvas);
 
           // Footer
-          ctx.font = "10px Arial";
-          ctx.fillStyle = "#666";
-          ctx.fillText(
-            `Generated: ${new Date().toLocaleDateString()}`,
-            20,
-            290
-          );
+          const footer = document.createElement("div");
+          footer.textContent = `Generated: ${new Date().toLocaleDateString()}`;
+          footer.style.fontSize = "10px";
+          footer.style.color = "#666";
+          footer.style.textAlign = "center";
+          footer.style.marginTop = "5px";
+          container.appendChild(footer);
 
-          const dataUrl = finalCanvas.toDataURL("image/png", 1.0);
-          resolve(dataUrl);
-        };
+          // Convert to image
+          const tempImg = new Image();
+          tempImg.onload = () => {
+            const finalCanvas = document.createElement("canvas");
+            finalCanvas.width = 400;
+            finalCanvas.height = 300; // Increased height for long content
+            const ctx = finalCanvas.getContext("2d");
 
-        tempImg.src = canvas.toDataURL("image/png");
-      } catch (barcodeError) {
-        console.error("Barcode generation error:", barcodeError);
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(0, 0, 400, 300);
 
-        // Fallback for very long barcodes
-        if (barcodeError.message.includes("width") || itemCode.length > 50) {
-          // Create a simpler barcode for very long codes
-          const fallbackCanvas = document.createElement("canvas");
-          fallbackCanvas.width = 450;
-          fallbackCanvas.height = 100;
+            // Draw title
+            ctx.fillStyle = "#000000";
+            ctx.font = "bold 14px Arial";
+            ctx.fillText("BFP Villanueva - Equipment Barcode", 20, 30);
 
-          jsbarcode(fallbackCanvas, itemCode.substring(0, 50), {
-            format: "CODE128",
-            displayValue: false, // Hide text for very long codes
-            margin: 10,
-            width: 1,
-            height: 60,
-          });
+            // Draw equipment info with word wrap
+            ctx.font = "11px Arial";
 
-          const dataUrl = fallbackCanvas.toDataURL("image/png");
-          resolve(dataUrl);
-        } else {
-          reject(barcodeError);
+            // Function to wrap text
+            const wrapText = (context, text, x, y, maxWidth, lineHeight) => {
+              const words = text.split(" ");
+              let line = "";
+              let testLine = "";
+              let lineCount = 0;
+              const maxLines = 5;
+
+              for (let n = 0; n < words.length; n++) {
+                testLine = line + words[n] + " ";
+                const metrics = context.measureText(testLine);
+                const testWidth = metrics.width;
+
+                if (testWidth > maxWidth && n > 0 && lineCount < maxLines - 1) {
+                  context.fillText(line, x, y);
+                  line = words[n] + " ";
+                  y += lineHeight;
+                  lineCount++;
+                } else {
+                  line = testLine;
+                }
+              }
+              context.fillText(line, x, y);
+              return y + lineHeight;
+            };
+
+            let yPosition = 60;
+            yPosition = wrapText(
+              ctx,
+              `Equipment: ${itemName}`,
+              20,
+              yPosition,
+              360,
+              14
+            );
+            yPosition = wrapText(
+              ctx,
+              `Barcode: ${itemCode}`,
+              20,
+              yPosition,
+              360,
+              14
+            );
+
+            if (equipmentDetails) {
+              yPosition += 5;
+              yPosition = wrapText(
+                ctx,
+                `Category: ${equipmentDetails.category || "N/A"}`,
+                20,
+                yPosition,
+                360,
+                14
+              );
+              yPosition = wrapText(
+                ctx,
+                `Status: ${equipmentDetails.status || "N/A"}`,
+                20,
+                yPosition,
+                360,
+                14
+              );
+              yPosition = wrapText(
+                ctx,
+                `Assigned To: ${equipmentDetails.assigned_to || "Unassigned"}`,
+                20,
+                yPosition,
+                360,
+                14
+              );
+            }
+
+            // Draw barcode
+            const barcodeCanvas = document.createElement("canvas");
+            barcodeCanvas.width = canvasWidth;
+            barcodeCanvas.height = canvasHeight;
+
+            jsbarcode(barcodeCanvas, itemCode, barcodeConfig);
+
+            ctx.drawImage(barcodeCanvas, 20, yPosition + 10);
+
+            // Footer
+            ctx.font = "10px Arial";
+            ctx.fillStyle = "#666";
+            ctx.fillText(
+              `Generated: ${new Date().toLocaleDateString()}`,
+              20,
+              290
+            );
+
+            const dataUrl = finalCanvas.toDataURL("image/png", 1.0);
+            resolve(dataUrl);
+          };
+
+          tempImg.src = canvas.toDataURL("image/png");
+        } catch (barcodeError) {
+          console.error("Barcode generation error:", barcodeError);
+
+          // Fallback for very long barcodes
+          if (barcodeError.message.includes("width") || itemCode.length > 50) {
+            // Create a simpler barcode for very long codes
+            const fallbackCanvas = document.createElement("canvas");
+            fallbackCanvas.width = 450;
+            fallbackCanvas.height = 100;
+
+            jsbarcode(fallbackCanvas, itemCode.substring(0, 50), {
+              format: "CODE128",
+              displayValue: false, // Hide text for very long codes
+              margin: 10,
+              width: 1,
+              height: 60,
+            });
+
+            const dataUrl = fallbackCanvas.toDataURL("image/png");
+            resolve(dataUrl);
+          } else {
+            reject(barcodeError);
+          }
         }
+      } catch (error) {
+        console.error("Error in generateBarcodeImage:", error);
+        reject(error);
       }
-    } catch (error) {
-      console.error("Error in generateBarcodeImage:", error);
-      reject(error);
-    }
-  });
-};
+    });
+  };
   // Simple barcode generation (just the barcode)
   const generateSimpleBarcode = (itemCode) => {
     return new Promise((resolve, reject) => {
@@ -1677,148 +1686,196 @@ const generateBarcodeImage = (itemCode, itemName, equipmentDetails = null) => {
     setIsRequestingEditPermission(true);
 
     try {
+      // Request camera permission first
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "environment" },
       });
 
+      // Stop the stream immediately since we just needed permission
       stream.getTracks().forEach((track) => track.stop());
 
+      // Set scanner to show
       setShowEditScanner(true);
-
-      if (!editScannerRef.current?.html5QrcodeScanner) {
-        editScannerRef.current = {
-          html5QrcodeScanner: new Html5QrcodeScanner(
-            "editModalQrReader",
-            {
-              fps: 10,
-              qrbox: { width: 250, height: 150 },
-            },
-            false
-          ),
-        };
-
-        editScannerRef.current.html5QrcodeScanner.render(
-          async (decodedText) => {
-            console.log("Edit Modal - Scanned barcode:", decodedText);
-
-            try {
-              const { data, error } = await supabase
-                .from("inventory")
-                .select("*")
-                .eq("item_code", decodedText)
-                .single();
-
-              if (error && error.code !== "PGRST116") throw error;
-
-              if (data) {
-                // CRITICAL: Check if scanned equipment is the SAME as the one being edited
-                if (data.id === editId) {
-                  // Same equipment - just update the barcode
-                  setEditItem((prev) => ({
-                    ...prev,
-                    itemCode: decodedText,
-                  }));
-                  toast.success("Barcode updated for current equipment!");
-                } else {
-                  // Different equipment - show error
-                  toast.error(
-                    <div style={{ padding: "10px" }}>
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          marginBottom: "8px",
-                        }}
-                      >
-                        <span style={{ fontSize: "20px", marginRight: "10px" }}>
-                          ⚠️
-                        </span>
-                        <strong style={{ fontSize: "16px" }}>
-                          Different Equipment Scanned
-                        </strong>
-                      </div>
-                      <div style={{ fontSize: "14px", lineHeight: "1.4" }}>
-                        You scanned equipment: <strong>{data.item_name}</strong>{" "}
-                        (ID: {data.id})<br />
-                        Currently editing: <strong>
-                          {editItem.itemName}
-                        </strong>{" "}
-                        (ID: {editId})
-                      </div>
-                      <div
-                        style={{
-                          fontSize: "12px",
-                          marginTop: "10px",
-                          color: "#666",
-                        }}
-                      >
-                        Cannot apply data from a different equipment in edit
-                        mode.
-                      </div>
-                    </div>,
-                    { autoClose: 5000, closeButton: true }
-                  );
-
-                  // Optional: Show the scan result modal with limited options
-                  setScanResult({
-                    type: "different",
-                    message: `Scanned equipment "${data.item_name}" is different from "${editItem.itemName}"`,
-                    equipmentData: data,
-                    barcode: decodedText,
-                  });
-                  setShowScanResultModal(true);
-                }
-              } else {
-                // New barcode - not in system
-                setEditItem((prev) => ({
-                  ...prev,
-                  itemCode: decodedText,
-                }));
-                toast.success(`New barcode set: ${decodedText}`);
-              }
-
-              stopEditScanner();
-            } catch (err) {
-              console.error("Error fetching equipment:", err);
-              // Just update the barcode field
-              setEditItem((prev) => ({
-                ...prev,
-                itemCode: decodedText,
-              }));
-              toast.info(`Barcode updated to: ${decodedText}`);
-              stopEditScanner();
-            }
-          },
-          (errorMessage) => {
-            if (
-              !errorMessage.includes("NotFoundException") &&
-              !errorMessage.includes("No MultiFormat Readers")
-            ) {
-              console.log("Edit scanner status:", errorMessage);
-            }
-          }
-        );
-      }
     } catch (error) {
       console.error("Edit modal camera permission denied:", error);
-      toast.error("Camera access denied. Please allow camera permissions.");
+
+      // Show specific error messages
+      if (
+        error.name === "NotAllowedError" ||
+        error.name === "PermissionDeniedError"
+      ) {
+        toast.error(
+          "Camera access denied. Please allow camera permissions in your browser settings."
+        );
+      } else if (error.name === "NotFoundError") {
+        toast.error(
+          "No camera found. Please check if your device has a camera."
+        );
+      } else if (error.name === "NotReadableError") {
+        toast.error("Camera is already in use by another application.");
+      } else {
+        toast.error("Camera access error: " + error.message);
+      }
     } finally {
       setIsRequestingEditPermission(false);
     }
   };
 
   const stopEditScanner = () => {
-    if (editScannerRef.current?.html5QrcodeScanner) {
-      try {
-        editScannerRef.current.html5QrcodeScanner.clear().catch((error) => {
-          console.error("Failed to clear edit scanner:", error);
-        });
-        editScannerRef.current.html5QrcodeScanner = null;
-      } catch (error) {
-        console.error("Error stopping edit scanner:", error);
-      }
-    }
     setShowEditScanner(false);
+  };
+
+  // Handle scan result
+  // Handle scan result
+  const handleEditScan = (result) => {
+    if (!result || !result[0]) return;
+
+    const decodedText = result[0].rawValue;
+    console.log("Edit Modal - Scanned barcode:", decodedText);
+
+    // Process the scan result
+    processScannedBarcode(decodedText);
+  };
+
+const processScannedBarcode = async (decodedText) => {
+  try {
+    const { data, error } = await supabase
+      .from("inventory")
+      .select("*")
+      .eq("item_code", decodedText)
+      .single();
+
+    if (error && error.code !== "PGRST116") throw error;
+
+    if (data) {
+      if (data.id === editId) {
+        setEditItem((prev) => ({
+          ...prev,
+          itemCode: decodedText,
+        }));
+        toast.success("Barcode updated for current equipment!");
+      } else {
+        toast.error(
+          <div style={{ padding: "10px" }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                marginBottom: "8px",
+              }}
+            >
+              <span style={{ fontSize: "20px", marginRight: "10px" }}>⚠️</span>
+              <strong style={{ fontSize: "16px" }}>
+                Different Equipment Scanned
+              </strong>
+            </div>
+            <div style={{ fontSize: "14px", lineHeight: "1.4" }}>
+              You scanned equipment: <strong>{data.item_name}</strong> (ID:{" "}
+              {data.id})<br />
+              Currently editing: <strong>{editItem.itemName}</strong> (ID:{" "}
+              {editId})
+            </div>
+            <div
+              style={{
+                fontSize: "12px",
+                marginTop: "10px",
+                color: "#666",
+              }}
+            >
+              Cannot apply data from a different equipment in edit mode.
+            </div>
+          </div>,
+          { autoClose: 5000, closeButton: true }
+        );
+
+        setScanResult({
+          type: "different",
+          message: `Scanned equipment "${data.item_name}" is different from "${editItem.itemName}"`,
+          equipmentData: data,
+          barcode: decodedText,
+        });
+        setShowScanResultModal(true);
+      }
+    } else {
+      setEditItem((prev) => ({
+        ...prev,
+        itemCode: decodedText,
+      }));
+      toast.success(`New barcode set: ${decodedText}`);
+    }
+
+    stopEditScanner();
+  } catch (err) {
+    console.error("Error fetching equipment:", err);
+    setEditItem((prev) => ({
+      ...prev,
+      itemCode: decodedText,
+    }));
+    toast.info(`Barcode updated to: ${decodedText}`);
+    stopEditScanner();
+  }
+};
+  const handleEditScanError = (error) => {
+    console.log("Scanner error:", error);
+    // Don't show toast for every error, just log it
+  };
+
+  const initializeEditScanner = async () => {
+    try {
+      // Try to find the element
+      const element = document.getElementById("editModalQrReader");
+
+      if (!element) {
+        console.log("Element not found, trying again...");
+        // Try again after a delay
+        await new Promise((resolve) => setTimeout(resolve, 200));
+        const element2 = document.getElementById("editModalQrReader");
+
+        if (!element2) {
+          throw new Error("Scanner container element not found after retry");
+        }
+      }
+
+      console.log("editModalQrReader element found!");
+
+      // Clear any existing scanner
+      if (editScannerRef.current?.html5QrcodeScanner) {
+        try {
+          await editScannerRef.current.html5QrcodeScanner.clear();
+        } catch (error) {
+          console.warn("Error clearing previous scanner:", error);
+        }
+      }
+
+      // Initialize new scanner
+      editScannerRef.current = {
+        html5QrcodeScanner: new Html5QrcodeScanner(
+          "editModalQrReader",
+          {
+            fps: 10,
+            qrbox: { width: 250, height: 150 },
+            rememberLastUsedCamera: true,
+          },
+          false
+        ),
+      };
+
+      editScannerRef.current.html5QrcodeScanner.render(
+        async (decodedText) => {
+          // ... existing scan handler code ...
+        },
+        (errorMessage) => {
+          // ... existing error handler code ...
+        }
+      );
+
+      setIsRequestingEditPermission(false);
+    } catch (error) {
+      console.error("Failed to initialize scanner:", error);
+      toast.error("Failed to initialize scanner. Please try again.");
+      setIsRequestingEditPermission(false);
+      setShowEditScanner(false);
+    }
   };
 
   // Cleanup edit scanner when component unmounts or edit modal closes
@@ -1827,6 +1884,17 @@ const generateBarcodeImage = (itemCode, itemName, equipmentDetails = null) => {
       stopEditScanner();
     };
   }, []);
+
+  // Add this useEffect to clean up the scanner when modal closes
+  useEffect(() => {
+    if (!showEditScanner && editScannerRef.current?.html5QrcodeScanner) {
+      try {
+        editScannerRef.current.html5QrcodeScanner.clear();
+      } catch (error) {
+        console.warn("Error cleaning up edit scanner:", error);
+      }
+    }
+  }, [showEditScanner]);
   const startScanner = async () => {
     setIsRequestingPermission(true);
     try {
@@ -3813,6 +3881,8 @@ const generateBarcodeImage = (itemCode, itemName, equipmentDetails = null) => {
             </div>
           </div>
         )}
+
+        {/* Edit Modal Scanner */}
         {/* Edit Modal Scanner */}
         {showEditScanner && (
           <div
@@ -3822,6 +3892,7 @@ const generateBarcodeImage = (itemCode, itemName, equipmentDetails = null) => {
             <div
               className={styles.inventoryQrScannerModal}
               onClick={(e) => e.stopPropagation()}
+              style={{ maxWidth: "500px" }}
             >
               <div className={styles.inventoryQrScannerHeader}>
                 <h3>
@@ -3839,33 +3910,54 @@ const generateBarcodeImage = (itemCode, itemName, equipmentDetails = null) => {
               </div>
               <div className={styles.inventoryQrScannerContent}>
                 <div className={styles.inventoryEditScannerInfo}>
-                  <p style={{ color: "#1060af", fontWeight: "bold" }}>
+                  <p
+                    style={{
+                      color: "#1060af",
+                      fontWeight: "bold",
+                      marginBottom: "5px",
+                    }}
+                  >
                     Currently editing: {editItem.itemName}
                   </p>
-                  <p style={{ fontSize: "12px", color: "#666" }}>
+                  <p
+                    style={{ fontSize: "12px", color: "#666", marginTop: "0" }}
+                  >
                     ⚠️ Only scan the SAME equipment's barcode or a NEW barcode
                   </p>
                 </div>
 
                 <div
-                  className={styles.inventoryCameraPermissionRequest}
                   style={{
-                    display: isRequestingEditPermission ? "block" : "none",
+                    width: "100%",
+                    minHeight: "300px",
+                    backgroundColor: "#000",
+                    borderRadius: "8px",
+                    overflow: "hidden",
+                    position: "relative",
                   }}
                 >
-                  <div className={styles.inventoryPermissionIcon}>📷</div>
-                  <h4>Requesting Camera Access...</h4>
-                  <p>Please wait while we access your camera.</p>
+                  <Scanner
+                    onScan={handleEditScan}
+                    onError={handleEditScanError}
+                    constraints={{
+                      facingMode: "environment",
+                      width: { ideal: 640 },
+                      height: { ideal: 480 },
+                    }}
+                    scanDelay={300}
+                    styles={{
+                      container: {
+                        width: "100%",
+                        height: "100%",
+                      },
+                      video: {
+                        width: "100%",
+                        height: "100%",
+                        objectFit: "cover",
+                      },
+                    }}
+                  />
                 </div>
-
-                <div
-                  id="editModalQrReader"
-                  className={styles.inventoryQrReader}
-                  style={{
-                    display: !isRequestingEditPermission ? "block" : "none",
-                    height: "300px",
-                  }}
-                ></div>
 
                 <p className={styles.inventoryQrScannerHint}>
                   Point camera at the <strong>same equipment's</strong> barcode

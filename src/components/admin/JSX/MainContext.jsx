@@ -1436,17 +1436,6 @@ const MainContent = ({ isCollapsed }) => {
             </div>
           )}
 
-          {/* Bottom Pagination */}
-          {recentActivities.length > activityRowsPerPage && (
-            <div className="activity-bottom-pagination">
-              {renderPaginationButtons(
-                activityCurrentPage,
-                setActivityCurrentPage,
-                activityRowsPerPage,
-                recentActivities
-              )}
-            </div>
-          )}
 
           {/* Activity counter */}
           {!activitiesLoading &&
