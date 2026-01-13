@@ -1,842 +1,4 @@
-/* Add these to your RecruitmentPersonnel.module.css */
-
-.photoCell {
-  cursor: pointer;
-  transition: opacity 0.2s;
-}
-
-.photoCell:hover {
-  opacity: 0.8;
-}
-
-.tablePhoto {
-  width: 70px;
-  height: 70px;
-  border-radius: 4px;
-  object-fit: cover;
-  border: 1px solid #ddd;
-}
-
-.noPhoto {
-  width: 70px;
-  height: 70px;
-  background-color: #f5f5f5;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  color: #666;
-}
-
-.resumeCell {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 5px;
-}
-
-.resumeBtn {
-  background-color: #4f46e5;
-  color: white;
-  border: none;
-  padding: 6px 12px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 12px;
-  transition: background-color 0.3s;
-  white-space: nowrap;
-}
-
-.resumeBtn:hover {
-  background-color: #4338ca;
-}
-
-.resumeInfo small {
-  font-size: 10px;
-  color: #666;
-  max-width: 100px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.noResume {
-  color: #999;
-  font-style: italic;
-  font-size: 12px;
-}
-
-.actionButtons {
-  display: flex;
-  gap: 5px;
-}
-
-.editBtn, .deleteBtn {
-  padding: 6px 12px;
-  border-radius: 4px;
-  border: none;
-  cursor: pointer;
-  font-size: 12px;
-  text-align: center!important;
-  justify-content: center;
-  transition: background-color 0.3s;
-}
-
-.editBtn {
-  background-color: #f59e0b;
-  color: white;
-}
-
-.editBtn:hover {
-  background-color: #d97706;
-}
-
-.deleteBtn {
-  background-color: #dc2626;
-  color: white;
-}
-
-.deleteBtn:hover {
-  background-color: #b91c1c;
-}
-
-.editBtn:disabled,
-.deleteBtn:disabled,
-.resumeBtn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-.container {
-  min-height: 100vh;
-  background: #f5f5f5;
-}
-
-.loadingContainer {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 100px 0;
-}
-
-.loadingSpinner {
-  width: 50px;
-  height: 50px;
-  border: 5px solid #f3f3f3;
-  border-top: 5px solid #3498db;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-  margin-bottom: 20px;
-}
-
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-
-
-h1 {
-  color: #2c3e50;
-  margin-bottom: 30px;
-  font-size: 28px;
-}
-
-/* Top Controls */
-.topControls {
-  background: white;
-  padding: 20px;
-  border-radius: 10px;
-  margin-bottom: 20px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-.tableHeader {
-  display: flex;
-  gap: 15px;
-  align-items: center;
-}
-
-.filterType, .searchBar {
-  padding: 10px 15px;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  font-size: 14px;
-}
-
-.searchBar {
-  flex: 1;
-  min-width: 200px;
-}
-
-.refreshButton {
-  padding: 10px 15px;
-  background: #3498db;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 14px;
-}
-
-.refreshButton:hover {
-  background: #2980b9;
-}
-
-.refreshButton:disabled {
-  background: #95a5a6;
-  cursor: not-allowed;
-}
-
-/* Summary Cards */
-.summary {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 15px;
-  margin-bottom: 30px;
-}
-
-.summaryCard {
-  background: white;
-  padding: 20px;
-  border-radius: 10px;
-  text-align: center;
-  cursor: pointer;
-  border: 2px solid transparent;
-  transition: all 0.3s ease;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-.summaryCard:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(0,0,0,0.15);
-}
-
-.summaryCard.active {
-  border-color: #3498db;
-}
-
-.summaryCard.total { border-left: 4px solid #3498db; }
-.summaryCard.applied { border-left: 4px solid #facc15; }
-.summaryCard.screening { border-left: 4px solid #3b82f6; }
-.summaryCard.interview { border-left: 4px solid #06b6d4; }
-.summaryCard.final { border-left: 4px solid #10b981; }
-
-.summaryCard h3 {
-  margin: 0 0 10px 0;
-  font-size: 16px;
-  color: #666;
-}
-
-.summaryCard p {
-  margin: 0;
-  font-size: 32px;
-  font-weight: bold;
-  color: #2c3e50;
-}
-
-/* Upload Progress */
-.uploadProgress {
-  background: white;
-  padding: 15px;
-  border-radius: 10px;
-  margin-bottom: 20px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-.progressBar {
-  height: 10px;
-  background: #eee;
-  border-radius: 5px;
-  overflow: hidden;
-  margin-bottom: 10px;
-}
-
-.progressFill {
-  height: 100%;
-  background: linear-gradient(90deg, #3498db, #2ecc71);
-  transition: width 0.3s ease;
-}
-
-/* Form Card */
-.card {
-  background: rgb(255, 249, 249);
-  border-radius: 12px;
-  padding: 20px;
-  margin-bottom: 30px; /* Reduced from 50px */
-  box-shadow: 0 5px 4px rgba(16, 95, 175, 0.597);
-  position: relative;
-  margin-left: -3px;
-  padding-top: 65px;
-  width: 101%;
-  box-sizing: border-box;
-  min-height: auto; /* Changed from height: 100vh */
-  max-height: none; /* Remove max height */
-  overflow: visible; /* Changed from hidden */
-}
-
-
-.card h2 {
-  margin-top: 0;
-  color: #2c3e50;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.showFormBtn {
-  padding: 8px 16px;
-  background: #3498db;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 14px;
-}
-
-.showFormBtn:hover {
-  background: #2980b9;
-}
-
-.showFormBtn.showing {
-  background: #e74c3c;
-}
-
-/* Form Layout */
-.form.layout {
-  display: none;
-  flex-direction: row;
-  gap: 30px;
-  margin-top: 30px;
-  max-height: 600px; /* Limit height */
-  overflow-y: auto; /* Add scroll if needed */
-  padding-right: 10px;
-}
-
-.form.layout.show {
-  display: flex;
-}
-
-.photoSection {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.photoPreview {
-  width: 150px;
-  height: 150px;
-  border: 2px dashed #ddd;
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 20px;
-  overflow: hidden;
-  background: #f8f9fa;
-}
-
-.photoPreviewImg {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.fileUpload {
-  width: 100%;
-}
-
-.fileUploadLabel {
-  display: block;
-  padding: 8px 12px;
-  background: #3498db;
-  color: white;
-  border-radius: 6px;
-  text-align: center;
-  cursor: pointer;
-  margin-bottom: 5px;
-}
-
-.fileUploadLabel:hover {
-  background: #2980b9;
-}
-
-.removeFileBtn {
-  margin-top: 5px;
-  padding: 4px 8px;
-  background: #e74c3c;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 12px;
-}
-
-.removeFileBtn:hover {
-  background: #c0392b;
-}
-
-/* Form Fields */
-.infoSection {
-  margin-bottom: 20px; /* Reduced from 100px */
-  flex: 1;
-  padding-bottom: 80px; /* Space for buttons */
-}
-
-
-.formRow {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px;
-}
-
-.formGroup {
-  position: relative;
-  margin-bottom: 25px; /* Ensure proper spacing between form groups */
-}
-.formGroup > .generatePasswordBtn:hover:not(:disabled) {
-  background: #2980b9;
-}
-
-.formGroup > .generatePasswordBtn:disabled {
-  background: #95a5a6;
-  cursor: not-allowed;
-}
-.formGroup > .generatePasswordBtn {
-  margin-top: 8px;
-  padding: 8px 12px;
-  background: #3498db;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 600;
-  width: 100%;
-  transition: background-color 0.3s ease;
-}
-.floatingGroup {
-  position: relative;
-  margin-bottom: 5px; /* Reduced since Generate button is below */
-}
-
-.floatingInput, .floatingSelect {
-  width: 100%;
-  padding: 15px;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  font-size: 16px;
-  background: white;
-}
-
-.floatingInput:focus, .floatingSelect:focus {
-  outline: none;
-  border-color: #3498db;
-  box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
-}
-
-.floatingLabel {
-  position: absolute;
-  top: 50%;
-  left: 15px;
-  transform: translateY(-50%);
-  background: white;
-  padding: 0 5px;
-  color: #999;
-  transition: all 0.2s ease;
-  pointer-events: none;
-}
-
-.passwordInputGroup .floatingInput:focus + .floatingLabel,
-.passwordInputGroup .floatingInput:not(:placeholder-shown) + .floatingLabel {
-  top: -5px;
-  font-size: 12px;
-  color: #3498db;
-  background: #fff;
-  padding: 0 5px;
-}
-
-/* Form Actions */
-.formActions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 15px;
-  margin-top: 20px;
-  padding-top: 20px;
-  border-top: 1px solid #eee;
-}
-
-.submit, .cancel {
-  padding: 12px 24px;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.submit {
-  background: #2ecc71;
-  color: white;
-}
-
-.submit:hover {
-  background: #27ae60;
-}
-
-.submit:disabled {
-  background: #95a5a6;
-  cursor: not-allowed;
-}
-
-.cancel {
-  background: #e74c3c;
-  color: white;
-}
-
-.cancel:hover {
-  background: #c0392b;
-}
-
-/* Table Section */
-.tableHeaderSection {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-}
-
-.tableHeaderSection h2 {
-  margin: 0;
-  color: #2c3e50;
-}
-
-.tableBorder {
-  background: white;
-  border-radius: 10px;
-  overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-}
-
-.tableBorder {
-  width: 100%;
-  max-width: auto;
-  overflow-x: auto; /* Enable horizontal scrolling */
-  overflow-y: hidden;
-  -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
-  border-radius: 12px;
-  box-shadow: 0 5px 4px rgba(16, 95, 175, 0.597);
-  background: #fff;
-  position: relative;
-  margin-bottom: 20px;
-}
-
-.table th {
-  background: #f8f9fa;
-  padding: 15px;
-  text-align: left;
-  font-weight: 600;
-  color: #2c3e50;
-  border-bottom: 2px solid #eee;
-}
-
-.table td {
-  padding: 15px;
-  border-bottom: 1px solid #eee;
-}
-
-.table tr:hover {
-  background: #f8f9fa;
-}
-
-/* Candidate Cell */
-.candidateCell {
-  display: flex;
-  align-items: center;
-  gap: 15px;
-}
-
-.candidatePhoto {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  object-fit: cover;
-}
-
-.candidatePhotoPlaceholder {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: #3498db;
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: bold;
-}
-
-.candidateContact {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  margin-top: 5px;
-  font-size: 12px;
-  color: #666;
-}
-
-.candidateContact span {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-
-/* Action Buttons */
-.actionButtons {
-  display: flex;
-  gap: 5px;
-}
-
-.viewBtn, .downloadBtn, .editBtn, .deleteBtn {
-  padding: 6px 10px;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 14px;
-  transition: all 0.2s ease;
-}
-
-.viewBtn {
-  background: #3498db;
-  color: white;
-}
-
-.viewBtn:hover {
-  background: #2980b9;
-}
-
-.downloadBtn {
-  background: #2ecc71;
-  color: white;
-}
-
-.downloadBtn:hover {
-  background: #27ae60;
-}
-
-.editBtn {
-  background: #f39c12;
-  color: white;
-}
-
-.editBtn:hover {
-  background: #d68910;
-}
-
-.deleteBtn {
-  background: #e74c3c;
-  color: white;
-}
-
-.deleteBtn:hover {
-  background: #c0392b;
-}
-
-/* Status Badge */
-.status {
-  display: inline-block;
-  padding: 6px 12px;
-  border-radius: 20px;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-/* Pagination */
-.paginationContainer {
-  display: flex;
-  gap: 5px;
-  flex-wrap: wrap;
-  justify-content: center;
-  margin: 20px 0;
-}
-
-.paginationBtn {
-  padding: 8px 12px;
-  border: 1px solid #ddd;
-  background: white;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 14px;
-  min-width: 40px;
-}
-
-.paginationBtn:hover {
-  background: #f8f9fa;
-}
-
-.paginationBtn.active {
-  background: #3498db;
-  color: white;
-  border-color: #3498db;
-}
-
-.paginationBtn.disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.paginationEllipsis {
-  padding: 8px 12px;
-  color: #666;
-}
-
-/* Modal */
-.modal {
-  display: none;
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0,0,0,0.5);
-  z-index: 1000;
-  align-items: center;
-  justify-content: center;
-}
-
-.modal.show {
-  display: flex;
-}
-
-.modalContent {
-  background: white;
-  width: 90%;
-  max-width: 500px;
-  border-radius: 10px;
-  overflow: hidden;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.2);
-}
-
-.modalHeader {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 20px;
-  background: #f8f9fa;
-  border-bottom: 1px solid #eee;
-}
-
-.modalHeader h2 {
-  margin: 0;
-  color: #2c3e50;
-}
-
-.closeBtn {
-  background: none;
-  border: none;
-  font-size: 24px;
-  cursor: pointer;
-  color: #666;
-}
-
-.closeBtn:hover {
-  color: #333;
-}
-
-.modalBody {
-  padding: 20px;
-}
-
-.modalActions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 15px;
-  margin-top: 20px;
-}
-
-.cancelBtn, .deleteConfirmBtn {
-  padding: 10px 20px;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.cancelBtn {
-  background: #95a5a6;
-  color: white;
-}
-
-.cancelBtn:hover {
-  background: #7f8c8d;
-}
-
-.deleteConfirmBtn {
-  background: #e74c3c;
-  color: white;
-}
-
-.deleteConfirmBtn:hover {
-  background: #c0392b;
-}
-
-/* Edit Form in Modal */
-.editForm {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.editForm .formGroup label {
-  display: block;
-  margin-bottom: 8px;
-  font-weight: 600;
-  color: #2c3e50;
-}
-
-.editForm .formGroup input,
-.editForm .formGroup select {
-  width: 100%;
-  padding: 10px;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  font-size: 14px;
-}
-
-.editForm .formGroup input:focus,
-.editForm .formGroup select:focus {
-  outline: none;
-  border-color: #3498db;
-  box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
-}
-
-/* Responsive */
-@media (max-width: 768px) {
-
-  
-  .form.layout {
-    grid-template-columns: 1fr;
-  }
-  
-  .formRow {
-    grid-template-columns: 1fr;
-  }
-  
-  .summary {
-    grid-template-columns: repeat(2, 1fr);
-  }
-  
-  .tableHeader {
-    flex-direction: column;
-    align-items: stretch;
-  }
-  
-  .actionButtons {
-    flex-direction: column;
-  }
-}
-/* RecruitmentPersonnel.module.css */
+/* RecruitmentPersonnel.module.css - UPDATED VERSION */
 :root {
   --text-primary: #000000;
   --text-secondary: #ffffff;
@@ -879,7 +41,7 @@ h1 {
 }
 
 /* ================================
-    FORM STYLES - REPLICATED FROM PERSONNEL REGISTER
+    FORM STYLES
   =============================== */
 .form {
   max-height: 0;
@@ -1152,7 +314,7 @@ h1 {
 }
 
 /* ================================
-    TABLE STYLES - REPLICATED FROM PERSONNEL REGISTER
+    TABLE STYLES - FIXED COLUMN WIDTHS
   =============================== */
 .tableHeaderSection {
   display: flex;
@@ -1163,41 +325,35 @@ h1 {
   border-left: 4px solid #085cb1;
   color: black;
   padding-left: 10px;
-
- 
 }
 
 .tableBorder {
   width: 101%;
-  max-width: auto;
-  overflow-x: auto; /* Enable horizontal scrolling */
+  overflow-x: auto;
   overflow-y: hidden;
-  -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+  -webkit-overflow-scrolling: touch;
   border-radius: 12px;
   box-shadow: 0 5px 4px rgba(16, 95, 175, 0.597);
   background: #fff;
   position: relative;
+  margin-bottom: 20px;
 }
 
 .table {
-  width: 100%!important; /* Change from 98.5% to auto */
-max-width: auto;
-  padding: 20px;
+  width: 100% !important;
+  min-width: 1500px; /* REDUCED from 1980px to fit content better */
   border-collapse: separate;
   border-spacing: 0;
   font-size: 14px;
-  margin-left: 0; /* Remove negative margin */
   background: #fff;
   border-radius: 12px;
   text-align: center;
-  min-width: 1980px; /* Increase to accommodate extra column */
-  box-shadow: none; /* Remove shadow since container has it */
+  box-shadow: none;
 }
 
 .table thead {
   position: sticky;
   top: 0;
-    max-width: auto;
   z-index: 1;
 }
 
@@ -1209,9 +365,8 @@ max-width: auto;
   border-bottom: 3px solid var(--border);
 }
 
-
 .table th {
-  padding: 14px 16px;
+  padding: 14px 8px; /* Reduced padding for tighter fit */
   text-align: center;
   font-weight: bold;
   font-size: 15px;
@@ -1221,31 +376,32 @@ max-width: auto;
   top: 0;
   z-index: 2;
   background: #529ae1;
-  white-space: nowrap; /* Prevent header text from wrapping */
+  white-space: nowrap;
 }
+
 .table tbody td {
   background: var(--bg-main);
   border-bottom: 1px solid rgba(0, 0, 0, 0.585);
   color: var(--text-primary);
   transition: background 0.25s ease;
-  padding: 12px 16px;
+  padding: 12px 8px; /* Reduced padding for tighter fit */
   text-align: center;
-  white-space: nowrap; /* Prevent cell content from wrapping */
+  white-space: nowrap;
+  vertical-align: middle; /* Added for better vertical alignment */
 }
+
 .tableBorder::-webkit-scrollbar {
-  height: 20px;
+  height: 10px;
 }
 
 .tableBorder::-webkit-scrollbar-track {
   background: #f1f1f1;
-  border-radius: 0 0 20px 20px;
+  border-radius: 10px;
 }
 
 .tableBorder::-webkit-scrollbar-thumb {
   background: #529ae1;
   border-radius: 10px;
-  display: none;
-  height: 101px;
 }
 
 .tableBorder::-webkit-scrollbar-thumb:hover {
@@ -1254,84 +410,104 @@ max-width: auto;
 
 /* Firefox Scrollbar */
 .tableBorder {
-  
   scrollbar-color: #529ae1 #f1f1f1;
 }
 
-/* Column width adjustments for better scrolling */
-.table th:nth-child(1), /* Photo */
+/* ================================
+    COLUMN WIDTH ADJUSTMENTS - FIXED WHITE SPACE ISSUE
+  =============================== */
+/* Photo column */
+.table th:nth-child(1),
 .table td:nth-child(1) {
   min-width: 80px;
   max-width: 100px;
+  width: 80px;
 }
 
-.table th:nth-child(2), /* Candidate */
+/* Candidate column */
+.table th:nth-child(2),
 .table td:nth-child(2) {
   min-width: 150px;
   max-width: 200px;
+  width: 150px;
 }
 
-.table th:nth-child(3), /* Position */
+/* Position column */
+.table th:nth-child(3),
 .table td:nth-child(3) {
   min-width: 150px;
   max-width: 200px;
+  width: 150px;
 }
 
-.table th:nth-child(4), /* Username */
+/* Username column */
+.table th:nth-child(4),
 .table td:nth-child(4) {
   min-width: 120px;
   max-width: 150px;
+  width: 120px;
 }
 
-.table td:nth-child(5), /* Password */
-.table tr:nth-child(5) {
-  min-width: 290px;
-  max-width: 290px;
-  width: auto;
-
+/* Password column - FIXED: Reduced width to prevent white space */
+.table th:nth-child(5),
+.table td:nth-child(5) {
+  min-width: 150px; /* CHANGED from 290px */
+  max-width: 180px; /* CHANGED from 290px */
+  width: 150px;
+  color: #000!important;
 }
 
-.table th:nth-child(6), /* Application Date */
+/* Application Date column - FIXED: Adjusted to align properly */
+.table th:nth-child(6),
 .table td:nth-child(6) {
-  min-width: 220px;
-  max-width: 250px;
+  min-width: 120px; /* ADJUSTED */
+  max-width: 150px;
+  width: 120px;
 }
 
-.table th:nth-child(7), /* Stage */
+/* Stage column */
+.table th:nth-child(7),
 .table td:nth-child(7) {
   min-width: 100px;
   max-width: 120px;
+  width: 100px;
 }
 
-.table th:nth-child(8), /* Interview Date */
+/* Interview Date column */
+.table th:nth-child(8),
 .table td:nth-child(8) {
   min-width: 120px;
   max-width: 150px;
+  width: 120px;
 }
 
-.table th:nth-child(9), /* Status */
+/* Status column */
+.table th:nth-child(9),
 .table td:nth-child(9) {
   min-width: 100px;
   max-width: 120px;
+  width: 100px;
 }
 
-.table th:nth-child(10), /* Resume */
+/* Resume column */
+.table th:nth-child(10),
 .table td:nth-child(10) {
   min-width: 120px;
   max-width: 150px;
+  width: 120px;
 }
 
-.table th:nth-child(11), /* Actions */
+/* Actions column */
+.table th:nth-child(11),
 .table td:nth-child(11) {
   min-width: 120px;
   max-width: 150px;
-}
-.table th:nth-child(12), /* Actions */
-.table td:nth-child(12) {
-  min-width: 120px;
-  max-width: 150px;
+  width: 120px;
 }
 
+/* ================================
+    TABLE ROW STYLES
+  =============================== */
 /* Row alternating colors */
 .table tbody tr:nth-child(even) td {
   background: #81878c;
@@ -1372,65 +548,6 @@ max-width: auto;
 .table tbody tr:has(+ tr:hover),
 .table tbody tr:hover + tr {
   background: rgba(255, 215, 0, 0.06);
-}
-
-/* Responsive adjustments */
-@media (max-width: 768px) {
-  .tableBorder {
-    width: 98%;
-    margin: 0 auto;
-  }
-  
-  .table {
-    min-width: 900px; /* Smaller min-width for mobile */
-    font-size: 13px;
-  }
-  
-  .table th,
-  .table td {
-    padding: 10px 12px;
-  }
-}
-/* Row alternating colors */
-.table tbody tr:nth-child(even) td {
-  background: #81878c;
-  color: var(--text-secondary);
-}
-
-.table tbody tr:nth-child(even):hover td {
-  background: var(--accent);
-}
-
-.table tbody tr:nth-child(odd) td {
-  background: rgba(255, 255, 255, 0.95);
-}
-
-.table tbody tr:nth-child(odd):hover td {
-  background: var(--accent);
-}
-
-/* Row hover effects */
-.table tbody tr {
-  transition: transform 0.25s ease, box-shadow 0.25s ease, background 0.25s ease;
-}
-
-.table tbody tr:hover {
-  background: #549ee9;
-  color: #fff;
-  transform: translateY(-4px) scale(1.01);
-  box-shadow: 0 4px 8px rgba(33, 17, 17, 0.914), 0 8px 16px rgba(0, 0, 0, 0.1);
-  z-index: 5;
-  position: relative;
-}
-
-.table tbody tr:hover td {
-  background: #549ee9 !important;
-  color: #fff;
-}
-
-.table tbody tr:has(+ tr:hover),
-.table tbody tr:hover + tr {
-  background: rgba(255,215,0,0.06);
 }
 
 /* ================================
@@ -1478,6 +595,102 @@ max-width: auto;
   transform: translateY(-2px);
   transition: ease 0.3s;
   box-shadow: 0 4px 15px rgb(0, 0, 0);
+}
+
+/* ================================
+    PASSWORD CELL STYLES - FIXED LAYOUT
+  =============================== */
+.passwordCell {
+  position: relative;
+  padding: 8px 4px !important;
+}
+
+.passwordContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 60px;
+  text-align: center;
+}
+
+.passwordMask {
+  font-family: "Courier New", monospace;
+  font-size: 14px;
+  letter-spacing: 1px;
+  padding: 6px 10px;
+  background: #f5f5f500;
+  border-radius: 4px;
+  border: 1px solid #ddd;
+  width: 100%;
+  word-break: break-all;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.passwordActions {
+  display: flex;
+  gap: 5px;
+  justify-content: center;
+  width: 100%;
+}
+
+.passwordToggle,
+.copyBtn {
+  background: var(--bg-buttons);
+  border: none;
+  color: white;
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  padding: 0;
+}
+
+.passwordToggle:hover,
+.copyBtn:hover {
+  background: var(--bg-buttons_active);
+  transform: scale(1.05);
+}
+
+.passwordIcon,
+.copyIcon {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.copiedText {
+  position: absolute;
+  top: -20px;
+  right: 0;
+  background: #4caf50;
+  color: white;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 11px;
+  animation: fadeInOut 2s ease-in-out;
+}
+
+@keyframes fadeInOut {
+  0% {
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
 }
 
 /* ================================
@@ -1692,7 +905,7 @@ max-width: auto;
 }
 
 /* ================================
-    TOP CONTROLS & SUMMARY CARDS (Keep existing styles)
+    TOP CONTROLS & SUMMARY CARDS
   =============================== */
 .topControls {
   display: flex;
@@ -2027,7 +1240,7 @@ max-width: auto;
 .floatingGroup {
   position: relative;
   width: 100%;
-  margin-bottom: 25px; /* Add spacing between form groups */
+  margin-bottom: 25px;
 }
 
 .floatingLabel {
@@ -2099,154 +1312,21 @@ max-width: auto;
 
 .generatePasswordBtn:hover {
   background: #2980b9;
-}/* ================================
-    PASSWORD CELL STYLES (From Personnel Register)
-  =============================== */
-.passwordCell {
-  position: relative;
-  padding: px 4px !important;
 }
 
-.passwordContainer {
-  display: flex;
-
-  gap: 8px;
-  justify-content: center;
-  text-align: center;
-  position: relative;
-  align-items: center!important;
-  min-height: 36px;
-}
-
-.passwordMask {
-  font-family: "Courier New", monospace;
-  font-size: 14px;
-  letter-spacing: 1px;
-  padding: 4px 8px;
-  background: #f5f5f500;
-  border-radius: 4px;
-  border: 1px solid #000000;
-  min-width: 80px;
-  flex: 1;
-  display: inline-block;
-  word-break: break-all;
-}
-
-.passwordActions {
-  display: flex;
-  gap: 4px;
-  flex-shrink: 0;
-}
-
-.passwordToggle,
-.copyBtn {
-  background: var(--bg-buttons);
-  border: none;
-  color: white;
-  width: 32px;
-  height: 32px;
-  border-radius: 4px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s ease;
-  padding: 0;
-}
-
-.passwordToggle:hover,
-.copyBtn:hover {
-  background: var(--bg-buttons_active);
-  transform: scale(1.05);
-}
-
-.passwordIcon,
-.copyIcon {
-  font-size: 16px;
-  line-height: 1;
-}
-
-.copiedText {
-  position: absolute;
-  top: -20px;
-  right: 0;
-  background: #4caf50;
-  color: white;
-  padding: 2px 6px;
-  border-radius: 3px;
-  font-size: 11px;
-  animation: fadeInOut 2s ease-in-out;
-}
-
-@keyframes fadeInOut {
-  0% {
-    opacity: 0;
-  }
-  20% {
-    opacity: 1;
-  }
-  80% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 0;
-  }
-}
-
-/* Remove the old password cell styles */
-.passwordCell {
-  /* Remove previous styles */
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  top: 0px;
-  height: 100px;
-}
-
-.togglePassword {
-  /* Remove previous styles */
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 14px;
-  padding: 4px;
-}
-
-/* Add this for the password input in forms */
-.passwordInputGroup {
-  position: relative;
-  width: 100%;
-}
-
-.showPasswordBtn {
-  position: absolute;
-  right: 10px;
-  top: 50%;
-  transform: translateY(-50%);
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 16px;
-  padding: 5px;
-  z-index: 2;
-}
 /* ================================
-    FIX FOR FLOATING LABELS ON PASSWORD INPUTS
+    PASSWORD INPUT WITH EYE ICON
   =============================== */
-
-/* Container for password input with eye icon */
 .passwordInputContainer {
   position: relative;
   width: 100%;
 }
 
-/* Make sure floating input has right padding for the eye icon */
 .passwordInputContainer .floatingInput {
   padding-right: 40px !important;
   width: 100%;
 }
 
-/* Eye toggle button styling */
 .eyeToggleBtn {
   position: absolute;
   right: 10px;
@@ -2265,7 +1345,7 @@ max-width: auto;
   height: 30px;
   border-radius: 4px;
   transition: all 0.2s ease;
-  z-index: 3; /* Ensure it's above the label */
+  z-index: 3;
 }
 
 .eyeToggleBtn:hover {
@@ -2278,7 +1358,6 @@ max-width: auto;
   cursor: not-allowed;
 }
 
-/* Ensure the floating label works correctly with the eye button */
 .passwordInputContainer .floatingInput:focus + .floatingLabel,
 .passwordInputContainer .floatingInput:not(:placeholder-shown) + .floatingLabel {
   top: -5px !important;
@@ -2289,7 +1368,6 @@ max-width: auto;
   z-index: 2 !important;
 }
 
-/* Fix for edit modal specific styling */
 .prEditModalLayout .passwordInputContainer .floatingInput:focus + .floatingLabel,
 .prEditModalLayout .passwordInputContainer .floatingInput:not(:placeholder-shown) + .floatingLabel {
   top: -5px !important;
@@ -2299,12 +1377,11 @@ max-width: auto;
   padding: 0 5px !important;
 }
 
-/* Generate password button styling */
 .generatePasswordBtn {
   margin-top: 8px;
   padding: 8px 12px;
   background: #3498db;
-  color: white;
+  color: rgb(0, 0, 0);
   border: none;
   border-radius: 4px;
   cursor: pointer;
@@ -2321,72 +1398,6 @@ max-width: auto;
 .generatePasswordBtn:disabled {
   background: #95a5a6;
   cursor: not-allowed;
-}
-
-/* Fix for form groups to prevent label overlapping */
-.formGroup {
-  position: relative;
-  margin-bottom: 25px;
-}
-
-.floatingGroup {
-  position: relative;
-  margin-bottom: 5px;
-}
-
-/* Make sure labels have proper z-index */
-.floatingLabel {
-  position: absolute;
-  top: 50%;
-  left: 12px;
-  transform: translateY(-50%);
-  background: #fff;
-  padding: 0 5px;
-  color: #666;
-  font-size: 14px;
-  pointer-events: none;
-  transition: all 0.2s ease;
-  z-index: 2; /* Ensure label is above input but below eye button */
-}
-
-/* Floating label active state */
-.floatingInput:focus + .floatingLabel,
-.floatingInput:not(:placeholder-shown) + .floatingLabel,
-.floatingSelect:focus + .floatingLabel,
-.floatingSelect:not([value=""]) + .floatingLabel {
-  top: -5px;
-  font-size: 12px;
-  color: #3498db;
-  background: #fff;
-  padding: 0 8px;
-  z-index: 2;
-}
-
-/* For select elements */
-.floatingSelect:required:invalid + .floatingLabel {
-  color: #666;
-}
-
-/* Edit modal specific fixes */
-.prEditModalLayout .floatingGroup {
-  position: relative;
-  margin-bottom: 5px;
-}
-
-.prEditModalLayout .floatingLabel {
-  z-index: 2;
-}
-
-.prEditModalLayout .floatingInput:focus + .floatingLabel,
-.prEditModalLayout .floatingInput:not(:placeholder-shown) + .floatingLabel,
-.prEditModalLayout .floatingSelect:focus + .floatingLabel,
-.prEditModalLayout .floatingSelect:not([value=""]) + .floatingLabel {
-  top: -5px;
-  font-size: 12px;
-  color: #3498db;
-  background: #fff;
-  padding: 0 8px;
-  z-index: 2;
 }
 
 /* Edit Modal Close Button */
@@ -2415,11 +1426,12 @@ max-width: auto;
   background-color: rgba(255, 255, 255, 0.1);
 }
 
-/* Adjust modal header to accommodate the close button */
 .modalHeader {
   position: relative;
-  padding-right: 60px; /* Make space for the close button */
-}/* Delete Modal Styles - Matching Personnel Register */
+  padding-right: 60px;
+}
+
+/* Delete Modal Styles */
 .preModalDelete {
   position: fixed;
   z-index: 1000;
@@ -2603,46 +1615,7 @@ max-width: auto;
   }
 }
 
-/* Responsive adjustments */
-@media (max-width: 768px) {
-  .preModalContentDelete {
-    width: 95%;
-    margin: 10px;
-  }
-
-  .preModalActions {
-    flex-direction: column;
-    gap: 10px;
-  }
-
-  .preCancelBtn,
-  .deleteConfirmBtn {
-    width: 100%;
-    margin: 0 !important;
-  }
-}
-
-@media (max-width: 480px) {
-  .preModalHeaderDelete h2 {
-    font-size: 1.3rem;
-  }
-
-  .preModalBody {
-    padding: 20px;
-  }
-
-  .deleteWarningIcon {
-    font-size: 40px;
-  }
-
-  .deleteConfirmationText {
-    font-size: 15px;
-  }
-
-  .documentNameHighlight {
-    font-size: 15px;
-  }
-}
+/* Loading Animation */
 .animatedEmoji {
   display: inline-block;
   animation: bounceUpDown 2s ease-in-out infinite;
@@ -2655,4 +1628,115 @@ max-width: auto;
   50% {
     transform: translateY(-10px);
   }
-} 
+}
+
+/* Photo Cell */
+.photoCell {
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.photoCell:hover {
+  opacity: 0.8;
+}
+
+.tablePhoto {
+  width: 70px;
+  height: 70px;
+  border-radius: 4px;
+  object-fit: cover;
+  border: 1px solid #ddd;
+}
+
+.noPhoto {
+  width: 70px;
+  height: 70px;
+  background-color: #f5f5f5;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: #666;
+}
+
+.resumeCell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+
+.resumeBtn {
+  background-color: #4f46e5;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: background-color 0.3s;
+  white-space: nowrap;
+}
+
+.resumeBtn:hover {
+  background-color: #4338ca;
+}
+
+.resumeInfo small {
+  font-size: 10px;
+  color: #666;
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.noResume {
+  color: #999;
+  font-style: italic;
+  font-size: 12px;
+}
+
+.actionButtons {
+  display: flex;
+  gap: 5px;
+  justify-content: center;
+}
+
+.editBtn, .deleteBtn {
+  padding: 6px 12px;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  text-align: center;
+  justify-content: center;
+  transition: background-color 0.3s;
+}
+
+.editBtn {
+  background-color: #f59e0b;
+  color: white;
+}
+
+.editBtn:hover {
+  background-color: #d97706;
+}
+
+.deleteBtn {
+  background-color: #dc2626;
+  color: white;
+}
+
+.deleteBtn:hover {
+  background-color: #b91c1c;
+}
+
+.editBtn:disabled,
+.deleteBtn:disabled,
+.resumeBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

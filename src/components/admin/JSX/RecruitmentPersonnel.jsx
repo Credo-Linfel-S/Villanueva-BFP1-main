@@ -1476,21 +1476,22 @@ const { userId, isAuthenticated, userRole } = useUserId();
           {/* Table with Scrollbar Container */}
           <div className={styles.tableBorder}>
             <table className={styles.table}>
-              <thead>
-                <tr>
-                  <th>Photo</th>
-                  <th>Candidate</th>
-                  <th>Position</th>
-                  <th>Username</th>
-                  <th>Password</th>
-                  <th>Application Date</th>
-                  <th>Stage</th>
-                  <th>Interview Date</th>
-                  <th>Status</th>
-                  <th>Resume</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
+             {/* In your table header */}
+<thead>
+  <tr>
+    <th style={{ width: '80px' }}>Photo</th>
+    <th style={{ width: '150px' }}>Candidate</th>
+    <th style={{ width: '150px' }}>Position</th>
+    <th style={{ width: '120px' }}>Username</th>
+    <th style={{ width: '150px' }}>Password</th>
+    <th style={{ width: '120px' }}>Application Date</th>
+    <th style={{ width: '100px' }}>Stage</th>
+    <th style={{ width: '120px' }}>Interview Date</th>
+    <th style={{ width: '100px' }}>Status</th>
+    <th style={{ width: '120px' }}>Resume</th>
+    <th style={{ width: '120px' }}>Actions</th>
+  </tr>
+</thead>
               <tbody>
                 {initialLoading ? (
                   <tr>

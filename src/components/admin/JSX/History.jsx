@@ -930,14 +930,7 @@ const History = () => {
             {/* Additional Warning for Personnel */}
             {activeTab === "personnel" && (
               <div className={styles.additionalWarning}>
-                <div className={styles.warningItem}>
-                  <span className={styles.warningIcon}>📋</span>
-                  <span>All clearance records will be deleted</span>
-                </div>
-                <div className={styles.warningItem}>
-                  <span className={styles.warningIcon}>📊</span>
-                  <span>Leave and attendance history will be lost</span>
-                </div>
+      
                 <div className={styles.warningItem}>
                   <span className={styles.warningIcon}>🔄</span>
                   <span>Cannot be recovered or reactivated</span>
